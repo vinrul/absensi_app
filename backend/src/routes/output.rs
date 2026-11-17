@@ -3,17 +3,19 @@ use axum::Router;
 use axum::extract::{Path, Query, State};
 use axum::routing::{get, post};
 use chrono::NaiveDate;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::auth::extractor::AuthUser;
 use crate::domain::enums::{BerkasOwner, JenisOutput, StatusHasil, StatusOutput};
 use crate::error::{AppError, AppResult};
 use crate::repo::hasil;
-use crate::repo::lampiran;
+use crate::repo::lampiran::{self, LampiranRow};
 use crate::repo::notifikasi;
-use crate::repo::output::{self, ListFilter, NewOutput, OutputRow, SkorOutput};
+use crate::repo::output::{self, ListFilter, NewOutput, OutputRow, SkorOutput, UpdateOutput};
+use crate::repo::periode;
 use crate::repo::personel;
+use crate::repo::rencana;
 use crate::repo::{ListResponse, pagination};
 use crate::service::akses;
 use crate::service::scoring;
@@ -22,9 +24,17 @@ use crate::state::AppState;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_output).post(create_output))
-        .route("/{id}", get(detail_output))
+        .route("/verifikasi", get(list_verifikasi_output))
+        .route("/{id}", get(detail_output).patch(update_output))
         .route("/{id}/ajukan", post(ajukan_output))
         .route("/{id}/verifikasi", post(verifikasi_output))
+}
+
+#[derive(Debug, Serialize)]
+pub struct OutputDetail {
+    #[serde(flatten)]
+    pub output: OutputRow,
+    pub lampiran: Vec<LampiranRow>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,6 +76,43 @@ pub async fn list_output(
             satker_ids: scope,
             personel_id,
             status: query.status,
+            atasan_id: None,
+            hanya_diajukan: false,
+            limit: per_page,
+            offset,
+        },
+    )
+    .await?;
+
+    Ok(Json(ListResponse::new(rows, page, per_page, total)))
+}
+
+pub async fn list_verifikasi_output(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<ListQuery>,
+) -> AppResult<Json<ListResponse<OutputRow>>> {
+    if !(user.is_admin_any() || user.is_atasan() || user.is_pimpinan_any()) {
+        return Err(AppError::Forbidden(
+            "Hanya atasan, pimpinan, atau admin yang dapat melihat verifikasi".into(),
+        ));
+    }
+
+    let scope = crate::routes::personel::scope_for(&state, &user).await?;
+    let (page, per_page, offset) = pagination(query.page, query.per_page);
+
+    let (rows, total) = output::list(
+        &state.pool,
+        &ListFilter {
+            satker_ids: scope,
+            personel_id: None,
+            status: None,
+            atasan_id: if user.is_admin_any() {
+                None
+            } else {
+                Some(user.id())
+            },
+            hanya_diajukan: true,
             limit: per_page,
             offset,
         },
@@ -79,7 +126,7 @@ pub async fn detail_output(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,
-) -> AppResult<Json<serde_json::Value>> {
+) -> AppResult<Json<OutputDetail>> {
     let row = output::find(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Output tidak ditemukan".into()))?;
@@ -97,12 +144,18 @@ pub async fn detail_output(
         ));
     }
 
-    let lampiran_rows = lampiran::list(&state.pool, BerkasOwner::Output, id).await?;
+    Ok(Json(detail_internal(&state, id).await?))
+}
 
-    Ok(Json(serde_json::json!({
-        "data": row,
-        "lampiran": lampiran_rows,
-    })))
+async fn detail_internal(state: &AppState, id: Uuid) -> AppResult<OutputDetail> {
+    let row = output::find(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Output tidak ditemukan".into()))?;
+    let lampiran_rows = lampiran::list(&state.pool, BerkasOwner::Output, id).await?;
+    Ok(OutputDetail {
+        output: row,
+        lampiran: lampiran_rows,
+    })
 }
 
 #[derive(Debug, Deserialize)]
@@ -113,6 +166,8 @@ pub struct CreateOutputRequest {
     pub uraian: Option<String>,
     pub tanggal_hasil: NaiveDate,
     pub url_eksternal: Option<String>,
+    /// `false` menyimpan sebagai draf; default langsung diajukan.
+    pub ajukan: Option<bool>,
 }
 
 pub async fn create_output(
@@ -168,7 +223,11 @@ pub async fn create_output(
             uraian: req.uraian,
             tanggal_hasil: req.tanggal_hasil,
             url_eksternal: req.url_eksternal,
-            status: StatusOutput::MenungguVerifikasi,
+            status: if req.ajukan.unwrap_or(true) {
+                StatusOutput::MenungguVerifikasi
+            } else {
+                StatusOutput::Draft
+            },
         },
     )
     .await?;
@@ -179,11 +238,88 @@ pub async fn create_output(
     Ok(Json(row))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateOutputRequest {
+    pub jenis_output: JenisOutput,
+    pub judul: String,
+    pub uraian: Option<String>,
+    pub tanggal_hasil: NaiveDate,
+    pub url_eksternal: Option<String>,
+}
+
+pub async fn update_output(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(id): Path<Uuid>,
+    Json(req): Json<UpdateOutputRequest>,
+) -> AppResult<Json<OutputDetail>> {
+    let existing = output::find(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Output tidak ditemukan".into()))?;
+
+    if existing.personel_id != user.id() {
+        return Err(AppError::Forbidden(
+            "Hanya pemilik output yang dapat mengubah".into(),
+        ));
+    }
+    if !matches!(
+        existing.status,
+        StatusOutput::Draft | StatusOutput::PerluRevisi
+    ) {
+        return Err(AppError::Unprocessable(
+            "Output yang sudah diajukan tidak dapat diubah".into(),
+        ));
+    }
+
+    let rencana_row = rencana::find(&state.pool, existing.rencana_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Rencana kerja tidak ditemukan".into()))?;
+    periode::pastikan_terbuka(&state.pool, rencana_row.periode_id).await?;
+
+    if req.judul.trim().is_empty() {
+        return Err(AppError::BadRequest("Judul output wajib diisi".into()));
+    }
+
+    let url = req.url_eksternal.as_deref().map(str::trim);
+    if req.jenis_output == JenisOutput::LinkSistem {
+        let url = url.unwrap_or("");
+        if url.is_empty() {
+            return Err(AppError::Unprocessable(
+                "Jenis Link/Sistem wajib menyertakan URL".into(),
+            ));
+        }
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            return Err(AppError::Unprocessable(
+                "URL harus diawali http(s)://".into(),
+            ));
+        }
+    }
+
+    output::update(
+        &state.pool,
+        id,
+        &UpdateOutput {
+            jenis_output: req.jenis_output,
+            judul: req.judul.trim().to_string(),
+            uraian: req.uraian,
+            tanggal_hasil: req.tanggal_hasil,
+            url_eksternal: if req.jenis_output == JenisOutput::LinkSistem {
+                req.url_eksternal
+            } else {
+                None
+            },
+        },
+    )
+    .await?;
+
+    Ok(Json(detail_internal(&state, id).await?))
+}
+
 pub async fn ajukan_output(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,
-) -> AppResult<Json<OutputRow>> {
+) -> AppResult<Json<OutputDetail>> {
     let row = output::find(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Output tidak ditemukan".into()))?;
@@ -193,6 +329,31 @@ pub async fn ajukan_output(
             "Hanya pemilik output yang dapat mengajukan".into(),
         ));
     }
+    if !matches!(
+        row.status,
+        StatusOutput::Draft | StatusOutput::PerluRevisi | StatusOutput::MenungguVerifikasi
+    ) {
+        return Err(AppError::Unprocessable(
+            "Output ini sudah diajukan atau sudah diverifikasi".into(),
+        ));
+    }
+
+    let hasil_row = hasil::find(&state.pool, row.hasil_kerja_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Hasil kerja tidak ditemukan".into()))?;
+    if hasil_row.status != StatusHasil::Terverifikasi {
+        return Err(AppError::Unprocessable(
+            "Hasil kerja harus terverifikasi atasan sebelum output diajukan".into(),
+        ));
+    }
+
+    let rencana_row = rencana::find(&state.pool, row.rencana_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Rencana kerja tidak ditemukan".into()))?;
+    let atasan_id = rencana_row.atasan_id.ok_or_else(|| {
+        AppError::Unprocessable("Atasan langsung belum ditetapkan untuk akun Anda".into())
+    })?;
+    periode::pastikan_terbuka(&state.pool, rencana_row.periode_id).await?;
 
     let jumlah_lampiran = lampiran::count(&state.pool, BerkasOwner::Output, id).await?;
     if row.jenis_output.wajib_berkas() && jumlah_lampiran == 0 {
@@ -200,13 +361,29 @@ pub async fn ajukan_output(
             "Unggah berkas bukti sebelum mengajukan output".into(),
         ));
     }
+    if row.jenis_output == JenisOutput::LinkSistem
+        && row.url_eksternal.as_deref().unwrap_or("").trim().is_empty()
+    {
+        return Err(AppError::Unprocessable(
+            "Jenis Link/Sistem wajib menyertakan URL".into(),
+        ));
+    }
 
-    output::set_status(&state.pool, id, StatusOutput::DalamVerifikasi).await?;
+    output::ajukan(&state.pool, id).await?;
 
-    let row = output::find(&state.pool, id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Output tidak ditemukan".into()))?;
-    Ok(Json(row))
+    let personel = personel::active_personel(&state.pool, user.id()).await?;
+    notifikasi::kirim(
+        &state.pool,
+        atasan_id,
+        "output_diajukan",
+        "Output menunggu verifikasi",
+        &format!("{} mengirim output untuk diverifikasi", personel.nama),
+        Some("output"),
+        Some(id),
+    )
+    .await?;
+
+    Ok(Json(detail_internal(&state, id).await?))
 }
 
 #[derive(Debug, Deserialize)]
@@ -223,15 +400,24 @@ pub async fn verifikasi_output(
     Path(id): Path<Uuid>,
     Json(req): Json<VerifikasiOutputRequest>,
 ) -> AppResult<Json<OutputRow>> {
-    if !(user.is_admin_any() || user.is_atasan()) {
+    if !(user.is_admin_any() || user.is_atasan() || user.is_pimpinan_any()) {
         return Err(AppError::Forbidden(
-            "Hanya atasan atau admin yang dapat memverifikasi output".into(),
+            "Hanya atasan, pimpinan, atau admin yang dapat memverifikasi output".into(),
         ));
     }
 
     let row = output::find(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::NotFound("Output tidak ditemukan".into()))?;
+
+    if !matches!(
+        row.status,
+        StatusOutput::DalamVerifikasi | StatusOutput::MenungguVerifikasi
+    ) {
+        return Err(AppError::Unprocessable(
+            "Output ini tidak sedang menunggu verifikasi".into(),
+        ));
+    }
 
     let rencana_row = crate::repo::rencana::find(&state.pool, row.rencana_id)
         .await?

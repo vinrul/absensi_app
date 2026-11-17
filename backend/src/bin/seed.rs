@@ -6,6 +6,7 @@
 //!   cargo run --bin seed -- --reset   # hapus semua data lalu isi ulang
 
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 use std::time::Duration;
 
 use chrono::{DateTime, Datelike, Duration as Delta, NaiveDate, NaiveTime, Timelike, Utc};
@@ -62,6 +63,48 @@ fn contoh_pdf(judul: &str, keterangan: &str) -> Vec<u8> {
 
 fn contoh_png() -> Vec<u8> {
     include_bytes!("../../../dashboard/static/logo-polda-bali.png").to_vec()
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn simpan_lampiran_contoh(
+    pool: &PgPool,
+    upload_dir: &Path,
+    owner: &str,
+    kategori: &str,
+    satker_id: Uuid,
+    owner_id: Uuid,
+    uploaded_by: Uuid,
+    id: Uuid,
+    nama: &str,
+    mime: &str,
+    ext: &str,
+    isi: &[u8],
+) -> Result<(), Box<dyn std::error::Error>> {
+    let key = format!("lampiran/{satker_id}/{owner}/{owner_id}/{id}.{ext}");
+    let path = upload_dir.join(&key);
+    if let Some(parent) = path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(&path, isi).await?;
+
+    sqlx::query(
+        "INSERT INTO lampiran (id, owner_type, owner_id, kategori, file_name, mime,
+                               size_bytes, storage_key, uploaded_by)
+         VALUES ($1, $2::berkas_owner, $3, $4::berkas_kategori, $5, $6, $7, $8, $9)",
+    )
+    .bind(id)
+    .bind(owner)
+    .bind(owner_id)
+    .bind(kategori)
+    .bind(nama)
+    .bind(mime)
+    .bind(isi.len() as i64)
+    .bind(&key)
+    .bind(uploaded_by)
+    .execute(pool)
+    .await?;
+
+    Ok(())
 }
 
 struct NodeSeed {
@@ -193,6 +236,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .acquire_timeout(Duration::from_secs(10))
         .connect(&settings.database_url)
         .await?;
+
+    // Pastikan skema mutakhir sebelum menulis data (mis. enum status baru).
+    sqlx::migrate!("./migrations").run(&pool).await?;
 
     let reset = std::env::args().any(|arg| arg == "--reset");
 
@@ -1087,6 +1133,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         isi: Vec<u8>,
     }
 
+    struct ContohHasil {
+        kode: &'static str,
+        rencana_id: Uuid,
+        personel_id: Uuid,
+        uraian: &'static str,
+        progres: f64,
+        realisasi: Option<f64>,
+        kendala: Option<&'static str>,
+        tanggal: NaiveDate,
+        status: &'static str,
+        catatan: Option<&'static str>,
+        verified_by: Option<Uuid>,
+        verified_at: Option<DateTime<Utc>>,
+        lampiran: Vec<ContohLampiran>,
+    }
+
     struct ContohRencana {
         kode: &'static str,
         personel_id: Uuid,
@@ -1547,6 +1609,353 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .execute(&pool)
     .await?;
 
+    // -------------------------------------------------- contoh hasil kerja
+    let rencana_demo_1 = uid(&format!("rencana-{personel_demo}-1"));
+    let rencana_demo_2 = uid(&format!("rencana-{personel_demo}-2"));
+    let rencana_lain_1 = uid(&format!("rencana-{personel_lain}-1"));
+
+    let contoh_hasil = vec![
+        ContohHasil {
+            kode: "draft",
+            rencana_id: rencana_demo_1,
+            personel_id: personel_demo,
+            uraian: "Menyusun kelengkapan berkas perkara tahap 1.",
+            progres: 40.0,
+            realisasi: Some(3.0),
+            kendala: None,
+            tanggal: awal_bulan + Delta::days(18),
+            status: "draft",
+            catatan: None,
+            verified_by: None,
+            verified_at: None,
+            lampiran: vec![],
+        },
+        ContohHasil {
+            kode: "diajukan",
+            rencana_id: rencana_demo_2,
+            personel_id: personel_demo,
+            uraian: "Melaksanakan penyelidikan dan menyusun berkas perkara tahap 2.",
+            progres: 100.0,
+            realisasi: Some(5.0),
+            kendala: None,
+            tanggal: awal_bulan + Delta::days(20),
+            status: "diajukan",
+            catatan: None,
+            verified_by: None,
+            verified_at: None,
+            lampiran: vec![
+                ContohLampiran {
+                    nama: "Bukti-Penyelidikan.pdf",
+                    mime: "application/pdf",
+                    ext: "pdf",
+                    isi: contoh_pdf(
+                        "Bukti Pelaksanaan Hasil Kerja",
+                        "Penyelidikan berkas perkara tahap 2",
+                    ),
+                },
+                ContohLampiran {
+                    nama: "Dokumentasi-Penyelidikan.png",
+                    mime: "image/png",
+                    ext: "png",
+                    isi: contoh_png(),
+                },
+            ],
+        },
+        ContohHasil {
+            kode: "perlu-revisi",
+            rencana_id: rencana_demo_1,
+            personel_id: personel_demo,
+            uraian: "Menyelesaikan berkas perkara tahap 1.",
+            progres: 100.0,
+            realisasi: Some(8.0),
+            kendala: Some("Sebagian dokumen masih dalam pengecekan."),
+            tanggal: awal_bulan + Delta::days(19),
+            status: "perlu_revisi",
+            catatan: Some("Lengkapi bukti pelaksanaan dan tanda tangan berkas."),
+            verified_by: Some(atasan_personel),
+            verified_at: Some(wita_to_utc(awal_bulan + Delta::days(20), 14, 0)),
+            lampiran: vec![ContohLampiran {
+                nama: "Berkas-Perkara-Tahap-1.pdf",
+                mime: "application/pdf",
+                ext: "pdf",
+                isi: contoh_pdf(
+                    "Berkas Perkara Tahap 1",
+                    "Ringkasan pelaksanaan dan bukti pendukung",
+                ),
+            }],
+        },
+        ContohHasil {
+            kode: "personel-lain-diajukan",
+            rencana_id: rencana_lain_1,
+            personel_id: personel_lain,
+            uraian: "Mengungkap jaringan penipuan daring dan mengamankan barang bukti.",
+            progres: 100.0,
+            realisasi: Some(1.0),
+            kendala: None,
+            tanggal: awal_bulan + Delta::days(19),
+            status: "diajukan",
+            catatan: None,
+            verified_by: None,
+            verified_at: None,
+            lampiran: vec![
+                ContohLampiran {
+                    nama: "Bukti-Pengungkapan.pdf",
+                    mime: "application/pdf",
+                    ext: "pdf",
+                    isi: contoh_pdf(
+                        "Bukti Pengungkapan Kasus",
+                        "Jaringan penipuan daring - Polda Bali",
+                    ),
+                },
+                ContohLampiran {
+                    nama: "Barang-Bukti.png",
+                    mime: "image/png",
+                    ext: "png",
+                    isi: contoh_png(),
+                },
+            ],
+        },
+    ];
+
+    for contoh in &contoh_hasil {
+        let hasil_id = uid(&format!(
+            "hasil-demo-{}-{}",
+            contoh.personel_id, contoh.kode
+        ));
+        sqlx::query(
+            "INSERT INTO hasil_kerja (id, rencana_id, personel_id, satker_id, uraian_pelaksanaan,
+                                     progres_persen, jumlah_realisasi, kendala, tanggal_realisasi,
+                                     status, verified_by, catatan_verifikator, verified_at)
+             VALUES ($1, $2, $3, $4, $5, $6::float8::numeric, $7::float8::numeric, $8, $9,
+                     $10::status_hasil, $11, $12, $13)",
+        )
+        .bind(hasil_id)
+        .bind(contoh.rencana_id)
+        .bind(contoh.personel_id)
+        .bind(satker_demo)
+        .bind(contoh.uraian)
+        .bind(contoh.progres)
+        .bind(contoh.realisasi)
+        .bind(contoh.kendala)
+        .bind(contoh.tanggal)
+        .bind(contoh.status)
+        .bind(contoh.verified_by)
+        .bind(contoh.catatan)
+        .bind(contoh.verified_at)
+        .execute(&pool)
+        .await?;
+
+        for (index, lampiran) in contoh.lampiran.iter().enumerate() {
+            simpan_lampiran_contoh(
+                &pool,
+                &settings.upload_dir,
+                "hasil",
+                "bukti",
+                satker_demo,
+                hasil_id,
+                contoh.personel_id,
+                uid(&format!("lampiran-hasil-demo-{hasil_id}-{index}")),
+                lampiran.nama,
+                lampiran.mime,
+                lampiran.ext,
+                &lampiran.isi,
+            )
+            .await?;
+        }
+    }
+
+    // ------------------------------------------------------ contoh output
+    struct ContohOutput {
+        kode: &'static str,
+        hasil_kerja_id: Uuid,
+        rencana_id: Uuid,
+        personel_id: Uuid,
+        jenis: &'static str,
+        judul: &'static str,
+        uraian: &'static str,
+        tanggal: NaiveDate,
+        status: &'static str,
+        catatan: Option<&'static str>,
+        verified_by: Option<Uuid>,
+        verified_at: Option<DateTime<Utc>>,
+        lampiran: Vec<ContohLampiran>,
+    }
+
+    let contoh_output = vec![
+        ContohOutput {
+            kode: "draft",
+            hasil_kerja_id: uid(&format!("hasil-{rencana_demo_1}")),
+            rencana_id: rencana_demo_1,
+            personel_id: personel_demo,
+            jenis: "laporan",
+            judul: "Draf Laporan Analisis Gangguan Siber",
+            uraian: "Draf laporan analisis gangguan jaringan pada layanan publik.",
+            tanggal: awal_bulan + Delta::days(20),
+            status: "draft",
+            catatan: None,
+            verified_by: None,
+            verified_at: None,
+            lampiran: vec![],
+        },
+        ContohOutput {
+            kode: "dalam-verifikasi",
+            hasil_kerja_id: uid(&format!("hasil-{rencana_demo_2}")),
+            rencana_id: rencana_demo_2,
+            personel_id: personel_demo,
+            jenis: "laporan",
+            judul: "Laporan Hasil Analisis Gangguan Siber",
+            uraian: "Laporan lengkap beserta rekomendasi tindak lanjut.",
+            tanggal: awal_bulan + Delta::days(20),
+            status: "dalam_verifikasi",
+            catatan: None,
+            verified_by: None,
+            verified_at: None,
+            lampiran: vec![
+                ContohLampiran {
+                    nama: "Laporan-Analisis-Gangguan.pdf",
+                    mime: "application/pdf",
+                    ext: "pdf",
+                    isi: contoh_pdf(
+                        "Laporan Analisis Gangguan Siber",
+                        "Analisis gangguan jaringan dan rekomendasi tindak lanjut",
+                    ),
+                },
+                ContohLampiran {
+                    nama: "Dokumentasi-Analisis.png",
+                    mime: "image/png",
+                    ext: "png",
+                    isi: contoh_png(),
+                },
+            ],
+        },
+        ContohOutput {
+            kode: "perlu-revisi",
+            hasil_kerja_id: uid(&format!("hasil-{rencana_demo_1}")),
+            rencana_id: rencana_demo_1,
+            personel_id: personel_demo,
+            jenis: "dokumen_pendukung",
+            judul: "Dokumen Pendukung Berkas Perkara",
+            uraian: "Kelengkapan dokumen pendukung berkas perkara tahap 1.",
+            tanggal: awal_bulan + Delta::days(18),
+            status: "perlu_revisi",
+            catatan: Some("Lengkapi tanda tangan pejabat dan unggah berkas terbaru."),
+            verified_by: Some(atasan_personel),
+            verified_at: Some(wita_to_utc(awal_bulan + Delta::days(19), 13, 0)),
+            lampiran: vec![ContohLampiran {
+                nama: "Dokumen-Pendukung-Perkara.pdf",
+                mime: "application/pdf",
+                ext: "pdf",
+                isi: contoh_pdf(
+                    "Dokumen Pendukung Berkas Perkara",
+                    "Ringkasan dokumen pendukung tahap 1",
+                ),
+            }],
+        },
+        ContohOutput {
+            kode: "personel-lain-dalam-verifikasi",
+            hasil_kerja_id: uid(&format!("hasil-{rencana_lain_1}")),
+            rencana_id: rencana_lain_1,
+            personel_id: personel_lain,
+            jenis: "foto",
+            judul: "Dokumentasi Barang Bukti",
+            uraian: "Foto barang bukti hasil pengungkapan kasus penipuan daring.",
+            tanggal: awal_bulan + Delta::days(19),
+            status: "dalam_verifikasi",
+            catatan: None,
+            verified_by: None,
+            verified_at: None,
+            lampiran: vec![ContohLampiran {
+                nama: "Barang-Bukti-Output.png",
+                mime: "image/png",
+                ext: "png",
+                isi: contoh_png(),
+            }],
+        },
+    ];
+
+    for contoh in &contoh_output {
+        let output_id = uid(&format!(
+            "output-demo-{}-{}",
+            contoh.personel_id, contoh.kode
+        ));
+        let (kelengkapan, kesesuaian, keabsahan, total) = match contoh.status {
+            "disetujui" => (100.0, 90.0, 92.0, 94.0),
+            "perlu_revisi" => (100.0, 0.0, 0.0, 0.0),
+            _ => (0.0, 0.0, 0.0, 0.0),
+        };
+        let (skor_kelengkapan, skor_kesesuaian, skor_keabsahan, skor_total) =
+            if contoh.status == "draft" || contoh.status == "dalam_verifikasi" {
+                (None, None, None, None)
+            } else {
+                (
+                    Some(kelengkapan),
+                    Some(kesesuaian),
+                    Some(keabsahan),
+                    Some(total),
+                )
+            };
+
+        sqlx::query(
+            "INSERT INTO output (id, hasil_kerja_id, rencana_id, personel_id, satker_id, jenis_output,
+                                judul, uraian, tanggal_hasil, url_eksternal, status,
+                                skor_kelengkapan, skor_kesesuaian, skor_keabsahan, skor_total,
+                                verified_by, catatan_verifikator, verified_at)
+             VALUES ($1, $2, $3, $4, $5, $6::jenis_output, $7, $8, $9, NULL, $10::status_output,
+                     $11::float8::numeric, $12::float8::numeric, $13::float8::numeric,
+                     $14::float8::numeric, $15, $16, $17)",
+        )
+        .bind(output_id)
+        .bind(contoh.hasil_kerja_id)
+        .bind(contoh.rencana_id)
+        .bind(contoh.personel_id)
+        .bind(satker_demo)
+        .bind(contoh.jenis)
+        .bind(contoh.judul)
+        .bind(contoh.uraian)
+        .bind(contoh.tanggal)
+        .bind(contoh.status)
+        .bind(skor_kelengkapan)
+        .bind(skor_kesesuaian)
+        .bind(skor_keabsahan)
+        .bind(skor_total)
+        .bind(contoh.verified_by)
+        .bind(contoh.catatan)
+        .bind(contoh.verified_at)
+        .execute(&pool)
+        .await?;
+
+        for (index, lampiran) in contoh.lampiran.iter().enumerate() {
+            simpan_lampiran_contoh(
+                &pool,
+                &settings.upload_dir,
+                "output",
+                "bukti",
+                satker_demo,
+                output_id,
+                contoh.personel_id,
+                uid(&format!("lampiran-output-demo-{output_id}-{index}")),
+                lampiran.nama,
+                lampiran.mime,
+                lampiran.ext,
+                &lampiran.isi,
+            )
+            .await?;
+        }
+    }
+
+    // Foto profil contoh untuk akun demo Android.
+    let foto_key = format!("foto/{personel_demo}/avatar.png");
+    let foto_path = settings.upload_dir.join(&foto_key);
+    if let Some(parent) = foto_path.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(&foto_path, contoh_png()).await?;
+    sqlx::query("UPDATE personel SET foto_path = $2 WHERE id = $1")
+        .bind(personel_demo)
+        .bind(&foto_key)
+        .execute(&pool)
+        .await?;
+
     let total_personel_akun: i64 =
         sqlx::query_scalar("SELECT count(*) FROM personel WHERE jenis_akun = 'personel'")
             .fetch_one(&pool)
@@ -1574,6 +1983,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Rencana atasan: 1 diajukan dari NRP 000100 ke pimpinan 000002");
     println!("  Rencana personel lain: 1 diajukan dengan lampiran PDF + PNG");
     println!("  Lampiran demo: PDF dan PNG ditulis ke folder upload");
+    println!("  Hasil demo: 1 draft, 1 diajukan, 1 perlu revisi, 1 dari personel lain");
     println!("\nAkun demo:");
     println!("  Admin global        : superuser / Superuser#2026");
     println!("  Admin Polda         : admin_polda / AdminPolda#2026");

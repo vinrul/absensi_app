@@ -40,6 +40,34 @@ class Repositori(
         return pengguna
     }
 
+    suspend fun ubahProfil(request: UbahProfilRequest): Pengguna {
+        val body = json.encodeToString(UbahProfilRequest.serializer(), request)
+        val teks = api.panggil("PATCH", "auth/profile", body)
+        val pengguna = json.decodeFromString(Pengguna.serializer(), teks)
+        sesi.simpanPengguna(pengguna)
+        return pengguna
+    }
+
+    suspend fun unggahFotoProfil(nama: String, mime: String, byte: ByteArray): Pengguna {
+        val teks = api.unggahFoto(nama, mime, byte)
+        val pengguna = json.decodeFromString(Pengguna.serializer(), teks)
+        sesi.simpanPengguna(pengguna)
+        return pengguna
+    }
+
+    suspend fun unduhFotoProfil(fotoUrl: String): ByteArray = api.unduh(fotoUrl)
+
+    /** Ganti password lalu hapus sesi lokal karena server mencabut seluruh refresh token. */
+    suspend fun ubahPassword(oldPassword: String, newPassword: String) {
+        val body = json.encodeToString(
+            UbahPasswordRequest.serializer(),
+            UbahPasswordRequest(oldPassword = oldPassword, newPassword = newPassword)
+        )
+        api.panggil("POST", "auth/change-password", body)
+        sesi.hapusSesi()
+        antrean.kosongkan()
+    }
+
     suspend fun keluar() {
         runCatching { api.panggil("POST", "auth/logout") }
         sesi.hapusSesi()
@@ -196,9 +224,15 @@ class Repositori(
 
     // ------------------------------------------------------------ hasil kerja
 
-    suspend fun daftarHasil(): List<Hasil> {
-        val teks = api.panggil("GET", "hasil-kerja?per_page=50")
+    suspend fun daftarHasil(personelId: String? = null): List<Hasil> {
+        val filter = if (personelId != null) "&personel_id=$personelId" else ""
+        val teks = api.panggil("GET", "hasil-kerja?per_page=50$filter")
         return json.decodeFromString(ListResponse.serializer(Hasil.serializer()), teks).data
+    }
+
+    suspend fun detailHasil(id: String): Hasil {
+        val teks = api.panggil("GET", "hasil-kerja/$id")
+        return json.decodeFromString(Hasil.serializer(), teks)
     }
 
     suspend fun buatHasil(request: HasilRequest): Hasil {
@@ -207,14 +241,45 @@ class Repositori(
         return json.decodeFromString(Hasil.serializer(), teks)
     }
 
+    suspend fun ubahHasil(id: String, request: UbahHasilRequest): Hasil {
+        val body = json.encodeToString(UbahHasilRequest.serializer(), request)
+        val teks = api.panggil("PATCH", "hasil-kerja/$id", body)
+        return json.decodeFromString(Hasil.serializer(), teks)
+    }
+
+    suspend fun ajukanHasil(id: String) {
+        api.panggil("POST", "hasil-kerja/$id/ajukan")
+    }
+
+    suspend fun unggahBuktiHasil(hasilId: String, berkas: BerkasLampiran) {
+        api.unggah("hasil", hasilId, "bukti", berkas.nama, berkas.mime, berkas.isi)
+    }
+
+    suspend fun daftarVerifikasiHasil(): List<Hasil> {
+        val teks = api.panggil("GET", "hasil-kerja/verifikasi?per_page=50")
+        return json.decodeFromString(ListResponse.serializer(Hasil.serializer()), teks).data
+    }
+
+    suspend fun verifikasiHasil(id: String, request: VerifikasiHasilRequest): Hasil {
+        val body = json.encodeToString(VerifikasiHasilRequest.serializer(), request)
+        val teks = api.panggil("POST", "hasil-kerja/$id/verifikasi", body)
+        return json.decodeFromString(Hasil.serializer(), teks)
+    }
+
     suspend fun daftarHasilTerverifikasi(): List<Hasil> =
         daftarHasil().filter { it.status == "terverifikasi" }
 
     // ------------------------------------------------------------------ output
 
-    suspend fun daftarOutput(): List<Output> {
-        val teks = api.panggil("GET", "output?per_page=50")
+    suspend fun daftarOutput(personelId: String? = null): List<Output> {
+        val filter = if (personelId != null) "&personel_id=$personelId" else ""
+        val teks = api.panggil("GET", "output?per_page=50$filter")
         return json.decodeFromString(ListResponse.serializer(Output.serializer()), teks).data
+    }
+
+    suspend fun detailOutput(id: String): Output {
+        val teks = api.panggil("GET", "output/$id")
+        return json.decodeFromString(Output.serializer(), teks)
     }
 
     suspend fun buatOutput(request: OutputRequest): Output {
@@ -223,12 +288,29 @@ class Repositori(
         return json.decodeFromString(Output.serializer(), teks)
     }
 
+    suspend fun ubahOutput(id: String, request: UbahOutputRequest): Output {
+        val body = json.encodeToString(UbahOutputRequest.serializer(), request)
+        val teks = api.panggil("PATCH", "output/$id", body)
+        return json.decodeFromString(Output.serializer(), teks)
+    }
+
     suspend fun ajukanOutput(id: String) {
         api.panggil("POST", "output/$id/ajukan")
     }
 
-    suspend fun unggahBukti(outputId: String, nama: String, mime: String, byte: ByteArray) {
-        api.unggah("output", outputId, "bukti", nama, mime, byte)
+    suspend fun unggahBuktiOutput(outputId: String, berkas: BerkasLampiran) {
+        api.unggah("output", outputId, "bukti", berkas.nama, berkas.mime, berkas.isi)
+    }
+
+    suspend fun daftarVerifikasiOutput(): List<Output> {
+        val teks = api.panggil("GET", "output/verifikasi?per_page=50")
+        return json.decodeFromString(ListResponse.serializer(Output.serializer()), teks).data
+    }
+
+    suspend fun verifikasiOutput(id: String, request: VerifikasiOutputRequest): Output {
+        val body = json.encodeToString(VerifikasiOutputRequest.serializer(), request)
+        val teks = api.panggil("POST", "output/$id/verifikasi", body)
+        return json.decodeFromString(Output.serializer(), teks)
     }
 
     // --------------------------------------------------------------- penilaian

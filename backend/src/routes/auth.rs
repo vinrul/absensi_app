@@ -1,9 +1,10 @@
 use axum::Json;
 use axum::Router;
-use axum::extract::State;
-use axum::http::{HeaderMap, HeaderValue, header::SET_COOKIE};
+use axum::body::Body;
+use axum::extract::{Multipart, Path, State};
+use axum::http::{HeaderMap, HeaderValue, StatusCode, header, header::SET_COOKIE};
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post};
+use axum::routing::{get, patch, post};
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -15,7 +16,33 @@ use crate::error::{AppError, AppResult};
 use crate::repo::personel::{self, PersonelRow};
 use crate::routes::personel::RoleScopeDto;
 use crate::service::akses;
+use crate::service::storage;
 use crate::state::AppState;
+
+/// Pangkat Polri dari terendah ke tertinggi (selaras dengan combobox dashboard).
+const PANGKAT_POLRI: &[&str] = &[
+    "BHARADA",
+    "BHARATU",
+    "BHARAKA",
+    "ABRIPDA",
+    "ABRIPTU",
+    "ABRIPKA",
+    "BRIPDA",
+    "BRIPTU",
+    "BRIPKA",
+    "AIPDA",
+    "AIPTU",
+    "IPDA",
+    "IPTU",
+    "AKP",
+    "KOMPOL",
+    "AKBP",
+    "KOMBES POL",
+    "BRIGJEN POL",
+    "IRJEN POL",
+    "KOMJEN POL",
+    "JENDERAL POL",
+];
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -23,6 +50,9 @@ pub fn routes() -> Router<AppState> {
         .route("/refresh", post(refresh))
         .route("/logout", post(logout))
         .route("/me", get(me))
+        .route("/profile", patch(update_profile))
+        .route("/foto", post(upload_foto))
+        .route("/foto/{id}", get(foto))
         .route("/change-password", post(change_password))
 }
 
@@ -54,6 +84,9 @@ pub struct UserDto {
     pub role_scopes: Vec<RoleScopeDto>,
     pub must_change_password: bool,
     pub atasan_id: Option<Uuid>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub foto_url: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -85,6 +118,12 @@ fn user_dto(
         role_scopes,
         must_change_password: personel.must_change_password,
         atasan_id: personel.atasan_id,
+        email: personel.email.clone(),
+        phone: personel.phone.clone(),
+        foto_url: personel
+            .foto_path
+            .as_ref()
+            .map(|_| format!("auth/foto/{}", personel.id)),
     }
 }
 
@@ -329,6 +368,193 @@ pub async fn me(State(state): State<AppState>, user: AuthUser) -> AppResult<Json
         roles,
         role_scopes.into_iter().map(RoleScopeDto::from).collect(),
     )))
+}
+
+async fn user_json(state: &AppState, personel: &PersonelRow) -> AppResult<Json<UserDto>> {
+    let roles = personel::roles(&state.pool, personel.id).await?;
+    let role_scopes = personel::role_scopes(&state.pool, personel.id).await?;
+    Ok(Json(user_dto(
+        personel,
+        roles,
+        role_scopes.into_iter().map(RoleScopeDto::from).collect(),
+    )))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateProfileRequest {
+    pub nama: Option<String>,
+    pub pangkat: Option<String>,
+    pub jabatan: Option<String>,
+    pub phone: Option<String>,
+    pub email: Option<String>,
+}
+
+/// Personel memperbarui nama, pangkat, jabatan, telepon, dan email miliknya sendiri.
+pub async fn update_profile(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Json(req): Json<UpdateProfileRequest>,
+) -> AppResult<Json<UserDto>> {
+    let nama = req.nama.as_deref().map(str::trim).filter(|v| !v.is_empty());
+    if let Some(nama) = nama {
+        let panjang = nama.chars().count();
+        if panjang < 3 {
+            return Err(AppError::Unprocessable("Nama minimal 3 karakter".into()));
+        }
+        if panjang > 120 {
+            return Err(AppError::Unprocessable("Nama maksimal 120 karakter".into()));
+        }
+    }
+
+    let pangkat = req
+        .pangkat
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
+    if let Some(pangkat) = pangkat
+        && !PANGKAT_POLRI.contains(&pangkat)
+    {
+        return Err(AppError::Unprocessable(
+            "Pangkat tidak termasuk tingkatan Polri".into(),
+        ));
+    }
+
+    let jabatan = req
+        .jabatan
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
+    if let Some(jabatan) = jabatan {
+        let panjang = jabatan.chars().count();
+        if panjang < 3 {
+            return Err(AppError::Unprocessable("Jabatan minimal 3 karakter".into()));
+        }
+        if panjang > 120 {
+            return Err(AppError::Unprocessable(
+                "Jabatan maksimal 120 karakter".into(),
+            ));
+        }
+    }
+
+    let phone = req
+        .phone
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
+    if let Some(phone) = phone {
+        let valid = phone.chars().count() <= 30
+            && phone
+                .chars()
+                .all(|c| c.is_ascii_digit() || matches!(c, '+' | '-' | ' ' | '(' | ')'));
+        if !valid {
+            return Err(AppError::Unprocessable("Nomor telepon tidak valid".into()));
+        }
+    }
+
+    let email = req
+        .email
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
+    if let Some(email) = email
+        && (!email.contains('@') || email.chars().count() > 120)
+    {
+        return Err(AppError::Unprocessable("Alamat email tidak valid".into()));
+    }
+
+    personel::update_profil(&state.pool, user.id(), nama, pangkat, jabatan, phone, email).await?;
+    let personel = personel::active_personel(&state.pool, user.id()).await?;
+    user_json(&state, &personel).await
+}
+
+/// Unggah foto profil (JPG/PNG, maks. 5 MB).
+pub async fn upload_foto(
+    State(state): State<AppState>,
+    user: AuthUser,
+    mut multipart: Multipart,
+) -> AppResult<Json<UserDto>> {
+    let mut bytes: Option<Vec<u8>> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| AppError::BadRequest("Formulir unggahan tidak valid".into()))?
+    {
+        if field.name() == Some("file") {
+            bytes = Some(
+                field
+                    .bytes()
+                    .await
+                    .map_err(|_| AppError::BadRequest("berkas gagal dibaca".into()))?
+                    .to_vec(),
+            );
+        } else {
+            let _ = field.bytes().await;
+        }
+    }
+
+    let bytes = bytes.ok_or_else(|| AppError::BadRequest("Berkas foto wajib diunggah".into()))?;
+    if bytes.is_empty() {
+        return Err(AppError::BadRequest("Berkas foto kosong".into()));
+    }
+    if bytes.len() > storage::MAX_FOTO_BYTES {
+        return Err(AppError::PayloadTooLarge(
+            "Ukuran foto maksimal 5 MB".into(),
+        ));
+    }
+
+    let Some((ext, _mime)) = storage::deteksi_berkas(&bytes) else {
+        return Err(AppError::Unprocessable(
+            "Foto profil harus berformat JPG atau PNG".into(),
+        ));
+    };
+    if ext != "jpg" && ext != "png" {
+        return Err(AppError::Unprocessable(
+            "Foto profil harus berformat JPG atau PNG".into(),
+        ));
+    }
+
+    let personel = personel::active_personel(&state.pool, user.id()).await?;
+    let key = format!("foto/{}/{}.{ext}", personel.id, Uuid::now_v7());
+    state.storage.save(&key, &bytes).await?;
+
+    if let Some(lama) = personel.foto_path.as_deref() {
+        state.storage.remove(lama).await.ok();
+    }
+    personel::set_foto_path(&state.pool, personel.id, Some(&key)).await?;
+
+    let personel = personel::active_personel(&state.pool, user.id()).await?;
+    user_json(&state, &personel).await
+}
+
+/// Mengambil foto profil menurut id personel (wajib login).
+pub async fn foto(
+    State(state): State<AppState>,
+    _user: AuthUser,
+    Path(id): Path<Uuid>,
+) -> AppResult<Response> {
+    let personel = personel::find_by_id(&state.pool, id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Foto profil tidak ditemukan".into()))?;
+    let key = personel
+        .foto_path
+        .ok_or_else(|| AppError::NotFound("Foto profil belum diunggah".into()))?;
+
+    let bytes = state.storage.read(&key).await?;
+    let mime = mime_guess::from_path(&key).first_or_octet_stream();
+
+    let mut response = Response::new(Body::from(bytes));
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_str(mime.as_ref())
+            .unwrap_or_else(|_| HeaderValue::from_static("application/octet-stream")),
+    );
+    response.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("private, max-age=300"),
+    );
+    Ok(response)
 }
 
 #[derive(Debug, Deserialize)]

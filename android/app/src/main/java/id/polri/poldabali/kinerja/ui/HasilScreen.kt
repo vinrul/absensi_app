@@ -8,11 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -23,22 +21,48 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import id.polri.poldabali.kinerja.data.HasilRequest
+import id.polri.poldabali.kinerja.data.Hasil
+import id.polri.poldabali.kinerja.data.Lampiran
 import id.polri.poldabali.kinerja.ui.theme.Warna
+import java.util.Locale
 
 @Composable
-fun HasilScreen(vm: KinerjaViewModel) {
+fun HasilScreen(
+    vm: KinerjaViewModel,
+    mintaBukaVerifikasi: Boolean = false,
+    onVerifikasiDibuka: () -> Unit = {}
+) {
     var bukaForm by remember { mutableStateOf(false) }
+    var idSunting by remember { mutableStateOf<String?>(null) }
+    var bukaVerifikasi by remember { mutableStateOf(false) }
+    var detailId by remember { mutableStateOf<String?>(null) }
+    var detail by remember { mutableStateOf<Hasil?>(null) }
+    var lampiranDilihat by remember { mutableStateOf<Lampiran?>(null) }
 
     LaunchedEffect(vm.pengguna?.id) {
         vm.muatHasil()
         if (vm.rencana.isEmpty()) vm.muatRencana()
+        if (vm.bisaMemverifikasiHasil) vm.muatVerifikasiHasil()
+    }
+
+    LaunchedEffect(mintaBukaVerifikasi) {
+        if (mintaBukaVerifikasi) {
+            bukaVerifikasi = true
+            onVerifikasiDibuka()
+        }
     }
 
     if (bukaForm) {
-        FormHasil(vm) { bukaForm = false }
+        WizardHasil(vm, idHasil = idSunting) {
+            bukaForm = false
+            idSunting = null
+        }
+        return
+    }
+
+    if (bukaVerifikasi) {
+        VerifikasiHasilScreen(vm) { bukaVerifikasi = false }
         return
     }
 
@@ -49,14 +73,74 @@ fun HasilScreen(vm: KinerjaViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (vm.bisaMemverifikasiHasil) {
+            Kartu {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Verifikasi Hasil Kerja",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Warna.Teks
+                        )
+                        Text(
+                            "Hasil kerja bawahan langsung yang menunggu verifikasi.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Warna.TeksLembut
+                        )
+                    }
+                    Lencana(
+                        "${vm.hasilMenungguVerifikasi.size}",
+                        if (vm.hasilMenungguVerifikasi.isEmpty()) Warna.TeksLembut else Warna.Kuning
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (vm.hasilMenungguVerifikasi.isEmpty()) {
+                        "Tidak ada hasil kerja yang menunggu verifikasi."
+                    } else {
+                        "${vm.hasilMenungguVerifikasi.size} hasil kerja menunggu verifikasi Anda."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Warna.Teks
+                )
+                Spacer(Modifier.height(10.dp))
+                TombolUtama(
+                    teks = if (vm.hasilMenungguVerifikasi.isEmpty()) {
+                        "Buka Verifikasi"
+                    } else {
+                        "Tinjau Verifikasi (${vm.hasilMenungguVerifikasi.size})"
+                    },
+                    aktif = !vm.sedangMemproses,
+                    onClick = {
+                        vm.bersihkanPesan()
+                        bukaVerifikasi = true
+                    }
+                )
+            }
+        }
+
         Kartu {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                JudulBagian("Hasil Kerja", "${vm.hasil.size} laporan realisasi")
-                TextButton(onClick = { bukaForm = true }) { Text("+ Baru", color = Warna.Navy) }
+                JudulBagian(
+                    "Hasil Kerja",
+                    "${vm.hasil.size} laporan realisasi",
+                    Modifier.weight(1f)
+                )
+                TextButton(onClick = {
+                    vm.bersihkanPesan()
+                    idSunting = null
+                    bukaForm = true
+                }) {
+                    Text("+ Baru", color = Warna.Navy)
+                }
             }
             Spacer(Modifier.height(6.dp))
             Text(
@@ -92,11 +176,7 @@ fun HasilScreen(vm: KinerjaViewModel) {
                             )
                         }
                         Lencana(
-                            when (item.status) {
-                                "terverifikasi" -> "Terverifikasi"
-                                "perlu_revisi" -> "Perlu Revisi"
-                                else -> "Menunggu Verifikasi"
-                            },
+                            labelStatusHasil(item.status),
                             when (item.status) {
                                 "terverifikasi" -> Warna.Hijau
                                 "perlu_revisi" -> Warna.Kuning
@@ -106,124 +186,92 @@ fun HasilScreen(vm: KinerjaViewModel) {
                     }
 
                     Spacer(Modifier.height(8.dp))
+                    HorizontalDivider(color = Warna.NavySoft)
+                    Spacer(Modifier.height(8.dp))
+
                     BarisInfo("Progres", "${item.progresPersen.toInt()}%")
                     BarisInfo("Jumlah realisasi", item.jumlahRealisasi?.toString() ?: "-")
                     item.skorTotal?.let {
                         BarisInfo(
                             "Nilai hasil kerja",
-                            String.format(java.util.Locale.US, "%.2f", it),
+                            String.format(Locale.US, "%.2f", it),
                             Warna.Hijau
                         )
                     }
                     item.kendala?.let { BarisInfo("Kendala", it) }
                     item.catatanVerifikator?.let { BarisInfo("Catatan atasan", it, Warna.Kuning) }
+
+                    Spacer(Modifier.height(10.dp))
+                    if (item.status == "draft" || item.status == "perlu_revisi") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            TombolKedua(
+                                teks = "Lihat Detail",
+                                modifier = Modifier.weight(1f),
+                                aktif = !vm.sedangMemproses,
+                                onClick = {
+                                    vm.bersihkanPesan()
+                                    detail = null
+                                    detailId = item.id
+                                }
+                            )
+                            TombolKedua(
+                                teks = if (item.status == "perlu_revisi") "Perbaiki" else "Ubah",
+                                modifier = Modifier.weight(1f),
+                                aktif = !vm.sedangMemproses,
+                                onClick = {
+                                    vm.bersihkanPesan()
+                                    idSunting = item.id
+                                    bukaForm = true
+                                }
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        TombolUtama(
+                            teks = if (item.status == "perlu_revisi") {
+                                "Kirim Ulang ke Atasan"
+                            } else {
+                                "Kirim ke Atasan"
+                            },
+                            memuat = vm.sedangMemproses,
+                            aktif = !vm.sedangMemproses,
+                            onClick = { vm.ajukanHasil(item.id) }
+                        )
+                    } else {
+                        TombolKedua(
+                            teks = "Lihat Detail Hasil",
+                            aktif = !vm.sedangMemproses,
+                            onClick = {
+                                vm.bersihkanPesan()
+                                detail = null
+                                detailId = item.id
+                            }
+                        )
+                    }
                 }
             }
         }
     }
-}
 
-@Composable
-private fun FormHasil(vm: KinerjaViewModel, onTutup: () -> Unit) {
-    val daftarRencana = vm.rencanaDisetujui()
-    var rencanaId by remember { mutableStateOf(daftarRencana.firstOrNull()?.id ?: "") }
-    var uraian by remember { mutableStateOf("") }
-    var progres by remember { mutableStateOf("100") }
-    var realisasi by remember { mutableStateOf("") }
-    var kendala by remember { mutableStateOf("") }
-    var tanggal by remember { mutableStateOf(tanggalHariIni()) }
-
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        Kartu {
-            JudulBagian("Lapor Hasil Kerja", "Pilih rencana yang sudah disetujui")
-            Spacer(Modifier.height(10.dp))
-
-            if (daftarRencana.isEmpty()) {
-                KotakPesan("Belum ada rencana kerja yang disetujui atasan.", JenisPesan.Info)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    daftarRencana.take(8).forEach { rencana ->
-                        FilterChip(
-                            selected = rencanaId == rencana.id,
-                            onClick = { rencanaId = rencana.id },
-                            label = { Text(rencana.kegiatan) }
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = uraian,
-                    onValueChange = { uraian = it },
-                    label = { Text("Uraian pelaksanaan") },
-                    minLines = 3,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = progres,
-                        onValueChange = { progres = it.filter { c -> c.isDigit() } },
-                        label = { Text("Progres %") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = realisasi,
-                        onValueChange = { realisasi = it.filter { c -> c.isDigit() || c == '.' } },
-                        label = { Text("Realisasi") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = kendala,
-                    onValueChange = { kendala = it },
-                    label = { Text("Kendala (opsional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = tanggal,
-                    onValueChange = { tanggal = it },
-                    label = { Text("Tanggal realisasi") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+    if (detailId != null) {
+        LaunchedEffect(detailId) {
+            val id = detailId
+            if (id != null) {
+                vm.muatDetailHasil(id) { detail = it }
             }
         }
-
-        vm.galat?.let { KotakPesan(it, JenisPesan.Galat) }
-
-        TombolUtama(
-            teks = "Kirim Hasil Kerja",
-            memuat = vm.sedangMemproses,
-            aktif = rencanaId.isNotBlank() && uraian.isNotBlank(),
-            onClick = {
-                vm.buatHasil(
-                    HasilRequest(
-                        rencanaId = rencanaId,
-                        uraianPelaksanaan = uraian,
-                        progresPersen = progres.toDoubleOrNull() ?: 100.0,
-                        jumlahRealisasi = realisasi.toDoubleOrNull(),
-                        kendala = kendala.ifBlank { null },
-                        tanggalRealisasi = tanggal
-                    )
-                ) { onTutup() }
+        DialogDetailHasil(
+            detail = detail,
+            galat = vm.galat,
+            onLihatLampiran = { lampiranDilihat = it },
+            onTutup = {
+                detailId = null
+                detail = null
+                vm.bersihkanPesan()
             }
         )
+    }
 
-        TombolKedua(teks = "Batal", onClick = onTutup)
-        Spacer(Modifier.height(8.dp))
+    lampiranDilihat?.let { berkas ->
+        DialogLihatLampiran(vm, berkas) { lampiranDilihat = null }
     }
 }

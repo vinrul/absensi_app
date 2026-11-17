@@ -111,14 +111,16 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
     		return
     	}
 
-    	if (vm.pengguna == null) {
-    		LoginScreen(vm) { }
-    		return
-    	}
-
     var tabAktif by rememberSaveable { mutableStateOf(0) }
     var bukaProfil by rememberSaveable { mutableStateOf(false) }
     var bukaPersetujuanRencana by rememberSaveable { mutableStateOf(false) }
+    var bukaVerifikasiHasil by rememberSaveable { mutableStateOf(false) }
+    var bukaVerifikasiOutput by rememberSaveable { mutableStateOf(false) }
+
+    	if (vm.pengguna == null) {
+    		LoginScreen(vm) { bukaProfil = false }
+    		return
+    	}
 
     if (bukaProfil) {
         Scaffold(
@@ -205,6 +207,14 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                     onBukaPersetujuan = {
                         bukaPersetujuanRencana = true
                         tabAktif = 2
+                    },
+                    onBukaVerifikasiHasil = {
+                        bukaVerifikasiHasil = true
+                        tabAktif = 3
+                    },
+                    onBukaVerifikasiOutput = {
+                        bukaVerifikasiOutput = true
+                        tabAktif = 4
                     }
                 )
                 1 -> AbsensiScreen(vm)
@@ -213,8 +223,16 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                     mintaBukaPersetujuan = bukaPersetujuanRencana,
                     onPersetujuanDibuka = { bukaPersetujuanRencana = false }
                 )
-                3 -> HasilScreen(vm)
-                4 -> OutputScreen(vm)
+                3 -> HasilScreen(
+                    vm = vm,
+                    mintaBukaVerifikasi = bukaVerifikasiHasil,
+                    onVerifikasiDibuka = { bukaVerifikasiHasil = false }
+                )
+                4 -> OutputScreen(
+                    vm = vm,
+                    mintaBukaVerifikasi = bukaVerifikasiOutput,
+                    onVerifikasiDibuka = { bukaVerifikasiOutput = false }
+                )
             }
         }
     }

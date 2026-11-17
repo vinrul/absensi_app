@@ -95,6 +95,14 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Access token 15 menit; refresh token 30 hari dengan rotasi; logout mencabut token.
 - Password minimal 8 karakter, kombinasi huruf & angka; `must_change_password` diset saat akun dibuat.
 - Pembatasan 5 percobaan login/menit/IP → HTTP 429 + `Retry-After`.
+- Profil personel dapat memuat **foto** (JPG/PNG maks. 5 MB) dan diubah sendiri untuk nama,
+  **pangkat** (combobox 21 tingkat Polri dari Bharada sampai Jenderal Pol), **jabatan**, telepon,
+  serta email. Satker, NRP, jenis akun, dan peran tetap hanya dapat diubah admin.
+- Halaman **Profil & Pengaturan** Android menyediakan ganti foto, edit profil, dan ganti password.
+  Kolom password memiliki ikon mata untuk menampilkan/menyembunyikan isian. Ganti password
+  mencabut seluruh sesi sehingga pengguna harus login kembali.
+- Foto profil yang sudah diunggah ditampilkan sebagai avatar di Beranda; bila belum ada, Beranda
+  tidak menampilkan avatar maupun placeholder.
 
 ### FR-02 Absensi harian
 - Status: dinas kantor, dinas luar, PH (Perintah Hadir), piket/shift, libur nasional, cuti, izin,
@@ -138,18 +146,27 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Notifikasi dikirim ke atasan saat diajukan dan ke personel saat diputuskan.
 
 ### FR-04 Hasil kerja
-- Hanya dari rencana berstatus `disetujui`; progres 0–100.
+- Hanya dari rencana berstatus `disetujui`; progres 0–100 memakai slider (default 100%).
+- Wizard Android 3 langkah: pilih rencana → realisasi (uraian, progres, realisasi, kendala,
+  tanggal) → bukti pendukung. Tersedia **Simpan Draf** dan **Kirim ke Atasan**.
+- Draf dan `perlu_revisi` dapat diubah lalu dikirim ulang; detail tersedia untuk semua status.
 - Verifikasi menghitung skor kuantitas (realisasi/target), kualitas (input verifikator), dan waktu
   (keterlambatan) — lihat `docs/penilaian.md`.
-- Verifikator dapat meminta revisi dengan catatan wajib.
+- Verifikator dapat meminta revisi dengan catatan wajib. Skor kualitas dipilih memakai slider 0–100
+  pada layar verifikasi Android. Layar verifikasi dibuka dari kartu di Beranda atau tab Hasil Kerja.
 
 ### FR-05 Output
 - Hanya dari hasil kerja `terverifikasi`.
 - Jenis: laporan, dokumen pendukung, foto, video, data/diagram, berita acara, surat/nota dinas,
   link/sistem.
 - Jenis selain `link_sistem` wajib berkas; `link_sistem` wajib URL `http(s)://`.
-- Status: menunggu verifikasi → dalam verifikasi → disetujui / perlu revisi.
-- Kelengkapan dinilai dari keberadaan berkas/tautan saat verifikasi.
+- Wizard Android 3 langkah: pilih hasil kerja → data output (jenis, judul, uraian, tanggal, URL) →
+  berkas bukti. Tersedia **Simpan Draf** dan **Kirim ke Atasan**; draf/revisi dapat diubah.
+- Status: `draft` → dalam verifikasi → `disetujui` / `perlu_revisi`.
+- Kelengkapan dinilai dari keberadaan berkas/tautan saat verifikasi; kesesuaian dan keabsahan
+  diisi atasan memakai slider 0–100 (bobot 40/30/30). Permintaan revisi wajib menyertakan catatan.
+- Layar verifikasi atasan menampilkan output bawahan langsung yang berstatus dalam verifikasi,
+  lengkap dengan detail lampiran.
 
 ### FR-06 Periode & penilaian
 - Periode bulanan dengan tanggal mulai/selesai; bobot default 20/20/30/30; total bobot harus 100.

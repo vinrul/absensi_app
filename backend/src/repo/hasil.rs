@@ -46,22 +46,29 @@ const LIST_SQL: &str = r#"
      WHERE h.satker_id = ANY($1::uuid[])
        AND ($2::uuid IS NULL OR h.personel_id = $2)
        AND ($3::status_hasil IS NULL OR h.status = $3)
+       AND ($4::uuid IS NULL OR r.atasan_id = $4)
+       AND (NOT $5::bool OR h.status = 'diajukan')
      ORDER BY h.created_at DESC
-     LIMIT $4 OFFSET $5
+     LIMIT $6 OFFSET $7
 "#;
 
 const LIST_COUNT: &str = r#"
     SELECT count(*)
       FROM hasil_kerja h
+      JOIN rencana_kerja r ON r.id = h.rencana_id
      WHERE h.satker_id = ANY($1::uuid[])
        AND ($2::uuid IS NULL OR h.personel_id = $2)
        AND ($3::status_hasil IS NULL OR h.status = $3)
+       AND ($4::uuid IS NULL OR r.atasan_id = $4)
+       AND (NOT $5::bool OR h.status = 'diajukan')
 "#;
 
 pub struct ListFilter {
     pub satker_ids: Vec<Uuid>,
     pub personel_id: Option<Uuid>,
     pub status: Option<StatusHasil>,
+    pub atasan_id: Option<Uuid>,
+    pub hanya_diajukan: bool,
     pub limit: i64,
     pub offset: i64,
 }
@@ -71,6 +78,8 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<HasilRow
         .bind(&filter.satker_ids)
         .bind(filter.personel_id)
         .bind(filter.status)
+        .bind(filter.atasan_id)
+        .bind(filter.hanya_diajukan)
         .bind(filter.limit)
         .bind(filter.offset)
         .fetch_all(pool)
@@ -80,6 +89,8 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<HasilRow
         .bind(&filter.satker_ids)
         .bind(filter.personel_id)
         .bind(filter.status)
+        .bind(filter.atasan_id)
+        .bind(filter.hanya_diajukan)
         .fetch_one(pool)
         .await?;
 
@@ -147,13 +158,15 @@ pub struct NewHasil {
     pub jumlah_realisasi: Option<f64>,
     pub kendala: Option<String>,
     pub tanggal_realisasi: NaiveDate,
+    pub status: StatusHasil,
 }
 
 pub async fn create(pool: &PgPool, data: &NewHasil) -> AppResult<()> {
     const SQL: &str = r#"
         INSERT INTO hasil_kerja (id, rencana_id, personel_id, satker_id, uraian_pelaksanaan,
                                  progres_persen, jumlah_realisasi, kendala, tanggal_realisasi, status)
-        VALUES ($1, $2, $3, $4, $5, $6::float8::numeric, $7::float8::numeric, $8, $9, 'diajukan')
+        VALUES ($1, $2, $3, $4, $5, $6::float8::numeric, $7::float8::numeric, $8, $9,
+                $10::status_hasil)
     "#;
     sqlx::query(SQL)
         .bind(data.id)
@@ -165,8 +178,53 @@ pub async fn create(pool: &PgPool, data: &NewHasil) -> AppResult<()> {
         .bind(data.jumlah_realisasi)
         .bind(&data.kendala)
         .bind(data.tanggal_realisasi)
+        .bind(data.status)
         .execute(pool)
         .await?;
+    Ok(())
+}
+
+pub struct UpdateHasil {
+    pub uraian_pelaksanaan: String,
+    pub progres_persen: f64,
+    pub jumlah_realisasi: Option<f64>,
+    pub kendala: Option<String>,
+    pub tanggal_realisasi: NaiveDate,
+}
+
+pub async fn update(pool: &PgPool, id: Uuid, data: &UpdateHasil) -> AppResult<()> {
+    const SQL: &str = r#"
+        UPDATE hasil_kerja
+           SET uraian_pelaksanaan = $2,
+               progres_persen = $3::float8::numeric,
+               jumlah_realisasi = $4::float8::numeric,
+               kendala = $5,
+               tanggal_realisasi = $6
+         WHERE id = $1
+    "#;
+    let result = sqlx::query(SQL)
+        .bind(id)
+        .bind(&data.uraian_pelaksanaan)
+        .bind(data.progres_persen)
+        .bind(data.jumlah_realisasi)
+        .bind(&data.kendala)
+        .bind(data.tanggal_realisasi)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Hasil kerja tidak ditemukan".into()));
+    }
+    Ok(())
+}
+
+pub async fn ajukan(pool: &PgPool, id: Uuid) -> AppResult<()> {
+    const SQL: &str = r#"
+        UPDATE hasil_kerja
+           SET status = 'diajukan'
+         WHERE id = $1
+    "#;
+    sqlx::query(SQL).bind(id).execute(pool).await?;
     Ok(())
 }
 

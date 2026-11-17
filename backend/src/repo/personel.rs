@@ -190,6 +190,55 @@ pub async fn set_password(pool: &PgPool, id: Uuid, password_hash: &str) -> AppRe
     Ok(())
 }
 
+/// Personel mengubah data profilnya sendiri (nama, pangkat, jabatan, telepon, email).
+pub async fn update_profil(
+    pool: &PgPool,
+    id: Uuid,
+    nama: Option<&str>,
+    pangkat: Option<&str>,
+    jabatan: Option<&str>,
+    phone: Option<&str>,
+    email: Option<&str>,
+) -> AppResult<()> {
+    const SQL: &str = r#"
+        UPDATE personel
+           SET nama = COALESCE($2, nama),
+               pangkat = COALESCE($3, pangkat),
+               jabatan = COALESCE($4, jabatan),
+               phone = COALESCE($5, phone),
+               email = COALESCE($6, email)
+         WHERE id = $1 AND deleted_at IS NULL
+    "#;
+    let result = sqlx::query(SQL)
+        .bind(id)
+        .bind(nama)
+        .bind(pangkat)
+        .bind(jabatan)
+        .bind(phone)
+        .bind(email)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Personel tidak ditemukan".into()));
+    }
+    Ok(())
+}
+
+pub async fn set_foto_path(pool: &PgPool, id: Uuid, foto_path: Option<&str>) -> AppResult<()> {
+    const SQL: &str = "UPDATE personel SET foto_path = $2 WHERE id = $1";
+    let result = sqlx::query(SQL)
+        .bind(id)
+        .bind(foto_path)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Personel tidak ditemukan".into()));
+    }
+    Ok(())
+}
+
 /// Reset oleh admin: password baru wajib diganti saat login berikutnya.
 pub async fn reset_password(pool: &PgPool, id: Uuid, password_hash: &str) -> AppResult<()> {
     let result = sqlx::query(

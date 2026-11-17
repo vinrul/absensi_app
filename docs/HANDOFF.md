@@ -38,10 +38,11 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
 | Absensi + geofence + antrean offline | e2e: dalam radius 200, luar radius 422, duplikat 409 |
 | Rencana kerja + persetujuan + lampiran | e2e alur penuh + wizard Android 4 langkah (jenis → dasar → rincian kegiatan → lampiran); seed menyediakan contoh draft/diajukan/perlu revisi |
-| Hasil kerja + output + verifikasi | e2e, skor tersimpan |
+| Hasil kerja + verifikasi | e2e API + wizard Android 3 langkah (pilih rencana → realisasi → bukti), draf, kirim, perbaikan; progres memakai slider 0–100 |
+| Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs` + hari PH dikecualikan |
 | Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser |
-| Aplikasi Android (login, absensi GPS, offline, wizard rencana, persetujuan atasan, penampil lampiran) | APK debug terbentuk |
+| Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
 | Dokumentasi API | `/docs` (70 path), `/api-docs/openapi.json` |
@@ -235,6 +236,35 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
   `PATCH /rencana-kerja/{id}` mengganti rincian kegiatan dalam satu transaksi. Tombol
   **Simpan Perubahan** dan **Ajukan Ulang ke Atasan**. Lampiran lama dapat dihapus (dihapus saat
   simpan) dan berkas baru ditambahkan.
+- **Wizard hasil kerja** (`ui/WizardHasil.kt`): langkah pilih rencana disetujui → realisasi
+  (uraian, slider progres 0–100 dengan default 100%, jumlah realisasi, kendala, tanggal lewat
+  kalender) → bukti multi-berkas. **Simpan Draf** menyimpan `ajukan=false`; **Kirim ke Atasan**
+  mengunggah bukti lalu `POST /hasil-kerja/{id}/ajukan`. Mode ubah tersedia untuk
+  `draft`/`perlu_revisi`.
+- **Verifikasi hasil kerja** (`ui/VerifikasiHasilScreen.kt`): daftar bawahan langsung berstatus
+  `diajukan`, dialog detail + lampiran, keputusan **Terverifikasi** (skor kualitas lewat slider
+  0–100, default 85) atau **Perlu Revisi** (catatan wajib). Dibuka dari kartu Beranda atau tab Hasil.
+- **Wizard output** (`ui/WizardOutput.kt`): langkah pilih hasil kerja `terverifikasi` → data output
+  (8 jenis, judul, uraian, tanggal, URL untuk `link_sistem`) → berkas bukti. Sama seperti hasil,
+  draf disimpan lebih dulu (`ajukan=false`), berkas diunggah, lalu diajukan; jika unggahan gagal
+  status tetap draf agar dapat diperbaiki. Hanya `GET /output/{id}` yang mengembalikan `lampiran`.
+- **Verifikasi output** (`ui/VerifikasiOutputScreen.kt`): daftar `dalam_verifikasi` dari bawahan
+  langsung, detail + lampiran, keputusan **Disetujui (Valid)** dengan skor kesesuaian & keabsahan
+  (slider 0–100, default 90/92) atau **Kembalikan dan Revisi** dengan catatan wajib. Kelengkapan
+  dihitung server dari berkas/URL.
+- **Detail output** (`ui/DetailOutput.kt`) menampilkan status, jenis, tanggal, uraian, tautan,
+  komponen nilai, catatan atasan, dan lampiran yang dapat dibuka di penampil internal.
+- Status output `draft` ditambahkan lewat migrasi `0014`; seed menyediakan contoh draft, dalam
+  verifikasi, perlu revisi, dan disetujui untuk akun demo.
+- **Profil & Pengaturan** (`ui/ProfilScreen.kt`): avatar bulat dari `GET /auth/foto/{id}`
+  (dimuat ke `vm.fotoProfil`), **Ganti Foto Profil** lewat pemilih gambar sistem (JPG/PNG maks. 5 MB,
+  `POST /auth/foto`), **Edit Profil** (nama, pangkat lewat combobox 21 tingkat Polri terendah→tertinggi,
+  jabatan, telepon, email via `PATCH /auth/profile`), dan **Ganti Password**
+  (`POST /auth/change-password`). Tiap kolom password punya ikon mata tampil/sembunyi (`IkonMata`,
+  tanpa dependensi tambahan). Satker/NRP/peran tetap hanya admin. Ganti password memicu
+  `bersihkanDataSesi()` sehingga aplikasi kembali ke layar login.
+- **Avatar di Beranda** memakai komponen bersama `FotoProfil` dan hanya digambar bila foto berhasil
+  diunggah/dimuat (`tampilkanInisial = false`); tanpa foto, salam langsung dimulai dari teks.
 - Semua tanggal memakai `FieldTanggal` + `DatePickerDialog` Material 3 (tidak ada input tanggal manual).
 - Satu pengajuan wizard = satu baris `rencana_kerja`; rincian kegiatan disimpan sebagai
   `rencana_tahapan` dengan kolom tambahan (migrasi `0013`) agar tetap satu alur persetujuan.
@@ -252,7 +282,7 @@ Login menerima `username` (admin), `nrp` (personel), dan `client` (`web`/`androi
 
 ```
 POST   /auth/login | /auth/refresh | /auth/logout | /auth/change-password
-GET    /auth/me
+GET    /auth/me          PATCH /auth/profile     POST /auth/foto     GET /auth/foto/{id}
 GET    /satker            POST /satker            GET|PATCH /satker/{id}
 GET    /admin             POST /admin             GET|PATCH /admin/{id}   POST /admin/{id}/reset-password
 GET    /personel          POST /personel          GET|PATCH /personel/{id}
@@ -267,7 +297,8 @@ GET    /absensi/rekap     GET  /absensi/titik-terdekat   POST /absensi/{id}/veri
 GET    /rencana-kerja     POST /rencana-kerja     GET /rencana-kerja/persetujuan
 GET|PATCH /rencana-kerja/{id}     POST /rencana-kerja/{id}/ajukan | /keputusan
 GET    /hasil-kerja       POST /hasil-kerja       GET /hasil-kerja/{id}   POST /hasil-kerja/{id}/verifikasi
-GET    /output            POST /output            GET /output/{id}        POST /output/{id}/ajukan | /verifikasi
+GET    /output            POST /output            GET|PATCH /output/{id}   GET /output/verifikasi
+POST   /output/{id}/ajukan | /verifikasi
 POST   /lampiran          GET  /lampiran/raw/{key} DELETE /lampiran/{id}
 GET    /periode           POST /periode           PUT /periode/{id}/bobot
 POST   /periode/{id}/tutup   POST /periode/{id}/buka
@@ -352,7 +383,18 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
 - Jangan mengisi `nrp` untuk akun admin atau `username` untuk personel;
   constraint `personel_identitas_check` akan menolak.
 - Personel tanpa `atasan_id` tidak bisa mengajukan rencana — form tambah personel wajib
-  memilih atasan satu satker.
+  memilih atasan satu satka.
+- `seed` sekarang menjalankan migrasi sebelum menulis data; jangan hapus langkah itu —
+  nilai enum baru (mis. `status_output='draft'`) gagal disisipkan bila skema DB uji tertinggal.
+- Alur output Android sengaja membuat baris `draft` lebih dulu, mengunggah berkas, baru
+  `POST /output/{id}/ajukan`. Jangan mengubah urutan ini: jika unggahan gagal, draf tetap dapat
+  diperbaiki. Daftar verifikasi atasan hanya memuat `dalam_verifikasi`.
+- Emulator: jangan menekan BACK untuk menyembunyikan keyboard bila keyboard sudah tertutup —
+  aktivitas ikut tertutup. Pindah field dengan `keyevent 61` (TAB), lalu satu BACK saat keyboard pasti tampil.
+- Emulator: foto yang di-`adb push` tidak muncul di pemilih foto Android 14 sampai dipindai:
+  `adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/<nama>.png`.
+- Foto profil disimpan di `upload_dir/foto/<personel_id>/<uuid>.<ext>` dan `personel.foto_path`
+  hanya menyimpan kunci; jangan menaruh biner di database.
 
 ---
 

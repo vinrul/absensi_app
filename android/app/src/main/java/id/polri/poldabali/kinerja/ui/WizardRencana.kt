@@ -880,7 +880,7 @@ private fun DialogKegiatan(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun FieldTanggal(
+internal fun FieldTanggal(
     label: String,
     nilai: String,
     modifier: Modifier = Modifier,
@@ -978,7 +978,7 @@ private fun validasiRentang(mulai: String, selesai: String): String? {
     return null
 }
 
-private fun namaBerkas(konteks: Context, uri: Uri): String {
+internal fun namaBerkas(konteks: Context, uri: Uri): String {
     konteks.contentResolver.query(uri, null, null, null, null)?.use { kursor ->
         val indeks = kursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
         if (indeks >= 0 && kursor.moveToFirst()) {

@@ -240,7 +240,12 @@ export interface Hasil {
 	catatan_verifikator: string | null;
 }
 
-export type StatusOutput = 'menunggu_verifikasi' | 'dalam_verifikasi' | 'disetujui' | 'perlu_revisi';
+export type StatusOutput =
+	| 'draft'
+	| 'menunggu_verifikasi'
+	| 'dalam_verifikasi'
+	| 'disetujui'
+	| 'perlu_revisi';
 
 export interface Output {
 	id: string;
@@ -344,6 +349,7 @@ export const LABEL_STATUS_RENCANA: Record<StatusRencana, string> = {
 };
 
 export const LABEL_STATUS_OUTPUT: Record<StatusOutput, string> = {
+	draft: 'Draft',
 	menunggu_verifikasi: 'Menunggu Verifikasi',
 	dalam_verifikasi: 'Dalam Verifikasi',
 	disetujui: 'Disetujui',

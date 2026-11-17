@@ -73,6 +73,10 @@ Seed menyertakan contoh rencana kerja untuk akun `85000001` pada tiga status:
 Ada juga satu rencana `diajukan` milik atasan `000100` yang ditujukan ke pimpinan `000002`,
 untuk menguji rantai dual-role (atasan sekaligus bawahan).
 
+Contoh hasil kerja dan output juga tersedia: hasil `draft`, `diajukan`, `perlu_revisi`, dan
+`terverifikasi`, serta output `draft`, `dalam_verifikasi` (PDF + PNG), `perlu_revisi`, dan
+`disetujui` — semuanya dapat dibuka dari tab Hasil/Output Android tanpa membuat data baru.
+
 Pengajuan contoh juga dilengkapi lampiran nyata di folder upload:
 
 - `85000001` — Patroli siber media sosial: **PDF + PNG**.
@@ -107,6 +111,67 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 Alamat server default `http://10.0.2.2:8080/api/v1/` (emulator). Untuk perangkat
 nyata, ubah lewat menu **Profil → Server** menjadi `http://<ip-server>:8080/api/v1/`.
+
+#### Menjalankan emulator & memasang APK lewat command line
+
+Pastikan backend sudah berjalan di `http://127.0.0.1:8080` (emulator mengaksesnya lewat
+`10.0.2.2`). Jalankan dua terminal terpisah: satu untuk emulator, satu untuk `adb`.
+
+```powershell
+# 1. Lihat AVD yang tersedia
+emulator -list-avds
+
+# 2. Jalankan emulator (nama AVD contoh dari mesin pengembangan ini)
+emulator -avd Pixel_3a_API_34 -gpu swiftshader_indirect
+
+# 3. Terminal lain: tunggu emulator siap
+adb wait-for-device
+adb shell getprop sys.boot_completed   # keluaran "1" berarti sudah siap
+adb devices                            # harus tampil "emulator-5554  device"
+```
+
+Jika `emulator`/`adb` tidak ada di `PATH`, panggil langsung dari Android SDK:
+
+```powershell
+$sdk = "$env:LOCALAPPDATA\Android\Sdk"
+& "$sdk\emulator\emulator.exe" -avd Pixel_3a_API_34 -gpu swiftshader_indirect
+& "$sdk\platform-tools\adb.exe" devices
+```
+
+Setelah emulator siap, build dan pasang APK dari root proyek:
+
+```powershell
+cd F:\absensi_polda_bali\android
+.\gradlew.bat :app:assembleDebug
+
+# APK debug memakai applicationId id.polri.poldabali.kinerja.debug
+adb install -r app\build\outputs\apk\debug\app-debug.apk
+
+# Buka aplikasi tanpa menyentuh layar
+adb shell am start -n id.polri.poldabali.kinerja.debug/id.polri.poldabali.kinerja.MainActivity
+```
+
+Perintah pemeliharaan yang sering dipakai:
+
+```powershell
+# Hapus data aplikasi (sesi login, wizard izin, pengaturan server kembali awal)
+adb shell pm clear id.polri.poldabali.kinerja.debug
+
+# Copot aplikasi dari emulator
+adb uninstall id.polri.poldabali.kinerja.debug
+
+# Matikan emulator
+exit   # pada terminal emulator, atau:
+adb -s emulator-5554 emu kill
+```
+
+Catatan:
+
+- `seed --reset` mengganti id personel sehingga **sesi Android lama dapat gagal**; login ulang
+  dengan akun demo (mis. `85000001` / `Polri#2026`).
+- Jika `adb install` menolak karena versi lama berbeda tanda tangan, jalankan
+  `adb uninstall id.polri.poldabali.kinerja.debug` lalu pasang ulang.
+- Emulator mesin ini memerlukan `-gpu swiftshader_indirect` agar tidak crash.
 
 ### 4. Fake server / jam server palsu (development)
 
@@ -189,8 +254,11 @@ Catatan penting:
   Lampiran PDF dirender langsung di aplikasi dan gambar dapat dibuka dengan pinch-zoom.
   Akun dual-role (atasan sekaligus bawahan) melihat rencana sendiri di tab Rencana dan rencana
   bawahannya lewat tombol persetujuan; rencana sendiri tetap diajukan ke atasannya.
-- **Hasil kerja & output**: realisasi + progres, verifikasi berskor, 8 jenis output,
-  berkas bukti atau tautan.
+- **Hasil kerja & output**: realisasi + progres (slider 0–100), wizard 3 langkah dengan simpan
+  draf dan kirim ke atasan, verifikasi berskor (slider 0–100), 8 jenis output, berkas bukti atau
+  tautan, serta layar verifikasi untuk atasan langsung.
+- **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 21 tingkat
+  Polri)/jabatan/telepon/email, ganti password, pengaturan alamat server, dan antrean offline.
 - **Penilaian**: periode bulanan dibuat otomatis (penutupan manual), bobot per periode
   (default 20/20/30/30), snapshot komponen untuk audit, hari ber-jadwal PH dikeluarkan dari
   skor absensi harian.

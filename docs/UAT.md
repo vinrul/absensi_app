@@ -12,7 +12,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| A1 | Buka `/docs` | Daftar 70 endpoint tampil, filter tag berfungsi | ✅ | |
+| A1 | Buka `/docs` | Daftar 76 endpoint tampil, filter tag berfungsi | ✅ | |
 | A2 | Login memakai username `superuser` | Berhasil; `jenis_akun=admin`, `nrp=null` | ✅ | API |
 | A3 | Login memakai NRP `000001` | Gagal (admin tidak punya NRP) | ✅ | API |
 | A4 | Login `superuser` dengan `client=android` | 403 "Akun admin hanya dapat masuk melalui dashboard web" | ✅ | API |
@@ -105,6 +105,16 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C35 | **Simpan Perubahan** lalu **Ajukan Ulang ke Atasan** | Perubahan tersimpan (status tetap `perlu_revisi`), lalu berubah `diajukan` setelah diajukan ulang | ✅ | emulator + API |
 | C36 | Jalankan `seed --reset` lalu buka tab Rencana | Tampil 5 dokumen: 2 disetujui, 1 draft, 1 diajukan, 1 perlu revisi dengan catatan atasan | ✅ | seed + emulator |
 | C37 | Buka **Lihat Detail Rencana** pada rencana disetujui | Dialog menampilkan status Disetujui, rincian kegiatan, lampiran PDF, dan catatan; lampiran dapat dibuka | ✅ | emulator |
+| C38 | Tab Hasil → **+ Baru** → pilih rencana → isi realisasi | Slider progres 0–100 tampil dengan default **100%**; tanggal dipilih lewat kalender | ✅ | emulator |
+| C39 | **Simpan Draf** pada wizard hasil kerja | Kartu baru berstatus Draft dan dapat diubah/dikirim kapan saja | ✅ | emulator |
+| C40 | Tab Output → **+ Baru** → pilih hasil terverifikasi → data output | Jenis 8 pilihan, judul/uraian/tanggal/URL; tombol **Simpan Draf** dan **Kirim ke Atasan** tersedia | ✅ | emulator |
+| C41 | Simpan draf output → Ubah → tambah PDF → **Kirim ke Atasan** | Berkas terunggah, status menjadi Dalam Verifikasi, pesan sukses tampil | ✅ | emulator + API |
+| C42 | Profil → **Ganti Foto Profil** → pilih gambar | Avatar bulat berubah sesuai gambar; foto disimpan ke `upload_dir/foto/<id>/` | ✅ | emulator + API |
+| C43 | Profil → **Edit Profil** → ubah pangkat lewat combobox & jabatan → Simpan | Combobox berisi 21 pangkat dari Bharada sampai Jenderal Pol; pilihan baru tampil di kartu profil (`BRIPTU · … Madya`), telepon/email tetap tersimpan | ✅ | emulator + API |
+| C44 | Profil → **Ganti Password** → kosongkan lalu Simpan | Validasi “Password lama wajib diisi”; konfirmasi tidak sama juga ditolak | ✅ | emulator |
+| C45 | Ganti password dengan data benar | Semua sesi dicabut, aplikasi kembali ke layar login; password lama tidak berlaku | ✅ | API |
+| C46 | Tekan ikon mata pada kolom password | Password berubah dari titik-titik menjadi teks biasa, lalu kembali tersembunyi saat ditekan lagi | ✅ | emulator |
+| C47 | Beranda personel dengan foto profil | Avatar bulat tampil di kiri salam; akun tanpa foto (mis. `000100`) tidak menampilkan avatar/placeholder | ✅ | emulator |
 
 ## D. Atasan Langsung (`000100` / `Atasan#2026`)
 
@@ -127,6 +137,11 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | D15 | Buka detail pengajuan dengan lampiran | Lampiran PDF dan PNG tampil dengan nama & ukuran; kedua berkas dapat diunduh | ✅ | emulator + API |
 | D16 | Persetujuan dari personel berbeda | Daftar memuat rencana `85000001` dan `85210022`; keduanya memiliki lampiran PDF+PNG | ✅ | emulator + API |
 | D17 | Tekan **Lihat** pada lampiran PDF/gambar | PDF tampil per halaman di dalam aplikasi; gambar tampil penuh dan dapat di-zoom | ✅ | emulator |
+| D18 | Kartu **Verifikasi Hasil Kerja** di Beranda | Menampilkan jumlah hasil `diajukan` dari bawahan langsung; **Tinjau Verifikasi** membuka layar di tab Hasil | ✅ | emulator |
+| D19 | Kartu **Verifikasi Output** di Beranda | Menampilkan jumlah output `dalam_verifikasi`; **Tinjau Verifikasi Output** membuka layar di tab Output | ✅ | emulator |
+| D20 | Verifikasi output: tolak tanpa catatan, lalu setujui | Tanpa catatan ditolak dengan pesan validasi; dengan skor 90/92 status menjadi `disetujui` dan nilai tampil | ✅ | emulator + API |
+| D21 | Geser slider skor kesesuaian & keabsahan | Dua slider 0–100 tampil; nilai berubah (mis. 54 dan 82) sebelum disimpan | ✅ | emulator |
+| D22 | Verifikasi hasil kerja | Slider skor kualitas 0–100 tampil dengan default 85 dan dapat digeser | ✅ | emulator |
 
 ## E. Pimpinan (`000002` / `Pimpinan#2026` dan akun ber-scope)
 

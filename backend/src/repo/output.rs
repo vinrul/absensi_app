@@ -27,6 +27,7 @@ pub struct OutputRow {
     pub verified_at: Option<DateTime<Utc>>,
     pub personel_nama: Option<String>,
     pub personel_nrp: Option<String>,
+    pub rencana_kegiatan: Option<String>,
 }
 
 const LIST_SQL: &str = r#"
@@ -37,28 +38,37 @@ const LIST_SQL: &str = r#"
            o.skor_keabsahan::float8 AS skor_keabsahan,
            o.skor_total::float8 AS skor_total,
            o.verified_by, o.catatan_verifikator, o.verified_at,
-           p.nama AS personel_nama, p.nrp AS personel_nrp
+           p.nama AS personel_nama, p.nrp AS personel_nrp,
+           r.kegiatan AS rencana_kegiatan
       FROM output o
       JOIN personel p ON p.id = o.personel_id
+      JOIN rencana_kerja r ON r.id = o.rencana_id
      WHERE o.satker_id = ANY($1::uuid[])
        AND ($2::uuid IS NULL OR o.personel_id = $2)
        AND ($3::status_output IS NULL OR o.status = $3)
+       AND ($4::uuid IS NULL OR r.atasan_id = $4)
+       AND (NOT $5::bool OR o.status = 'dalam_verifikasi')
      ORDER BY o.created_at DESC
-     LIMIT $4 OFFSET $5
+     LIMIT $6 OFFSET $7
 "#;
 
 const LIST_COUNT: &str = r#"
     SELECT count(*)
       FROM output o
+      JOIN rencana_kerja r ON r.id = o.rencana_id
      WHERE o.satker_id = ANY($1::uuid[])
        AND ($2::uuid IS NULL OR o.personel_id = $2)
        AND ($3::status_output IS NULL OR o.status = $3)
+       AND ($4::uuid IS NULL OR r.atasan_id = $4)
+       AND (NOT $5::bool OR o.status = 'dalam_verifikasi')
 "#;
 
 pub struct ListFilter {
     pub satker_ids: Vec<Uuid>,
     pub personel_id: Option<Uuid>,
     pub status: Option<StatusOutput>,
+    pub atasan_id: Option<Uuid>,
+    pub hanya_diajukan: bool,
     pub limit: i64,
     pub offset: i64,
 }
@@ -68,6 +78,8 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<OutputRo
         .bind(&filter.satker_ids)
         .bind(filter.personel_id)
         .bind(filter.status)
+        .bind(filter.atasan_id)
+        .bind(filter.hanya_diajukan)
         .bind(filter.limit)
         .bind(filter.offset)
         .fetch_all(pool)
@@ -77,6 +89,8 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<OutputRo
         .bind(&filter.satker_ids)
         .bind(filter.personel_id)
         .bind(filter.status)
+        .bind(filter.atasan_id)
+        .bind(filter.hanya_diajukan)
         .fetch_one(pool)
         .await?;
 
@@ -92,9 +106,11 @@ pub async fn find(pool: &PgPool, id: Uuid) -> AppResult<Option<OutputRow>> {
                o.skor_keabsahan::float8 AS skor_keabsahan,
                o.skor_total::float8 AS skor_total,
                o.verified_by, o.catatan_verifikator, o.verified_at,
-               p.nama AS personel_nama, p.nrp AS personel_nrp
+               p.nama AS personel_nama, p.nrp AS personel_nrp,
+               r.kegiatan AS rencana_kegiatan
           FROM output o
           JOIN personel p ON p.id = o.personel_id
+          JOIN rencana_kerja r ON r.id = o.rencana_id
          WHERE o.id = $1
     "#;
     Ok(sqlx::query_as::<_, OutputRow>(SQL)
@@ -116,7 +132,8 @@ pub async fn by_personel(
                o.skor_keabsahan::float8 AS skor_keabsahan,
                o.skor_total::float8 AS skor_total,
                o.verified_by, o.catatan_verifikator, o.verified_at,
-               p.nama AS personel_nama, p.nrp AS personel_nrp
+               p.nama AS personel_nama, p.nrp AS personel_nrp,
+               r.kegiatan AS rencana_kegiatan
           FROM output o
           JOIN personel p ON p.id = o.personel_id
           JOIN rencana_kerja r ON r.id = o.rencana_id
@@ -172,6 +189,62 @@ pub async fn set_status(pool: &PgPool, id: Uuid, status: StatusOutput) -> AppRes
         .bind(status)
         .execute(pool)
         .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Output tidak ditemukan".into()));
+    }
+    Ok(())
+}
+
+pub struct UpdateOutput {
+    pub jenis_output: JenisOutput,
+    pub judul: String,
+    pub uraian: Option<String>,
+    pub tanggal_hasil: NaiveDate,
+    pub url_eksternal: Option<String>,
+}
+
+pub async fn update(pool: &PgPool, id: Uuid, data: &UpdateOutput) -> AppResult<()> {
+    const SQL: &str = r#"
+        UPDATE output
+           SET jenis_output = $2,
+               judul = $3,
+               uraian = $4,
+               tanggal_hasil = $5,
+               url_eksternal = $6
+         WHERE id = $1
+    "#;
+    let result = sqlx::query(SQL)
+        .bind(id)
+        .bind(data.jenis_output)
+        .bind(&data.judul)
+        .bind(&data.uraian)
+        .bind(data.tanggal_hasil)
+        .bind(&data.url_eksternal)
+        .execute(pool)
+        .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Output tidak ditemukan".into()));
+    }
+    Ok(())
+}
+
+/// Mengajukan ulang output dan membersihkan hasil verifikasi sebelumnya.
+pub async fn ajukan(pool: &PgPool, id: Uuid) -> AppResult<()> {
+    const SQL: &str = r#"
+        UPDATE output
+           SET status = 'dalam_verifikasi',
+               skor_kelengkapan = NULL,
+               skor_kesesuaian = NULL,
+               skor_keabsahan = NULL,
+               skor_total = NULL,
+               verified_by = NULL,
+               catatan_verifikator = NULL,
+               verified_at = NULL
+         WHERE id = $1
+    "#;
+    let result = sqlx::query(SQL).bind(id).execute(pool).await?;
 
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound("Output tidak ditemukan".into()));

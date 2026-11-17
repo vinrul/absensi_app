@@ -26,7 +26,12 @@ import id.polri.poldabali.kinerja.data.PenilaianDetailResponse
 import id.polri.poldabali.kinerja.data.Periode
 import id.polri.poldabali.kinerja.data.Rencana
 import id.polri.poldabali.kinerja.data.RencanaRequest
+import id.polri.poldabali.kinerja.data.UbahHasilRequest
+import id.polri.poldabali.kinerja.data.UbahOutputRequest
+import id.polri.poldabali.kinerja.data.UbahProfilRequest
 import id.polri.poldabali.kinerja.data.UbahRencanaRequest
+import id.polri.poldabali.kinerja.data.VerifikasiHasilRequest
+import id.polri.poldabali.kinerja.data.VerifikasiOutputRequest
 import id.polri.poldabali.kinerja.sync.Pengingat
 import id.polri.poldabali.kinerja.sync.Sinkronisasi
 import kotlinx.coroutines.launch
@@ -87,8 +92,26 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     var hasil by mutableStateOf<List<Hasil>>(emptyList())
         private set
 
+    var hasilMenungguVerifikasi by mutableStateOf<List<Hasil>>(emptyList())
+        private set
+
+    /** Atasan langsung atau pimpinan yang ditunjuk sebagai atasan dapat memverifikasi hasil. */
+    val bisaMemverifikasiHasil: Boolean
+        get() = bisaMenyetujuiRencana
+
     var output by mutableStateOf<List<Output>>(emptyList())
         private set
+
+    var outputMenungguVerifikasi by mutableStateOf<List<Output>>(emptyList())
+        private set
+
+    /** Foto profil terakhir (byte gambar); null berarti belum diunggah/gagal dimuat. */
+    var fotoProfil by mutableStateOf<ByteArray?>(null)
+        private set
+
+    /** Atasan langsung atau pimpinan yang ditunjuk sebagai atasan dapat memverifikasi output. */
+    val bisaMemverifikasiOutput: Boolean
+        get() = bisaMenyetujuiRencana
 
     var nilai by mutableStateOf<PenilaianDetailResponse?>(null)
         private set
@@ -187,24 +210,70 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     fun keluar(selesai: () -> Unit) {
         viewModelScope.launch {
             repo.keluar()
-            pengguna = null
-            riwayat = emptyList()
-            rencana = emptyList()
-            persetujuan = emptyList()
-            hasil = emptyList()
-            output = emptyList()
-            nilai = null
-            jadwalPh = emptyList()
-            absensiPh = emptyList()
-            antrean = emptyList()
+            bersihkanDataSesi()
             selesai()
         }
+    }
+
+    private fun bersihkanDataSesi() {
+        pengguna = null
+        fotoProfil = null
+        riwayat = emptyList()
+        rencana = emptyList()
+        persetujuan = emptyList()
+        hasil = emptyList()
+        hasilMenungguVerifikasi = emptyList()
+        output = emptyList()
+        outputMenungguVerifikasi = emptyList()
+        nilai = null
+        jadwalPh = emptyList()
+        absensiPh = emptyList()
+        antrean = emptyList()
     }
 
     fun segarkanProfil() {
         jalankan {
             pengguna = repo.profil()
+            muatFotoProfilLangsung()
         }
+    }
+
+    fun simpanProfil(request: UbahProfilRequest, selesai: () -> Unit) {
+        jalankan {
+            pengguna = repo.ubahProfil(request)
+            pesan = "Profil diperbarui"
+            selesai()
+        }
+    }
+
+    fun unggahFotoProfil(nama: String, mime: String, byte: ByteArray) {
+        jalankan {
+            pengguna = repo.unggahFotoProfil(nama, mime, byte)
+            fotoProfil = byte
+            pesan = "Foto profil diperbarui"
+        }
+    }
+
+    fun gantiPassword(lama: String, baru: String, selesai: () -> Unit) {
+        jalankan {
+            repo.ubahPassword(lama, baru)
+            bersihkanDataSesi()
+            pesan = "Password berhasil diubah, silakan login kembali"
+            selesai()
+        }
+    }
+
+    fun muatFotoProfil() {
+        viewModelScope.launch { muatFotoProfilLangsung() }
+    }
+
+    private suspend fun muatFotoProfilLangsung() {
+        val url = pengguna?.fotoUrl
+        if (url == null) {
+            fotoProfil = null
+            return
+        }
+        runCatching { fotoProfil = repo.unduhFotoProfil(url) }
     }
 
     // --------------------------------------------------------------- absensi
@@ -257,8 +326,15 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         if (bisaMenyetujuiRencana) {
             runCatching { persetujuan = repo.daftarPersetujuan() }
         }
-        runCatching { hasil = repo.daftarHasil() }
-        runCatching { output = repo.daftarOutput() }
+        runCatching { hasil = repo.daftarHasil(pengguna?.id) }
+        if (bisaMemverifikasiHasil) {
+            runCatching { hasilMenungguVerifikasi = repo.daftarVerifikasiHasil() }
+        }
+        runCatching { output = repo.daftarOutput(pengguna?.id) }
+        if (bisaMemverifikasiOutput) {
+            runCatching { outputMenungguVerifikasi = repo.daftarVerifikasiOutput() }
+        }
+        runCatching { muatFotoProfilLangsung() }
         runCatching { muatPhLangsung() }
 
         val penggunaSaatIni = pengguna
@@ -484,14 +560,128 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     // ------------------------------------------------------------ hasil kerja
 
     fun muatHasil() {
-        jalankan { hasil = repo.daftarHasil() }
+        jalankan { hasil = repo.daftarHasil(pengguna?.id) }
     }
 
-    fun buatHasil(request: HasilRequest, selesai: () -> Unit) {
+    fun simpanHasil(
+        request: HasilRequest,
+        lampiran: List<BerkasLampiran>,
+        selesai: () -> Unit
+    ) {
         jalankan {
-            repo.buatHasil(request)
-            hasil = repo.daftarHasil()
-            pesan = "Hasil kerja terkirim untuk verifikasi"
+            val dibuat = repo.buatHasil(request)
+
+            var gagalUnggah = 0
+            lampiran.forEach { berkas ->
+                runCatching { repo.unggahBuktiHasil(dibuat.id, berkas) }
+                    .onFailure { gagalUnggah++ }
+            }
+
+            hasil = repo.daftarHasil(pengguna?.id)
+            pesan = if (request.ajukan) {
+                "Hasil kerja dikirim ke atasan"
+            } else {
+                "Hasil kerja disimpan sebagai draft"
+            }
+            if (gagalUnggah > 0) {
+                galat = "$gagalUnggah dari ${lampiran.size} bukti gagal diunggah"
+            } else if (lampiran.isNotEmpty()) {
+                pesan = "$pesan · ${lampiran.size} bukti terunggah"
+            }
+            selesai()
+        }
+    }
+
+    fun ubahHasil(
+        id: String,
+        request: UbahHasilRequest,
+        lampiranBaru: List<BerkasLampiran>,
+        lampiranDihapus: List<String>,
+        ajukan: Boolean,
+        selesai: () -> Unit
+    ) {
+        jalankan {
+            repo.ubahHasil(id, request)
+            if (ajukan) repo.ajukanHasil(id)
+
+            var gagalLampiran = 0
+            lampiranDihapus.forEach { lampiranId ->
+                runCatching { repo.hapusLampiran(lampiranId) }
+                    .onFailure { gagalLampiran++ }
+            }
+            lampiranBaru.forEach { berkas ->
+                runCatching { repo.unggahBuktiHasil(id, berkas) }
+                    .onFailure { gagalLampiran++ }
+            }
+
+            hasil = repo.daftarHasil(pengguna?.id)
+            pesan = if (ajukan) {
+                "Hasil kerja dikirim ulang ke atasan"
+            } else {
+                "Perubahan hasil kerja disimpan"
+            }
+            if (gagalLampiran > 0) {
+                galat = "$gagalLampiran bukti gagal diproses"
+            }
+            selesai()
+        }
+    }
+
+    fun ajukanHasil(id: String) {
+        jalankan {
+            repo.ajukanHasil(id)
+            hasil = repo.daftarHasil(pengguna?.id)
+            pesan = "Hasil kerja dikirim ke atasan"
+        }
+    }
+
+    fun muatDetailHasil(id: String, selesai: (Hasil) -> Unit) {
+        viewModelScope.launch {
+            sedangMemproses = true
+            galat = null
+            try {
+                selesai(repo.detailHasil(id))
+            } catch (error: ApiException) {
+                if (error.status == 401) {
+                    pengguna = null
+                    galat = "Sesi berakhir, silakan login kembali"
+                } else {
+                    galat = error.message
+                }
+            } catch (error: Exception) {
+                galat = error.message ?: "Terjadi kesalahan"
+            } finally {
+                sedangMemproses = false
+            }
+        }
+    }
+
+    // ------------------------------------------------ verifikasi hasil kerja
+
+    fun muatVerifikasiHasil() {
+        if (!bisaMemverifikasiHasil) return
+        jalankan { hasilMenungguVerifikasi = repo.daftarVerifikasiHasil() }
+    }
+
+    fun putuskanVerifikasiHasil(
+        id: String,
+        setuju: Boolean,
+        skorKualitas: Double?,
+        catatan: String?,
+        selesai: () -> Unit
+    ) {
+        jalankan {
+            repo.verifikasiHasil(
+                id,
+                VerifikasiHasilRequest(
+                    setuju = setuju,
+                    skorKualitas = if (setuju) skorKualitas else null,
+                    catatan = catatan
+                )
+            )
+            hasilMenungguVerifikasi = repo.daftarVerifikasiHasil()
+            hasil = repo.daftarHasil(pengguna?.id)
+            pesan = if (setuju) "Hasil kerja terverifikasi" else "Hasil kerja dikembalikan untuk revisi"
             selesai()
         }
     }
@@ -499,24 +689,135 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     // ----------------------------------------------------------------- output
 
     fun muatOutput() {
-        jalankan { output = repo.daftarOutput() }
+        jalankan { output = repo.daftarOutput(pengguna?.id) }
     }
 
-    fun buatOutput(
+    fun simpanOutput(
         request: OutputRequest,
-        namaBerkas: String?,
-        mime: String?,
-        byte: ByteArray?,
+        lampiran: List<BerkasLampiran>,
         selesai: () -> Unit
     ) {
         jalankan {
-            val dibuat = repo.buatOutput(request)
-            if (namaBerkas != null && mime != null && byte != null) {
-                repo.unggahBukti(dibuat.id, namaBerkas, mime, byte)
+            val dibuat = repo.buatOutput(request.copy(ajukan = false))
+
+            var gagalUnggah = 0
+            lampiran.forEach { berkas ->
+                runCatching { repo.unggahBuktiOutput(dibuat.id, berkas) }
+                    .onFailure { gagalUnggah++ }
             }
-            runCatching { repo.ajukanOutput(dibuat.id) }
-            output = repo.daftarOutput()
-            pesan = "Output tersimpan dan diajukan verifikasi"
+
+            val dikirim = request.ajukan && gagalUnggah == 0
+            if (dikirim) repo.ajukanOutput(dibuat.id)
+
+            output = repo.daftarOutput(pengguna?.id)
+            pesan = when {
+                dikirim -> "Output dikirim ke atasan"
+                request.ajukan -> "Output disimpan sebagai draf karena unggahan gagal"
+                else -> "Output disimpan sebagai draf"
+            }
+            if (gagalUnggah > 0) {
+                galat = "$gagalUnggah dari ${lampiran.size} berkas gagal diunggah"
+            } else if (lampiran.isNotEmpty()) {
+                pesan = "$pesan · ${lampiran.size} berkas terunggah"
+            }
+            selesai()
+        }
+    }
+
+    fun ubahOutput(
+        id: String,
+        request: UbahOutputRequest,
+        lampiranBaru: List<BerkasLampiran>,
+        lampiranDihapus: List<String>,
+        ajukan: Boolean,
+        selesai: () -> Unit
+    ) {
+        jalankan {
+            repo.ubahOutput(id, request)
+
+            var gagalLampiran = 0
+            lampiranDihapus.forEach { lampiranId ->
+                runCatching { repo.hapusLampiran(lampiranId) }
+                    .onFailure { gagalLampiran++ }
+            }
+            lampiranBaru.forEach { berkas ->
+                runCatching { repo.unggahBuktiOutput(id, berkas) }
+                    .onFailure { gagalLampiran++ }
+            }
+
+            val dikirim = ajukan && gagalLampiran == 0
+            if (dikirim) repo.ajukanOutput(id)
+
+            output = repo.daftarOutput(pengguna?.id)
+            pesan = when {
+                dikirim -> "Output dikirim ulang ke atasan"
+                ajukan -> "Perubahan disimpan, pengiriman dibatalkan karena unggahan gagal"
+                else -> "Perubahan output disimpan"
+            }
+            if (gagalLampiran > 0) {
+                galat = "$gagalLampiran berkas gagal diproses"
+            }
+            selesai()
+        }
+    }
+
+    fun ajukanOutput(id: String) {
+        jalankan {
+            repo.ajukanOutput(id)
+            output = repo.daftarOutput(pengguna?.id)
+            pesan = "Output dikirim ke atasan"
+        }
+    }
+
+    fun muatDetailOutput(id: String, selesai: (Output) -> Unit) {
+        viewModelScope.launch {
+            sedangMemproses = true
+            galat = null
+            try {
+                selesai(repo.detailOutput(id))
+            } catch (error: ApiException) {
+                if (error.status == 401) {
+                    pengguna = null
+                    galat = "Sesi berakhir, silakan login kembali"
+                } else {
+                    galat = error.message
+                }
+            } catch (error: Exception) {
+                galat = error.message ?: "Terjadi kesalahan"
+            } finally {
+                sedangMemproses = false
+            }
+        }
+    }
+
+    // ------------------------------------------------- verifikasi output
+
+    fun muatVerifikasiOutput() {
+        if (!bisaMemverifikasiOutput) return
+        jalankan { outputMenungguVerifikasi = repo.daftarVerifikasiOutput() }
+    }
+
+    fun putuskanVerifikasiOutput(
+        id: String,
+        setuju: Boolean,
+        skorKesesuaian: Double?,
+        skorKeabsahan: Double?,
+        catatan: String?,
+        selesai: () -> Unit
+    ) {
+        jalankan {
+            repo.verifikasiOutput(
+                id,
+                VerifikasiOutputRequest(
+                    setuju = setuju,
+                    skorKesesuaian = if (setuju) skorKesesuaian else null,
+                    skorKeabsahan = if (setuju) skorKeabsahan else null,
+                    catatan = catatan
+                )
+            )
+            outputMenungguVerifikasi = repo.daftarVerifikasiOutput()
+            output = repo.daftarOutput(pengguna?.id)
+            pesan = if (setuju) "Output disetujui" else "Output dikembalikan untuk revisi"
             selesai()
         }
     }

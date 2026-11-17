@@ -158,7 +158,10 @@
             "items": { "$ref": "#/components/schemas/RoleScope" }
           },
           "must_change_password": { "type": "boolean" },
-          "atasan_id": { "type": "string", "format": "uuid", "nullable": true }
+          "atasan_id": { "type": "string", "format": "uuid", "nullable": true },
+          "email": { "type": "string", "nullable": true },
+          "phone": { "type": "string", "nullable": true },
+          "foto_url": { "type": "string", "nullable": true }
         }
       },
       "AbsensiRequest": {
@@ -295,6 +298,63 @@
     },
     "/auth/logout": { "post": { "tags": ["auth"], "summary": "Cabut refresh token", "responses": { "200": { "description": "Berhasil keluar" } } } },
     "/auth/me": { "get": { "tags": ["auth"], "summary": "Profil pengguna aktif", "responses": { "200": { "description": "Profil", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pengguna" } } } } } } },
+    "/auth/profile": {
+      "patch": {
+        "tags": ["auth"],
+        "summary": "Ubah nama, telepon, dan email sendiri",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nama": { "type": "string", "nullable": true },
+                  "pangkat": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "Salah satu pangkat Polri (BHARADA … JENDERAL POL)"
+                  },
+                  "jabatan": { "type": "string", "nullable": true },
+                  "phone": { "type": "string", "nullable": true },
+                  "email": { "type": "string", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Profil diperbarui" }, "422": { "description": "Data tidak valid" } }
+      }
+    },
+    "/auth/foto": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Unggah foto profil (multipart, JPG/PNG maks. 5 MB)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Foto tersimpan" }, "413": { "description": "Melebihi 5 MB" }, "422": { "description": "Bukan JPG/PNG" } }
+      }
+    },
+    "/auth/foto/{id}": {
+      "get": {
+        "tags": ["auth"],
+        "summary": "Foto profil personel",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Gambar" }, "404": { "description": "Belum ada foto" } }
+      }
+    },
     "/auth/change-password": {
       "post": {
         "tags": ["auth"],
@@ -886,7 +946,8 @@
                   "progres_persen": { "type": "number" },
                   "jumlah_realisasi": { "type": "number", "nullable": true },
                   "kendala": { "type": "string", "nullable": true },
-                  "tanggal_realisasi": { "type": "string", "format": "date" }
+                  "tanggal_realisasi": { "type": "string", "format": "date" },
+                  "ajukan": { "type": "boolean", "description": "false menyimpan draf" }
                 },
                 "required": ["rencana_id", "uraian_pelaksanaan", "progres_persen", "tanggal_realisasi"]
               }
@@ -896,8 +957,20 @@
         "responses": { "200": { "description": "Terkirim" }, "422": { "description": "Rencana belum disetujui" } }
       }
     },
+    "/hasil-kerja/verifikasi": {
+      "get": { "tags": ["hasil"], "summary": "Hasil kerja menunggu verifikasi atasan langsung", "responses": { "200": { "description": "Daftar" } } }
+    },
     "/hasil-kerja/{id}": {
-      "get": { "tags": ["hasil"], "summary": "Detail hasil kerja", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } }
+      "get": { "tags": ["hasil"], "summary": "Detail hasil kerja + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
+      "patch": {
+        "tags": ["hasil"],
+        "summary": "Ubah hasil kerja draft/perlu revisi",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Diperbarui" }, "422": { "description": "Status tidak dapat diubah" } }
+      }
+    },
+    "/hasil-kerja/{id}/ajukan": {
+      "post": { "tags": ["hasil"], "summary": "Ajukan hasil kerja ke atasan", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diajukan" } } }
     },
     "/hasil-kerja/{id}/verifikasi": {
       "post": {
@@ -923,7 +996,7 @@
       }
     },
     "/output": {
-      "get": { "tags": ["output"], "summary": "Daftar output", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "Daftar" } } },
+      "get": { "tags": ["output"], "summary": "Daftar output", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }, { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Daftar" } } },
       "post": {
         "tags": ["output"],
         "summary": "Buat output dari hasil kerja terverifikasi",
@@ -942,7 +1015,8 @@
                   "judul": { "type": "string" },
                   "uraian": { "type": "string", "nullable": true },
                   "tanggal_hasil": { "type": "string", "format": "date" },
-                  "url_eksternal": { "type": "string", "nullable": true }
+                  "url_eksternal": { "type": "string", "nullable": true },
+                  "ajukan": { "type": "boolean", "description": "false menyimpan draf" }
                 },
                 "required": ["hasil_kerja_id", "jenis_output", "judul", "tanggal_hasil"]
               }
@@ -952,14 +1026,62 @@
         "responses": { "200": { "description": "Dibuat" } }
       }
     },
+    "/output/verifikasi": {
+      "get": { "tags": ["output"], "summary": "Output dalam verifikasi atasan langsung", "responses": { "200": { "description": "Daftar" } } }
+    },
     "/output/{id}": {
-      "get": { "tags": ["output"], "summary": "Detail output + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } }
+      "get": { "tags": ["output"], "summary": "Detail output + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
+      "patch": {
+        "tags": ["output"],
+        "summary": "Ubah output draft/perlu revisi",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "jenis_output": { "type": "string" },
+                  "judul": { "type": "string" },
+                  "uraian": { "type": "string", "nullable": true },
+                  "tanggal_hasil": { "type": "string", "format": "date" },
+                  "url_eksternal": { "type": "string", "nullable": true }
+                },
+                "required": ["jenis_output", "judul", "tanggal_hasil"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Diperbarui" }, "422": { "description": "Status tidak dapat diubah" } }
+      }
     },
     "/output/{id}/ajukan": {
       "post": { "tags": ["output"], "summary": "Ajukan output untuk verifikasi", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diajukan" } } }
     },
     "/output/{id}/verifikasi": {
-      "post": { "tags": ["output"], "summary": "Verifikasi output", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Disetujui / perlu revisi" } } }
+      "post": {
+        "tags": ["output"],
+        "summary": "Verifikasi output",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "setuju": { "type": "boolean" },
+                  "skor_kesesuaian": { "type": "number", "nullable": true },
+                  "skor_keabsahan": { "type": "number", "nullable": true },
+                  "catatan": { "type": "string", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Disetujui / perlu revisi" } }
+      }
     },
     "/lampiran": {
       "post": {

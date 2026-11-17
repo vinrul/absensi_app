@@ -248,6 +248,7 @@ pg_enum!(
     StatusOutput,
     "status_output",
     [
+        Draft => "draft",
         MenungguVerifikasi => "menunggu_verifikasi",
         DalamVerifikasi => "dalam_verifikasi",
         Disetujui => "disetujui",

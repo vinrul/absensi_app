@@ -177,7 +177,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 70 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/dev/waktu` |
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 76 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/dev/waktu`, hasil/output draf + verifikasi, profil/foto |
 | 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
 | 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
 | 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
@@ -196,7 +196,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
 | 9.6 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
 | 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 48/48 cek lulus |
-| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (70 path) |
+| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (76 path) |
 | 9.9 | Pagination & form personel (combobox pangkat) | ✅ | `bun run check` 0 error, `bun run build` sukses; verifikasi visual di browser tetap disarankan |
 | 9.10 | Uji API titik dinas (tambah/ubah jenis & koordinat/hapus) | ✅ | 3 cek tambahan pada `api-smoke.js` |
 | 9.11 | Uji jam palsu development | ✅ | 6 cek tambahan: aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
@@ -206,6 +206,14 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.15 | Lampiran contoh PDF/PNG dapat diunduh | ✅ | `GET /lampiran/raw/{key}` → 200, `application/pdf`/`image/png`, signature `%PDF`/PNG valid; detail persetujuan Android menampilkan kedua berkas |
 | 9.16 | Penampil lampiran Android | ✅ | emulator: PDF `SP-123-Pengungkapan.pdf` dirender satu halaman; PNG `Bukti-Transaksi.png` tampil penuh, pinch-zoom berfungsi |
 | 9.17 | Detail rencana berstatus disetujui | ✅ | emulator: kartu disetujui menampilkan **Lihat Detail Rencana**; dialog memuat status Disetujui, rincian, dan lampiran `Laporan-Pelaksanaan-Tahap-1.pdf` yang dapat dibuka |
+| 9.18 | Wizard hasil kerja Android + slider progres | ✅ | emulator: 3 langkah, slider 0–100 default 100%, **Simpan Draf** dan **Kirim ke Atasan**; draft tampil di daftar dan dapat dikirim ulang |
+| 9.19 | Verifikasi hasil kerja Android | ✅ | emulator `000100`: kartu Beranda + tab Hasil, detail lampiran, Terverifikasi (skor kualitas) dan Perlu Revisi (catatan wajib) |
+| 9.20 | Wizard output Android + verifikasi atasan | ✅ | emulator: draf tanpa berkas, mode ubah menambah PDF, kirim ke atasan; atasan melihat 3 output, detail + PDF viewer, tolak tanpa catatan 422, setujui dengan skor 90/92 |
+| 9.21 | Data demo output | ✅ | seed: draft, dalam verifikasi (PDF+PNG), perlu revisi (catatan + PDF), dan disetujui untuk `85000001`/`85210022` |
+| 9.22 | Profil Android: foto, edit, ganti password | ✅ | emulator: avatar seed tampil, unggah PNG baru berhasil, edit nama/pangkat (combobox 21 tingkat)/jabatan/telepon/email tersimpan, validasi password wajib; API: ganti password mencabut sesi lama |
+| 9.23 | Slider skor verifikasi | ✅ | emulator: skor kualitas 85→62, kesesuaian 90→54 dan keabsahan 92→82 pada dialog output |
+| 9.24 | Tampil/sembunyi password & avatar Beranda | ✅ | emulator: ikon mata mengubah titik-titik menjadi `Polri#2026` dan kembali; avatar tampil di Beranda `85000001`, tidak tampil untuk `000100` |
+| 9.25 | Validasi pangkat/jabatan profil | ✅ | API: pangkat `BRIPKA`/`JENDERAL POL` diterima, `KOLONEL` ditolak 422, jabatan <3 karakter ditolak 422 |
 
 ## 10. Yang belum dikerjakan (backlog)
 

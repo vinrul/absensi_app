@@ -1,5 +1,7 @@
 package id.polri.poldabali.kinerja.ui
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -19,11 +22,16 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.polri.poldabali.kinerja.data.Absensi
@@ -31,6 +39,53 @@ import id.polri.poldabali.kinerja.ui.theme.Warna
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+
+/**
+ * Avatar bulat dari byte foto profil.
+ *
+ * `tampilkanInisial = false` dipakai Beranda agar tidak menggambar placeholder
+ * ketika personel belum mengunggah foto.
+ */
+@Composable
+fun FotoProfil(
+    foto: ByteArray?,
+    nama: String? = null,
+    ukuran: Dp = 48.dp,
+    tampilkanInisial: Boolean = true
+) {
+    val bitmap = remember(foto) {
+        foto?.let {
+            runCatching {
+                BitmapFactory.decodeByteArray(it, 0, it.size)?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    if (bitmap == null && !tampilkanInisial) return
+
+    Box(
+        Modifier
+            .size(ukuran)
+            .clip(CircleShape)
+            .background(Warna.NavySoft),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = "Foto profil",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize()
+            )
+        } else {
+            Text(
+                nama?.trim()?.firstOrNull()?.uppercase() ?: "?",
+                style = MaterialTheme.typography.titleMedium,
+                color = Warna.Navy,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
 
 @Composable
 fun Kartu(
@@ -246,9 +301,60 @@ fun labelJenisRencana(jenis: String): String = when (jenis) {
 }
 
 fun labelStatusOutput(status: String): String = when (status) {
+    "draft" -> "Draft"
     "menunggu_verifikasi" -> "Menunggu Verifikasi"
     "dalam_verifikasi" -> "Dalam Verifikasi"
     "disetujui" -> "Disetujui"
+    "perlu_revisi" -> "Perlu Revisi"
+    else -> status
+}
+
+val JENIS_OUTPUT: List<Pair<String, String>> = listOf(
+    "laporan" to "Laporan",
+    "dokumen_pendukung" to "Dokumen Pendukung",
+    "foto" to "Foto Kegiatan",
+    "video" to "Video Kegiatan",
+    "data_diagram" to "Data/Diagram",
+    "berita_acara" to "Berita Acara",
+    "surat_nota_dinas" to "Surat/Nota Dinas",
+    "link_sistem" to "Link/Sistem"
+)
+
+fun labelJenisOutput(jenis: String): String =
+    JENIS_OUTPUT.firstOrNull { it.first == jenis }?.second ?: jenis
+
+/** Pangkat Polri dari terendah ke tertinggi (sama dengan combobox dashboard). */
+val PANGKAT_POLRI: List<Pair<String, String>> = listOf(
+    "BHARADA" to "Bhayangkara Dua (Bharada)",
+    "BHARATU" to "Bhayangkara Satu (Bharatu)",
+    "BHARAKA" to "Bhayangkara Kepala (Bharaka)",
+    "ABRIPDA" to "Ajun Brigadir Polisi Dua (Abripda)",
+    "ABRIPTU" to "Ajun Brigadir Polisi Satu (Abriptu)",
+    "ABRIPKA" to "Ajun Brigadir Polisi Kepala (Abripka)",
+    "BRIPDA" to "Brigadir Polisi Dua (Bripda)",
+    "BRIPTU" to "Brigadir Polisi Satu (Briptu)",
+    "BRIPKA" to "Brigadir Polisi Kepala (Bripka)",
+    "AIPDA" to "Ajun Inspektur Polisi Dua (Aipda)",
+    "AIPTU" to "Ajun Inspektur Polisi Satu (Aiptu)",
+    "IPDA" to "Inspektur Polisi Dua (Ipda)",
+    "IPTU" to "Inspektur Polisi Satu (Iptu)",
+    "AKP" to "Ajun Komisaris Polisi (AKP)",
+    "KOMPOL" to "Komisaris Polisi (Kompol)",
+    "AKBP" to "Ajun Komisaris Besar Polisi (AKBP)",
+    "KOMBES POL" to "Komisaris Besar Polisi (Kombes Pol)",
+    "BRIGJEN POL" to "Brigadir Jenderal Polisi (Brigjen Pol)",
+    "IRJEN POL" to "Inspektur Jenderal Polisi (Irjen Pol)",
+    "KOMJEN POL" to "Komisaris Jenderal Polisi (Komjen Pol)",
+    "JENDERAL POL" to "Jenderal Polisi"
+)
+
+fun labelPangkat(pangkat: String): String =
+    PANGKAT_POLRI.firstOrNull { it.first == pangkat }?.second ?: pangkat
+
+fun labelStatusHasil(status: String): String = when (status) {
+    "draft" -> "Draft"
+    "diajukan" -> "Menunggu Verifikasi"
+    "terverifikasi" -> "Terverifikasi"
     "perlu_revisi" -> "Perlu Revisi"
     else -> status
 }

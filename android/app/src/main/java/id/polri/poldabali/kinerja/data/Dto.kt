@@ -26,7 +26,10 @@ data class Pengguna(
     val satkerLevel: String,
     val roles: List<String> = emptyList(),
     val mustChangePassword: Boolean = false,
-    val atasanId: String? = null
+    val atasanId: String? = null,
+    val email: String? = null,
+    val phone: String? = null,
+    val fotoUrl: String? = null
 ) {
     val peranUtama: String
         get() = when {
@@ -52,6 +55,21 @@ data class TokenResponse(
     val refreshToken: String,
     val tokenType: String = "Bearer",
     val expiresIn: Long = 900
+)
+
+@Serializable
+data class UbahProfilRequest(
+    val nama: String? = null,
+    val pangkat: String? = null,
+    val jabatan: String? = null,
+    val phone: String? = null,
+    val email: String? = null
+)
+
+@Serializable
+data class UbahPasswordRequest(
+    val oldPassword: String,
+    val newPassword: String
 )
 
 @Serializable
@@ -292,7 +310,10 @@ data class Hasil(
     val skorWaktu: Double? = null,
     val skorTotal: Double? = null,
     val catatanVerifikator: String? = null,
-    val rencanaKegiatan: String? = null
+    val rencanaKegiatan: String? = null,
+    val personelNama: String? = null,
+    val personelNrp: String? = null,
+    val lampiran: List<Lampiran> = emptyList()
 )
 
 @Serializable
@@ -302,7 +323,24 @@ data class HasilRequest(
     val progresPersen: Double,
     val jumlahRealisasi: Double? = null,
     val kendala: String? = null,
+    val tanggalRealisasi: String,
+    val ajukan: Boolean = true
+)
+
+@Serializable
+data class UbahHasilRequest(
+    val uraianPelaksanaan: String,
+    val progresPersen: Double,
+    val jumlahRealisasi: Double? = null,
+    val kendala: String? = null,
     val tanggalRealisasi: String
+)
+
+@Serializable
+data class VerifikasiHasilRequest(
+    val setuju: Boolean = true,
+    val skorKualitas: Double? = null,
+    val catatan: String? = null
 )
 
 // ---------------------------------------------------------------------- output
@@ -311,14 +349,22 @@ data class HasilRequest(
 data class Output(
     val id: String,
     val hasilKerjaId: String = "",
+    val rencanaId: String = "",
+    val rencanaKegiatan: String? = null,
+    val personelNama: String? = null,
+    val personelNrp: String? = null,
     val jenisOutput: String,
     val judul: String,
     val uraian: String? = null,
     val tanggalHasil: String,
     val urlEksternal: String? = null,
     val status: String = "menunggu_verifikasi",
+    val skorKelengkapan: Double? = null,
+    val skorKesesuaian: Double? = null,
+    val skorKeabsahan: Double? = null,
     val skorTotal: Double? = null,
-    val catatanVerifikator: String? = null
+    val catatanVerifikator: String? = null,
+    val lampiran: List<Lampiran> = emptyList()
 )
 
 @Serializable
@@ -328,7 +374,25 @@ data class OutputRequest(
     val judul: String,
     val uraian: String? = null,
     val tanggalHasil: String,
+    val urlEksternal: String? = null,
+    val ajukan: Boolean = true
+)
+
+@Serializable
+data class UbahOutputRequest(
+    val jenisOutput: String,
+    val judul: String,
+    val uraian: String? = null,
+    val tanggalHasil: String,
     val urlEksternal: String? = null
+)
+
+@Serializable
+data class VerifikasiOutputRequest(
+    val setuju: Boolean = true,
+    val skorKesesuaian: Double? = null,
+    val skorKeabsahan: Double? = null,
+    val catatan: String? = null
 )
 
 // ------------------------------------------------------------------- penilaian

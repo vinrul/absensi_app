@@ -163,6 +163,33 @@ class Api(private val sesi: PenyimpananSesi) {
         hasil.second
     }
 
+    /** Unggah foto profil (multipart) ke `POST /auth/foto`. */
+    suspend fun unggahFoto(namaBerkas: String, mime: String, byte: ByteArray): String =
+        withContext(Dispatchers.IO) {
+            val isi = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart("file", namaBerkas, byte.toRequestBody(mime.toMediaType()))
+                .build()
+
+            val kirimSekali = suspend {
+                val pembangun = Request.Builder()
+                    .url(alamat() + "auth/foto")
+                    .post(isi)
+                sesi.aksesToken()?.let { pembangun.header("Authorization", "Bearer $it") }
+                klien.newCall(pembangun.build()).execute().use { respons ->
+                    respons.code to (respons.body?.string().orEmpty())
+                }
+            }
+
+            var hasil = kirimSekali()
+            if (hasil.first == 401 && segarkan()) hasil = kirimSekali()
+
+            if (hasil.first !in 200..299) {
+                throw ApiException(hasil.first, pesanError(hasil.second, hasil.first))
+            }
+            hasil.second
+        }
+
     /** Mengunduh berkas biner (mis. lampiran) dengan bearer token + refresh otomatis. */
     suspend fun unduh(path: String): ByteArray {
         val url = alamat() + path.removePrefix("/")
