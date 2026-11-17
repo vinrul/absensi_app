@@ -97,7 +97,14 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Pembatasan 5 percobaan login/menit/IP → HTTP 429 + `Retry-After`.
 
 ### FR-02 Absensi harian
-- Status: dinas kantor, dinas luar, piket/shift, libur nasional, cuti, izin, sakit, tanpa keterangan.
+- Status: dinas kantor, dinas luar, PH (Perintah Hadir), piket/shift, libur nasional, cuti, izin,
+  sakit, tanpa keterangan.
+- Aplikasi Android menampilkan alur bertahap: tombol **Absensi** → validasi lokasi (peta OSM,
+  titik dinas terdekat, radius, jarak, akurasi) → pilihan status → kirim atau simpan offline.
+- Tombol absen mengikuti status server hari ini: hanya Masuk bila belum masuk, hanya Pulang bila
+  sudah masuk; bila status server tidak dapat diambil, kedua tombol ditampilkan dan mode offline aktif.
+- Status **PH** pada absensi harian berbeda dari modul PH/Strong Point yang memiliki jadwal,
+  strong point, dan absensi sendiri.
 - Status yang dihitung hadir wajib menyertakan koordinat GPS; server menghitung jarak ke titik
   dinas terdekat (Haversine) dengan toleransi akurasi GPS.
 - Di luar radius → HTTP 422 dengan pesan jarak aktual dan radius.
@@ -219,6 +226,25 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Unit dan email tidak lagi diminta pada form personel; data lama tetap ditampilkan bila ada.
 - Atasan langsung wajib berada pada satker yang sama dan berstatus aktif.
 - Peran admin tidak dapat diberikan lewat halaman Data Personel; gunakan halaman Akun Admin.
+
+### FR-17 Titik dinas berbasis peta
+- Admin dan atasan mengelola titik dinas per satker (nama, jenis kantor/luar, koordinat, radius).
+- Form tambah/edit menampilkan peta OpenStreetMap (Leaflet). Koordinat dapat diketik manual atau
+  dipilih dengan klik peta dan digeser melalui penanda.
+- Lingkaran radius tampil di peta dan ikut berubah saat radius diubah; nilai valid 10–5000 meter.
+- Saat edit, satker tidak dipindah; nama, jenis, koordinat, radius, dan status aktif dapat diubah.
+
+### FR-18 Jam server palsu (development)
+- Backend dapat memakai jam palsu untuk pengujian (mis. `cargo run --bin fake -- 20-11-2026 07:45`).
+- Jam palsu memengaruhi tanggal/jam absensi, endpoint `/absensi/hari-ini`, dan validasi tanggal.
+- Fitur hanya aktif bila `APP__ALLOW_FAKE_TIME=true`; produksi wajib memakai jam sistem.
+- Perintah `fake status` dan `fake reset` tersedia; tidak ada perubahan permanen pada data selain absensi uji.
+
+### FR-19 Wizard izin Android
+- Wizard tampil sekali sebelum login setelah aplikasi dipasang/di-reset.
+- Menjelaskan izin lokasi (validasi radius, tanpa pelacakan latar belakang), kamera (foto bukti opsional),
+  notifikasi (pengingat PH), serta WorkManager/penyimpanan (antrean offline, cache privat).
+- Setiap izin dapat diberikan, ditolak, atau dilewati; status dapat diubah lewat Pengaturan Android.
 
 ## 6. Kebutuhan non-fungsional
 

@@ -37,7 +37,15 @@ pub fn build(state: AppState) -> Router {
         .nest("/dashboard", routes::dashboard::routes())
         .nest("/laporan", routes::laporan::routes())
         .nest("/notifikasi", routes::notifikasi::routes())
-        .nest("/audit", routes::audit::routes())
+        .nest("/audit", routes::audit::routes());
+
+    let api = if state.settings.allow_fake_time {
+        api.nest("/dev", routes::dev::routes())
+    } else {
+        api
+    };
+
+    let api = api
         .with_state(state.clone())
         // Audit di dalam, pembatas laju di luar: permintaan yang ditolak
         // karena limit tidak perlu dicatat sebagai mutasi.

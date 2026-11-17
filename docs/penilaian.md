@@ -12,7 +12,7 @@ personel yang dinilai.
 
 | Kondisi | Skor harian |
 |---|---|
-| Hadir (dinas kantor / dinas luar / piket) dalam radius | 100 |
+| Hadir (dinas kantor / dinas luar / PH / piket) dalam radius | 100 |
 | Telat | −1 per 10 menit (maksimal −20) |
 | Pulang cepat | −1 per 10 menit (maksimal −20) |
 | Tidak absen pulang | 50 |

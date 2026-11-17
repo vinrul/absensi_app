@@ -18,13 +18,14 @@ use crate::repo::titik_dinas;
 use crate::repo::{ListResponse, pagination};
 use crate::service::geofence;
 use crate::service::storage;
-use crate::service::waktu::{hari_ini_wita, ke_wita};
+use crate::service::waktu::{self, ke_wita};
 use crate::state::AppState;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_absensi).post(create_absensi))
         .route("/saya", get(list_saya))
+        .route("/hari-ini", get(hari_ini))
         .route("/rekap", get(rekap_absensi))
         .route("/titik-terdekat", get(titik_terdekat))
         .route("/{id}/verifikasi", post(verifikasi_absensi))
@@ -142,14 +143,17 @@ pub async fn create_absensi(
         return Ok(Json(AbsensiResponse {
             data: existing.into(),
             geofence,
-            server_time: Utc::now(),
+            server_time: waktu::sekarang_utc(),
         }));
     }
 
-    let lokal = ke_wita(req.captured_at);
+    // Saat jam palsu aktif (development), tanggal/jam absensi mengikuti jam palsu
+    // agar skenario uji tidak bergantung pada jam perangkat.
+    let acuan = waktu::override_aktif().unwrap_or(req.captured_at);
+    let lokal = ke_wita(acuan);
     let tanggal = lokal.date_naive();
     let jam = lokal.time();
-    let hari_ini = hari_ini_wita();
+    let hari_ini = waktu::hari_ini_wita();
 
     if tanggal > hari_ini + Duration::days(1) {
         return Err(AppError::Unprocessable(
@@ -281,7 +285,7 @@ pub async fn create_absensi(
             tanggal,
             jenis: req.jenis,
             status_kehadiran: req.status_kehadiran,
-            captured_at: req.captured_at,
+            captured_at: acuan,
             jam,
             latitude: koordinat.map(|(lat, _)| lat),
             longitude: koordinat.map(|(_, lng)| lng),
@@ -315,7 +319,38 @@ pub async fn create_absensi(
             radius_m: hasil.radius_m,
             dalam_radius: hasil.dalam_radius,
         },
-        server_time: Utc::now(),
+        server_time: waktu::sekarang_utc(),
+    }))
+}
+
+#[derive(Debug, Serialize)]
+pub struct AbsensiHariIniResponse {
+    pub tanggal: NaiveDate,
+    pub masuk: Option<AbsensiDto>,
+    pub pulang: Option<AbsensiDto>,
+}
+
+/// Status absensi personel untuk tanggal server hari ini (termasuk jam palsu).
+pub async fn hari_ini(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<AbsensiHariIniResponse>> {
+    let tanggal = waktu::hari_ini_wita();
+    let rows = absensi::list_personel(&state.pool, user.id(), tanggal, tanggal).await?;
+
+    let mut masuk = None;
+    let mut pulang = None;
+    for row in rows {
+        match row.jenis {
+            AbsensiJenis::Masuk => masuk = Some(row.into()),
+            AbsensiJenis::Pulang => pulang = Some(row.into()),
+        }
+    }
+
+    Ok(Json(AbsensiHariIniResponse {
+        tanggal,
+        masuk,
+        pulang,
     }))
 }
 
@@ -332,7 +367,7 @@ pub async fn list_saya(
     user: AuthUser,
     Query(query): Query<RiwayatQuery>,
 ) -> AppResult<Json<Vec<AbsensiDto>>> {
-    let hari_ini = hari_ini_wita();
+    let hari_ini = waktu::hari_ini_wita();
     let sampai = query.sampai.unwrap_or(hari_ini);
     let dari = query.dari.unwrap_or_else(|| {
         NaiveDate::from_ymd_opt(hari_ini.year(), hari_ini.month(), 1).unwrap_or(sampai)

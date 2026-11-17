@@ -25,10 +25,12 @@ fun BerandaScreen(
     onBukaAbsensi: () -> Unit,
     onBukaNilai: () -> Unit
 ) {
-    val pengguna = vm.pengguna
-    val hariIni = vm.riwayat.filter { it.tanggal == tanggalHariIni() }
-    val masuk = hariIni.firstOrNull { it.jenis == "masuk" }
-    val pulang = hariIni.firstOrNull { it.jenis == "pulang" }
+    	val pengguna = vm.pengguna
+    	val statusServer = vm.absensiHariIni
+    	val tanggalTampil = statusServer?.tanggal ?: tanggalHariIni()
+    	val dariRiwayat = vm.riwayat.filter { it.tanggal == tanggalTampil }
+    	val masuk = statusServer?.masuk ?: dariRiwayat.firstOrNull { it.jenis == "masuk" }
+    	val pulang = statusServer?.pulang ?: dariRiwayat.firstOrNull { it.jenis == "pulang" }
 
     Column(
         Modifier
@@ -61,7 +63,7 @@ fun BerandaScreen(
         }
 
         Kartu {
-            JudulBagian("Kehadiran Hari Ini", tanggalIndo(tanggalHariIni()))
+            			JudulBagian("Kehadiran Hari Ini", tanggalIndo(tanggalTampil))
             Spacer(Modifier.height(10.dp))
 
             Row(

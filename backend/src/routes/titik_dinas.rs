@@ -129,6 +129,7 @@ pub async fn create_titik(
 #[derive(Debug, Deserialize)]
 pub struct UpdateTitikRequest {
     pub nama: Option<String>,
+    pub jenis: Option<TitikDinasJenis>,
     pub latitude: Option<f64>,
     pub longitude: Option<f64>,
     pub radius_m: Option<i32>,
@@ -152,10 +153,34 @@ pub async fn update_titik(
         .ok_or_else(|| AppError::NotFound("Titik dinas tidak ditemukan".into()))?;
     user.require_satker(existing.satker_id)?;
 
+    if let Some(nama) = req.nama.as_deref()
+        && nama.trim().is_empty()
+    {
+        return Err(AppError::BadRequest("Nama titik dinas wajib diisi".into()));
+    }
+    if let Some(latitude) = req.latitude
+        && !(-90.0..=90.0).contains(&latitude)
+    {
+        return Err(AppError::Unprocessable("Koordinat tidak valid".into()));
+    }
+    if let Some(longitude) = req.longitude
+        && !(-180.0..=180.0).contains(&longitude)
+    {
+        return Err(AppError::Unprocessable("Koordinat tidak valid".into()));
+    }
+    if let Some(radius) = req.radius_m
+        && !(10..=5000).contains(&radius)
+    {
+        return Err(AppError::Unprocessable(
+            "Radius harus antara 10 dan 5000 meter".into(),
+        ));
+    }
+
     titik_dinas::update(
         &state.pool,
         id,
         req.nama.as_deref(),
+        req.jenis,
         req.latitude,
         req.longitude,
         req.radius_m,

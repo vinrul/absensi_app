@@ -3,8 +3,8 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 17 November 2026 (backend unit test + 39 cek API pada DB uji;
-dashboard `bun run check`/`build`; APK debug; `openapi.json` 67 path).
+Terakhir diverifikasi: 17 November 2026 (backend unit test + 48 cek API pada DB uji;
+dashboard `bun run check`/`build`; APK debug; `openapi.json` 70 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
@@ -21,6 +21,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Akun admin terpisah secara logis (`jenis_akun=admin`, username, tanpa NRP) | migrasi `0007`, halaman **Akun Admin** |
 | Login berkanal: admin hanya web, Android hanya akun personel | `routes/auth.rs`, `KanalLogin` |
 | CRUD satker + jam kerja + hari kerja (zona waktu & Sabtu setengah hari) | halaman **Satker & Jam Kerja** |
+| Titik dinas dengan peta OpenStreetMap interaktif (tambah/edit, radius, koordinat) | `PetaPicker.svelte` (Leaflet), halaman **Titik Dinas** |
 | Periode bulan berjalan dibuat otomatis + dapat dibuka kembali | `repo/periode.rs::pastikan_bulan_ini` / `buka`; alasan tersimpan |
 | Kesiapan satker per periode (admin satker menandai, admin global memantau) | tabel `periode_satker_kesiapan`, halaman **Kesiapan Periode** |
 | Kalender hari libur nasional & khusus satker | tabel `hari_libur`, halaman **Hari Libur**, otomatis netral di penilaian |
@@ -28,9 +29,12 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Pagination seragam di seluruh modul daftar | komponen `Pagination.svelte`; lihat CHECKLIST §3.24 |
 | CRUD akun admin + username + cakupan + reset password | halaman **Akun Admin** (`/admin`) |
 | Modul PH / Strong Point terpisah | migrasi `0006`, `/ph/*`, halaman **PH & Strong Point** |
+| Jam server palsu development (`fake`) | `/dev/waktu` + `cargo run --bin fake --`; hanya aktif dengan `APP__ALLOW_FAKE_TIME=true` |
+| Absensi Android bertahap + peta OSM | tombol besar → validasi GPS/peta → status → kirim/offline; `PetaAbsensi.kt` |
+| Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
 | Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422 |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00 & 60 menit sebelum |
-| Logo Polda Bali di dashboard, cetak, Android, ikon launcher | login/sidebar/top bar/launcher |
+| Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
 | Absensi + geofence + antrean offline | e2e: dalam radius 200, luar radius 422, duplikat 409 |
 | Rencana kerja + persetujuan + lampiran | e2e alur penuh |
@@ -40,7 +44,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Aplikasi Android (login, absensi GPS, offline, PH, 7 tab) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
-| Dokumentasi API | `/docs` (67 path), `/api-docs/openapi.json` |
+| Dokumentasi API | `/docs` (70 path), `/api-docs/openapi.json` |
 | Backup script | `deploy/backup.sh` (belum dijadwalkan di server) |
 
 **Belum / pekerjaan lanjutan** — lihat §9 backlog.
@@ -51,7 +55,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
 ```
 backend/    Rust 1.99, axum 0.8.9, sqlx 0.9, PostgreSQL 18
-dashboard/  Svelte 5.57, SvelteKit 3.2, Tailwind 4.3, Vite 8.3 — kelola dengan **bun**
+dashboard/  Svelte 5.57, SvelteKit 3.2, Tailwind 4.3, Vite 8.3, Leaflet 1.9 (peta OSM) — kelola dengan **bun**
 android/    Kotlin 2.4.21, AGP 9.0.1, Gradle 9.3, Compose BOM 2025.06, OkHttp 4.12
 deploy/     docker compose (db :5433), nginx, backup.sh
 docs/       PRD.md, penilaian.md, UAT.md, CHECKLIST.md, HANDOFF.md (dokumen ini)
@@ -62,6 +66,11 @@ tools/uji/  api-smoke.js (e2e DB uji), openapi-check.js
 # Database + API (demo)
 cd deploy; podman compose up -d db           # atau: docker compose up -d db
 cd ..\backend; cargo run --bin seed -- --reset; cargo run
+
+# Jam server palsu (development; .env harus APP__ALLOW_FAKE_TIME=true)
+cargo run --bin fake -- 20-11-2026 07:45
+cargo run --bin fake -- status
+cargo run --bin fake -- reset
 
 # Database uji terpisah (untuk e2e/unit test)
 # DATABASE_URL=postgres://kinerja:kinerja_dev@127.0.0.1:5433/kinerja_test
@@ -272,7 +281,7 @@ memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).
 |---|---|---|
 | Unit | `cd backend; cargo test` | geofence, scoring, deteksi berkas, kanal login |
 | Lint Rust | `cargo clippy --all-targets -- -D warnings` | — |
-| API e2e | `bun tools/uji/api-smoke.js` (DB `kinerja_test`, API :8091) | RBAC ber-scope, CRUD satker/personel/admin, kesiapan, libur, PH 39 cek |
+| API e2e | `bun tools/uji/api-smoke.js` (DB `kinerja_test`, API :8091) | RBAC ber-scope, CRUD satker/personel/admin/titik dinas, kesiapan, libur, PH, jam palsu 48 cek |
 | OpenAPI | `bun tools/uji/openapi-check.js` | JSON valid + seluruh `$ref` ada |
 | Periode otomatis | `bun tools/uji/periode-auto-check.js` | Hapus periode DB uji → dashboard memicu pembuatan bulan berjalan |
 | Type-check UI | `cd dashboard; bun run check` | 0 error |

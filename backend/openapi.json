@@ -168,7 +168,7 @@
           "jenis": { "type": "string", "enum": ["masuk", "pulang"] },
           "status_kehadiran": {
             "type": "string",
-            "enum": ["dinas_kantor", "dinas_luar", "piket", "libur_nasional", "cuti", "izin", "sakit", "tanpa_keterangan"]
+            "enum": ["dinas_kantor", "dinas_luar", "ph", "piket", "libur_nasional", "cuti", "izin", "sakit", "tanpa_keterangan"]
           },
           "captured_at": { "type": "string", "format": "date-time" },
           "latitude": { "type": "number", "nullable": true },
@@ -566,7 +566,7 @@
       "post": { "tags": ["master"], "summary": "Tambah titik dinas (admin/atasan)", "responses": { "200": { "description": "Titik dibuat" } } }
     },
     "/titik-dinas/{id}": {
-      "patch": { "tags": ["master"], "summary": "Ubah titik dinas", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diperbarui" } } },
+      "patch": { "tags": ["master"], "summary": "Ubah titik dinas", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "properties": { "nama": { "type": "string" }, "jenis": { "type": "string", "enum": ["kantor", "luar"] }, "latitude": { "type": "number" }, "longitude": { "type": "number" }, "radius_m": { "type": "integer", "minimum": 10, "maximum": 5000 }, "is_active": { "type": "boolean" } } } } } }, "responses": { "200": { "description": "Diperbarui" } } },
       "delete": { "tags": ["master"], "summary": "Hapus titik dinas", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Dihapus" } } }
     },
     "/ph/strong-point": {
@@ -764,6 +764,13 @@
         "responses": { "200": { "description": "Riwayat" } }
       }
     },
+    "/absensi/hari-ini": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Absensi hari ini menurut jam server (termasuk jam palsu development)",
+        "responses": { "200": { "description": "Tanggal server, absen masuk dan pulang" } }
+      }
+    },
     "/absensi/rekap": {
       "get": {
         "tags": ["absensi"],
@@ -790,6 +797,18 @@
     },
     "/absensi/{id}/verifikasi": {
       "post": { "tags": ["absensi"], "summary": "Verifikasi absensi offline/mock", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Terverifikasi" } } }
+    },
+    "/dev/waktu": {
+      "get": { "tags": ["sistem"], "summary": "Status jam server palsu (development)", "responses": { "200": { "description": "Status" } } },
+      "post": {
+        "tags": ["sistem"],
+        "summary": "Atur jam server palsu (development)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["tanggal", "jam"], "properties": { "tanggal": { "type": "string", "example": "2026-11-11" }, "jam": { "type": "string", "example": "07:45" }, "zona": { "type": "string", "enum": ["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura"] } } } } } },
+        "responses": { "200": { "description": "Jam palsu aktif" }, "403": { "description": "Mode development tidak aktif" } }
+      }
+    },
+    "/dev/waktu/reset": {
+      "post": { "tags": ["sistem"], "summary": "Kembali ke jam sistem (development)", "responses": { "200": { "description": "Reset" } } }
     },
     "/rencana-kerja": {
       "get": {

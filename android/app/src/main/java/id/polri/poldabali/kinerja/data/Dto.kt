@@ -94,6 +94,13 @@ data class AbsensiRequest(
 )
 
 @Serializable
+data class AbsensiHariIni(
+    val tanggal: String,
+    val masuk: Absensi? = null,
+    val pulang: Absensi? = null
+)
+
+@Serializable
 data class AbsensiResponse(
     val data: Absensi,
     val geofence: Geofence,

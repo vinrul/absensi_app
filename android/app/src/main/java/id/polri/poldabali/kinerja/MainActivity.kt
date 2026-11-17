@@ -61,6 +61,7 @@ import id.polri.poldabali.kinerja.ui.OutputScreen
 import id.polri.poldabali.kinerja.ui.PhScreen
 import id.polri.poldabali.kinerja.ui.ProfilScreen
 import id.polri.poldabali.kinerja.ui.RencanaScreen
+import id.polri.poldabali.kinerja.ui.WizardIzinScreen
 import id.polri.poldabali.kinerja.ui.theme.KinerjaTheme
 import id.polri.poldabali.kinerja.ui.theme.Warna
 
@@ -103,17 +104,22 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
         }
     }
 
-    if (vm.memuatSesi) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Warna.Navy)
-        }
-        return
-    }
+    	if (vm.memuatSesi || vm.wizardIzinSelesai == null) {
+    		Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    			CircularProgressIndicator(color = Warna.Navy)
+    		}
+    		return
+    	}
 
-    if (vm.pengguna == null) {
-        LoginScreen(vm) { }
-        return
-    }
+    	if (vm.wizardIzinSelesai == false) {
+    		WizardIzinScreen(onSelesai = vm::tandaiWizardIzinSelesai)
+    		return
+    	}
+
+    	if (vm.pengguna == null) {
+    		LoginScreen(vm) { }
+    		return
+    	}
 
     var tabAktif by rememberSaveable { mutableStateOf(0) }
     var bukaProfil by rememberSaveable { mutableStateOf(false) }

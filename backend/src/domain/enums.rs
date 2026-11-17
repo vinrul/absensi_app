@@ -137,6 +137,7 @@ pg_enum!(
     [
         DinasKantor => "dinas_kantor",
         DinasLuar => "dinas_luar",
+        Ph => "ph",
         Piket => "piket",
         LiburNasional => "libur_nasional",
         Cuti => "cuti",
@@ -149,7 +150,10 @@ pg_enum!(
 impl StatusKehadiran {
     /// Kehadiran yang dihitung sebagai hari kerja efektif (masuk penyebut).
     pub fn dihitung_hadir(&self) -> bool {
-        matches!(self, Self::DinasKantor | Self::DinasLuar | Self::Piket)
+        matches!(
+            self,
+            Self::DinasKantor | Self::DinasLuar | Self::Ph | Self::Piket
+        )
     }
 
     /// Status yang menetralkan hari tersebut (dikeluarkan dari penyebut).

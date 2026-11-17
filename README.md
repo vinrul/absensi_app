@@ -106,8 +106,15 @@ nyata, ubah lewat menu **Profil → Server** menjadi `http://<ip-server>:8080/ap
   (10 baris per halaman); modul besar memakai pagination server-side.
 - **Master & jam kerja**: tambah/ubah satker, zona waktu (WIB/WITA/WIT), jam masuk/pulang,
   hari kerja, dan jam pulang Sabtu untuk hari kerja setengah hari (mis. 10:00/12:00).
-- **Absensi**: GPS radius 100 m (validasi server), 8 status kehadiran, foto opsional,
-  deteksi mock location, antrean offline + sinkronisasi otomatis, verifikasi atasan.
+- **Titik dinas dengan peta interaktif**: tambah/edit titik langsung di peta OpenStreetMap
+  (klik atau geser penanda), lingkaran radius, dan input koordinat manual tetap tersedia.
+- **Absensi**: GPS radius 100 m (validasi server), 8 status kehadiran (termasuk PH/Perintah Hadir
+  pada absensi harian), foto opsional, deteksi mock location, antrean offline + sinkronisasi otomatis.
+- **Alur absensi Android**: tombol besar **Absensi** → validasi lokasi dengan peta OpenStreetMap,
+  titik dinas terdekat, radius, jarak, dan akurasi → pilihan status kehadiran → kirim/simpan offline.
+  Tombol Masuk/Pulang mengikuti absensi hari ini dari server; bila server tidak terjangkau,
+  keduanya ditampilkan dan data dapat disimpan offline.
+- **Wizard izin**: penjelasan lokasi, kamera, notifikasi, WorkManager, dan penyimpanan sebelum login. 
 - **PH / Strong Point terpisah**: strong point per satker, jadwal bulanan per personel,
   check-in **dan check-out wajib lokasi**, verifikasi, serta rekap PH sendiri.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
@@ -125,7 +132,8 @@ nyata, ubah lewat menu **Profil → Server** menjadi `http://<ip-server>:8080/ap
   otomatis dikeluarkan dari perhitungan absensi harian.
 - **Dashboard pimpinan**: KPI, capaian per indikator, tren, sebaran kategori, rekap
   berpaginasi, catatan & keputusan, cetak A4, ekspor CSV.
-- **Branding**: logo Polda Bali di login, sidebar, kop laporan, aplikasi Android, dan ikon launcher.
+- **Branding**: logo Polda Bali di login (terpusat), sidebar, kop laporan, aplikasi Android, dan ikon launcher. Password pada login Android dapat ditampilkan/disembunyikan lewat ikon mata.
+- **Jam server palsu (development)**: `cargo run --bin fake -- DD-MM-YYYY HH:MM` mengubah jam yang dipakai backend untuk absensi; endpoint hanya aktif bila `APP__ALLOW_FAKE_TIME=true`.
 - **Operasional**: audit log setiap mutasi, rate limit login 5/menit/IP, RBAC ber-scope,
   backup harian database + berkas.
 
@@ -144,10 +152,11 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 ## Verifikasi yang sudah dilakukan
 
 - `cargo test` → **30 test lulus** (geofence, scoring, deteksi berkas, kanal login).
-- `bun tools/uji/api-smoke.js` → **39/39 cek lulus** pada database uji `kinerja_test`:
-  RBAC ber-scope, CRUD satker/personel/admin, zona waktu & jam Sabtu, kanal login Android,
-  tutup/buka periode, kesiapan satker, kalender libur, jadwal & absensi PH, verifikasi, rekap.
-- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (67 path).
+- `bun tools/uji/api-smoke.js` → **48/48 cek lulus** pada database uji `kinerja_test`:
+  RBAC ber-scope, CRUD satker/personel/admin, titik dinas (termasuk ubah jenis & koordinat),
+  zona waktu & jam Sabtu, kanal login Android, tutup/buka periode, kesiapan satker,
+  kalender libur, jadwal & absensi PH, jam server palsu, verifikasi, rekap.
+- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (70 path).
 - `bun run check` → 0 error · `bun run build` → sukses.
 - `gradlew :app:assembleDebug` → APK debug terbentuk (7 tab, termasuk PH).
 - Emulator Pixel 6a: login, absen GPS, dan navigasi modul utama.

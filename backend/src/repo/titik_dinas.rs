@@ -95,10 +95,12 @@ pub async fn create(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn update(
     pool: &PgPool,
     id: Uuid,
     nama: Option<&str>,
+    jenis: Option<TitikDinasJenis>,
     latitude: Option<f64>,
     longitude: Option<f64>,
     radius_m: Option<i32>,
@@ -107,15 +109,17 @@ pub async fn update(
     const SQL: &str = r#"
         UPDATE titik_dinas
            SET nama = COALESCE($2, nama),
-               latitude = COALESCE($3::float8::numeric, latitude),
-               longitude = COALESCE($4::float8::numeric, longitude),
-               radius_m = COALESCE($5, radius_m),
-               is_active = COALESCE($6, is_active)
+               jenis = COALESCE($3, jenis),
+               latitude = COALESCE($4::float8::numeric, latitude),
+               longitude = COALESCE($5::float8::numeric, longitude),
+               radius_m = COALESCE($6, radius_m),
+               is_active = COALESCE($7, is_active)
          WHERE id = $1 AND deleted_at IS NULL
     "#;
     let result = sqlx::query(SQL)
         .bind(id)
         .bind(nama)
+        .bind(jenis)
         .bind(latitude)
         .bind(longitude)
         .bind(radius_m)

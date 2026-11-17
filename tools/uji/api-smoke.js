@@ -27,7 +27,8 @@ const server = Bun.spawn([BIN_API], {
 		APP__DATABASE_URL: DATABASE_URL,
 		APP__PORT: String(PORT),
 		APP__RUN_MIGRATIONS: "false",
-		APP__UPLOAD_DIR: "./data-test/uploads"
+		APP__UPLOAD_DIR: "./data-test/uploads",
+		APP__ALLOW_FAKE_TIME: "true"
 	},
 	stdout: "inherit",
 	stderr: "inherit"
@@ -328,6 +329,49 @@ try {
 			updateSatker.data.jam_masuk === "06:30" &&
 			updateSatker.data.jam_pulang_sabtu === "10:00"
 	);
+
+	const titikBaru = await panggil(adminToken, "/titik-dinas", {
+		method: "POST",
+		body: {
+			satker_id: satkerBaru.data.id,
+			nama: "Titik Uji Peta",
+			jenis: "kantor",
+			latitude: -8.65,
+			longitude: 115.22,
+			radius_m: 150
+		}
+	});
+	cek(
+		"admin membuat titik dinas",
+		titikBaru.status === 200 && titikBaru.data?.radius_m === 150,
+		JSON.stringify(titikBaru.data)
+	);
+	const titikUbah = await panggil(adminToken, `/titik-dinas/${titikBaru.data.id}`, {
+		method: "PATCH",
+		body: {
+			nama: "Titik Uji Peta Baru",
+			jenis: "luar",
+			latitude: -8.66,
+			longitude: 115.23,
+			radius_m: 250,
+			is_active: false
+		}
+	});
+	cek(
+		"titik dinas dapat diubah termasuk jenis & koordinat",
+		titikUbah.status === 200 &&
+			titikUbah.data?.nama === "Titik Uji Peta Baru" &&
+			titikUbah.data?.jenis === "luar" &&
+			titikUbah.data?.latitude === -8.66 &&
+			titikUbah.data?.longitude === 115.23 &&
+			titikUbah.data?.radius_m === 250 &&
+			titikUbah.data?.is_active === false,
+		JSON.stringify(titikUbah.data)
+	);
+	const titikHapus = await panggil(adminToken, `/titik-dinas/${titikBaru.data.id}`, {
+		method: "DELETE"
+	});
+	cek("titik dinas dapat dihapus", titikHapus.status === 200, `status ${titikHapus.status}`);
 	const zonaSalah = await panggil(adminToken, "/satker", {
 		method: "POST",
 		body: {
@@ -483,6 +527,88 @@ try {
 	cek("check-out PH di dalam radius berhasil", pulang.status === 200, JSON.stringify(pulang.data));
 	const rekapPh = await panggil(adminToken, "/ph/rekap?bulan=2026-11");
 	cek("rekap PH memuat personel uji", rekapPh.status === 200 && rekapPh.data.data.some((r) => r.personel_id === personel.user.id));
+
+	// ------------------------------------------------------------ jam palsu dev
+	const fakeSet = await fetch(`${BASE}/dev/waktu`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ tanggal: "2026-11-20", jam: "07:45" })
+	});
+	const fakeData = await fakeSet.json();
+	cek(
+		"jam server palsu development dapat diaktifkan",
+		fakeSet.status === 200 && fakeData.aktif === true && fakeData.tanggal === "2026-11-20",
+		JSON.stringify(fakeData)
+	);
+
+	const hariFake = await panggil(personel.access_token, "/absensi/hari-ini");
+	cek(
+		"hari ini mengikuti tanggal server palsu",
+		hariFake.status === 200 && hariFake.data.tanggal === "2026-11-20" && hariFake.data.masuk === null,
+		JSON.stringify(hariFake.data)
+	);
+
+	const daftarTitik = await panggil(adminToken, "/titik-dinas");
+	const titikPersonel = daftarTitik.data.find((t) => t.satker_id === detailPersonel.data.satker_id);
+	const absenFake = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "masuk",
+			status_kehadiran: "dinas_kantor",
+			captured_at: new Date().toISOString(),
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5,
+			is_offline: false,
+			is_mock_suspect: false,
+			device_id: "uji-fake-clock"
+		}
+	});
+	cek(
+		"absen masuk memakai tanggal dan jam palsu",
+		absenFake.status === 200 &&
+			absenFake.data.data.tanggal === "2026-11-20" &&
+			absenFake.data.data.jam === "07:45",
+		JSON.stringify(absenFake.data?.data)
+	);
+
+	const hariSetelahAbsen = await panggil(personel.access_token, "/absensi/hari-ini");
+	cek(
+		"status hari ini mendeteksi absen masuk",
+		hariSetelahAbsen.status === 200 && hariSetelahAbsen.data.masuk?.jenis === "masuk",
+		JSON.stringify(hariSetelahAbsen.data)
+	);
+
+	await fetch(`${BASE}/dev/waktu`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ tanggal: "2026-11-21", jam: "08:00" })
+	});
+	const absenPh = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "masuk",
+			status_kehadiran: "ph",
+			captured_at: new Date().toISOString(),
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5,
+			is_offline: false,
+			is_mock_suspect: false,
+			device_id: "uji-status-ph"
+		}
+	});
+	cek(
+		"status PH (Perintah Hadir) diterima pada absensi harian",
+		absenPh.status === 200 && absenPh.data.data.status_kehadiran === "ph",
+		JSON.stringify(absenPh.data)
+	);
+
+	const fakeReset = await fetch(`${BASE}/dev/waktu/reset`, { method: "POST" });
+	const resetData = await fakeReset.json();
+	cek("jam server palsu dapat dikembalikan", fakeReset.status === 200 && resetData.aktif === false);
 } catch (error) {
 	console.error(error);
 	hasil.push({ nama: "exception", lulus: false, detail: String(error) });

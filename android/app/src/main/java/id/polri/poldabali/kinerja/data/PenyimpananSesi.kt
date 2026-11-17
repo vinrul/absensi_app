@@ -2,6 +2,7 @@ package id.polri.poldabali.kinerja.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.Json
@@ -20,7 +21,8 @@ class PenyimpananSesi(private val context: Context) {
         val akses = stringPreferencesKey("token_akses")
         val segar = stringPreferencesKey("token_segar")
         val pengguna = stringPreferencesKey("pengguna")
-        val server = stringPreferencesKey("alamat_server")
+        		val server = stringPreferencesKey("alamat_server")
+        		val wizardIzin = booleanPreferencesKey("wizard_izin_selesai")
     }
 
     suspend fun simpanLogin(akses: String, segar: String, pengguna: Pengguna) {
@@ -59,9 +61,16 @@ class PenyimpananSesi(private val context: Context) {
 
     suspend fun alamatServer(): String? = context.dataStore.data.first()[Kunci.server]
 
-    suspend fun setAlamatServer(url: String) {
-        context.dataStore.edit { it[Kunci.server] = url }
-    }
+    	suspend fun setAlamatServer(url: String) {
+    		context.dataStore.edit { it[Kunci.server] = url }
+    	}
+
+    	suspend fun wizardIzinSelesai(): Boolean =
+    		context.dataStore.data.first()[Kunci.wizardIzin] ?: false
+
+    	suspend fun setWizardIzinSelesai() {
+    		context.dataStore.edit { it[Kunci.wizardIzin] = true }
+    	}
 
     suspend fun hapusSesi() {
         context.dataStore.edit { pref ->

@@ -102,6 +102,7 @@ export interface HariLibur {
 export type StatusKehadiran =
 	| 'dinas_kantor'
 	| 'dinas_luar'
+	| 'ph'
 	| 'piket'
 	| 'libur_nasional'
 	| 'cuti'
@@ -318,6 +319,7 @@ export interface ListResponse<T> {
 export const LABEL_STATUS_KEHADIRAN: Record<StatusKehadiran, string> = {
 	dinas_kantor: 'Dinas Kantor',
 	dinas_luar: 'Dinas Luar',
+	ph: 'PH (Perintah Hadir)',
 	piket: 'Piket/Shift',
 	libur_nasional: 'Libur Nasional',
 	cuti: 'Cuti',

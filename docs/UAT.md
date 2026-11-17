@@ -12,7 +12,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| A1 | Buka `/docs` | Daftar 62 endpoint tampil, filter tag berfungsi | ✅ | |
+| A1 | Buka `/docs` | Daftar 70 endpoint tampil, filter tag berfungsi | ✅ | |
 | A2 | Login memakai username `superuser` | Berhasil; `jenis_akun=admin`, `nrp=null` | ✅ | API |
 | A3 | Login memakai NRP `000001` | Gagal (admin tidak punya NRP) | ✅ | API |
 | A4 | Login `superuser` dengan `client=android` | 403 "Akun admin hanya dapat masuk melalui dashboard web" | ✅ | API |
@@ -43,6 +43,8 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A29 | Buka halaman Hari Libur | 5 libur nasional seed tampil | ✅ | API |
 | A30 | Tambah libur nasional + duplikat | Tersimpan; tanggal sama 409 | ✅ | API |
 | A31 | Buka daftar satker/libur/titik dinas/kesiapan/PH/absensi/rekap/persetujuan | Tiap tabel menampilkan “Menampilkan X–Y dari N” dan tombol Sebelumnya/Berikutnya; maks. 10 baris | ⬜ | UI |
+| A32 | Tambah titik dinas, klik peta OpenStreetMap | Koordinat terisi otomatis, penanda & lingkaran radius muncul; simpan berhasil | ⬜ | UI |
+| A33 | Edit titik dinas: ubah nama, jenis, koordinat/penanda, radius, status | Perubahan tersimpan dan tampil di tabel | ⬜ | API ✅; UI perlu uji visual |
 
 ## B. Admin ber-scope
 
@@ -66,7 +68,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| C1 | Login di Android | Masuk ke Beranda, nama/pangkat/satker benar | ✅ | emulator |
+| C1 | Login di Android | Logo & header terpusat, ikon mata menampilkan/menyembunyikan password, masuk ke Beranda | ✅ | emulator |
 | C2 | Absen masuk di dalam radius | Tercatat, "0 m dari titik dinas" | ✅ | emulator |
 | C3 | Absen masuk di luar radius (status Dinas Kantor) | Ditolak 422 dengan jarak & radius | ✅ | API |
 | C4 | Absen dua kali jenis sama di hari sama | 409 "Absen masuk sudah tercatat" | ✅ | API |
@@ -84,6 +86,15 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C16 | Izin notifikasi Android 13+ | Diminta saat pertama buka aplikasi | ⬜ | perangkat |
 | C17 | Pengingat H-1 19:00 & 60 menit sebelum | Notifikasi muncul sesuai jadwal | ⬜ | perangkat |
 | C18 | Login memakai akun admin di Android | Ditolak 403 dengan pesan jelas | ✅ | API |
+| C19 | Buka aplikasi pertama kali setelah install | Wizard izin tampil sebelum login; lokasi, kamera, notifikasi, WorkManager/penyimpanan dijelaskan | ✅ | emulator |
+| C20 | Tekan tombol besar **Absensi** | Halaman validasi peta OpenStreetMap dengan titik dinas, radius, lokasi, jarak, dan akurasi | ✅ | emulator |
+| C21 | Belum absen masuk hari ini | Hanya tombol **Absen Masuk** yang tampil | ✅ | emulator |
+| C22 | Sudah absen masuk hari ini | Hanya tombol **Absen Pulang** yang tampil | ✅ | emulator |
+| C23 | Di dalam radius | Status Dinas Kantor otomatis terpilih; di luar radius tidak ada yang terpilih | ✅ | emulator |
+| C24 | Server tidak terjangkau saat cek absensi hari ini | Dua tombol tampil, mode offline aktif, absensi tersimpan di perangkat | ✅ | emulator |
+| C25 | Riwayat absensi | Terbuka di halaman terpisah dan memuat riwayat bulan berjalan | ✅ | emulator |
+| C26 | Jam server palsu `20-11-2026 07:45` | Absensi tercatat tanggal 20 Nov 2026 pukul 07:45; reset mengembalikan jam sistem | ✅ | API + emulator |
+| C27 | Pilih status **PH (Perintah Hadir)** | Tersimpan sebagai status `ph` dan dihitung hadir | ✅ | API |
 
 ## D. Atasan Langsung (`000100` / `Atasan#2026`)
 
@@ -123,7 +134,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | F3 | `bun run check` | 0 error, 0 warning | ✅ | |
 | F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` | ✅ | |
 | F5 | `.gradlew :app:assembleDebug` | APK debug terbentuk | ✅ | |
-| F6 | `bun tools/uji/api-smoke.js` | 39/39 cek lulus (DB `kinerja_test`) | ✅ | |
+| F6 | `bun tools/uji/api-smoke.js` | 48/48 cek lulus (DB `kinerja_test`) | ✅ | |
 | F7 | `bun tools/uji/openapi-check.js` | JSON valid, semua `$ref` ada | ✅ | |
 | F8 | Restore backup di lingkungan uji | Data & berkas kembali utuh | ⬜ | |
 | F9 | Uji 1 bulan data riil | Hitung periode < 60 detik | ⬜ | |

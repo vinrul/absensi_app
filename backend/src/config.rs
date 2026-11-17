@@ -12,6 +12,8 @@ pub struct Settings {
     pub run_migrations: bool,
     pub cors_origins: Vec<String>,
     pub cookie_secure: bool,
+    /// Hanya untuk development: mengaktifkan endpoint jam server palsu.
+    pub allow_fake_time: bool,
 }
 
 fn var(key: &str) -> Option<String> {
@@ -61,6 +63,9 @@ impl Settings {
                 .filter(|s| !s.is_empty())
                 .collect(),
             cookie_secure: var("COOKIE_SECURE")
+                .map(|v| v == "true" || v == "1")
+                .unwrap_or(false),
+            allow_fake_time: var("ALLOW_FAKE_TIME")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),
         })

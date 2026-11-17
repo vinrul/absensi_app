@@ -3,6 +3,7 @@ pub mod admin;
 pub mod audit;
 pub mod auth;
 pub mod dashboard;
+pub mod dev;
 pub mod hasil;
 pub mod health;
 pub mod lampiran;

@@ -285,7 +285,7 @@ pub struct RekapRow {
 const REKAP_SQL: &str = r#"
     SELECT p.id AS personel_id, p.nama, p.nrp, p.pangkat, p.jabatan, p.unit, p.satker_id,
            count(a.id) FILTER (
-               WHERE a.status_kehadiran IN ('dinas_kantor', 'dinas_luar', 'piket')
+               WHERE a.status_kehadiran IN ('dinas_kantor', 'dinas_luar', 'piket', 'ph')
            ) AS hadir,
            count(a.id) FILTER (WHERE a.status_kehadiran = 'dinas_luar') AS dinas_luar,
            count(a.id) FILTER (WHERE a.status_kehadiran = 'piket') AS piket,

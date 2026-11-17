@@ -1,13 +1,43 @@
+use std::sync::RwLock;
+
 use chrono::{DateTime, Datelike, FixedOffset, NaiveDate, Utc};
 
 pub const WITA_OFFSET_SECS: i32 = 8 * 3600;
+
+/// Override waktu hanya untuk pengembangan. `None` berarti memakai jam sistem.
+static OVERRIDE_UTC: RwLock<Option<DateTime<Utc>>> = RwLock::new(None);
+
+fn baca_override() -> Option<DateTime<Utc>> {
+    *OVERRIDE_UTC
+        .read()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+pub fn sekarang_utc() -> DateTime<Utc> {
+    baca_override().unwrap_or_else(Utc::now)
+}
+
+pub fn sekarang_wita() -> DateTime<FixedOffset> {
+    ke_wita(sekarang_utc())
+}
 
 pub fn ke_wita(ts: DateTime<Utc>) -> DateTime<FixedOffset> {
     ts.with_timezone(&FixedOffset::east_opt(WITA_OFFSET_SECS).expect("offset WITA valid"))
 }
 
 pub fn hari_ini_wita() -> NaiveDate {
-    ke_wita(Utc::now()).date_naive()
+    sekarang_wita().date_naive()
+}
+
+/// Mengaktifkan/mematikan waktu palsu. Pemanggil wajib memastikan mode development.
+pub fn set_override(nilai: Option<DateTime<Utc>>) {
+    *OVERRIDE_UTC
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner()) = nilai;
+}
+
+pub fn override_aktif() -> Option<DateTime<Utc>> {
+    baca_override()
 }
 
 pub fn awal_bulan(tanggal: NaiveDate) -> NaiveDate {

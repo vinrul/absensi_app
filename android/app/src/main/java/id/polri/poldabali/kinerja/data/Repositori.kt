@@ -46,22 +46,37 @@ class Repositori(
         antrean.kosongkan()
     }
 
-    suspend fun alamatServer(): String = sesi.alamatServer() ?: Api.ALAMAT_BAWAAN
+    	suspend fun alamatServer(): String = sesi.alamatServer() ?: Api.ALAMAT_BAWAAN
 
-    suspend fun ubahAlamatServer(url: String) = sesi.setAlamatServer(url.trim())
+    	suspend fun ubahAlamatServer(url: String) = sesi.setAlamatServer(url.trim())
+
+    	suspend fun wizardIzinSelesai(): Boolean = sesi.wizardIzinSelesai()
+
+    	suspend fun tandaiWizardIzinSelesai() = sesi.setWizardIzinSelesai()
 
     // ---------------------------------------------------------------- absensi
 
-    suspend fun riwayatAbsensi(dari: String, sampai: String): List<Absensi> {
-        val teks = api.panggil("GET", "absensi/saya?dari=$dari&sampai=$sampai")
-        return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)
-    }
+    	suspend fun riwayatAbsensi(dari: String, sampai: String): List<Absensi> {
+    		val teks = api.panggil("GET", "absensi/saya?dari=$dari&sampai=$sampai")
+    		return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)
+    	}
 
-    suspend fun kirimAbsensi(request: AbsensiRequest): AbsensiResponse {
-        val body = json.encodeToString(AbsensiRequest.serializer(), request)
-        val teks = api.panggil("POST", "absensi", body)
-        return json.decodeFromString(AbsensiResponse.serializer(), teks)
-    }
+    	/** Riwayat bulan berjalan menurut tanggal server (mendukung jam palsu development). */
+    	suspend fun riwayatAbsensiBulanIni(): List<Absensi> {
+    		val teks = api.panggil("GET", "absensi/saya")
+    		return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)
+    	}
+
+    	suspend fun kirimAbsensi(request: AbsensiRequest): AbsensiResponse {
+    		val body = json.encodeToString(AbsensiRequest.serializer(), request)
+    		val teks = api.panggil("POST", "absensi", body)
+    		return json.decodeFromString(AbsensiResponse.serializer(), teks)
+    	}
+
+    	suspend fun absensiHariIni(): AbsensiHariIni {
+    		val teks = api.panggil("GET", "absensi/hari-ini")
+    		return json.decodeFromString(AbsensiHariIni.serializer(), teks)
+    	}
 
     suspend fun titikTerdekat(latitude: Double, longitude: Double, akurasi: Double): TitikTerdekatResponse {
         val teks = api.panggil(

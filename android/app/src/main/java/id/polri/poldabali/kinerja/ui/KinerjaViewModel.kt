@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import id.polri.poldabali.kinerja.data.Absensi
 import id.polri.poldabali.kinerja.data.AbsensiAntrean
+import id.polri.poldabali.kinerja.data.AbsensiHariIni
 import id.polri.poldabali.kinerja.data.AbsensiPh
 import id.polri.poldabali.kinerja.data.AbsensiPhRequest
 import id.polri.poldabali.kinerja.data.AbsensiRequest
@@ -33,8 +34,11 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     private val repo = Graf.repositori
 
-    var pengguna by mutableStateOf<Pengguna?>(null)
-        private set
+    	var pengguna by mutableStateOf<Pengguna?>(null)
+        		private set
+
+        	var wizardIzinSelesai by mutableStateOf<Boolean?>(null)
+        		private set
 
     var memuatSesi by mutableStateOf(true)
         private set
@@ -48,8 +52,18 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     var galat by mutableStateOf<String?>(null)
         private set
 
-    var riwayat by mutableStateOf<List<Absensi>>(emptyList())
-        private set
+    	var riwayat by mutableStateOf<List<Absensi>>(emptyList())
+        		private set
+
+        	var absensiHariIni by mutableStateOf<AbsensiHariIni?>(null)
+        		private set
+
+        	var memuatAbsensiHariIni by mutableStateOf(false)
+        		private set
+
+        	/** True bila status absensi hari ini tidak dapat diambil dari server. */
+        	var absensiHariIniOffline by mutableStateOf(false)
+        		private set
 
     var antrean by mutableStateOf<List<AbsensiAntrean>>(emptyList())
         private set
@@ -82,12 +96,13 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         private set
 
     init {
-        viewModelScope.launch {
-            alamatServer = repo.alamatServer()
-            pengguna = repo.penggunaTersimpan()
-            memuatSesi = false
-            if (pengguna != null) muatSemua()
-        }
+        		viewModelScope.launch {
+        			alamatServer = repo.alamatServer()
+        			pengguna = repo.penggunaTersimpan()
+        			wizardIzinSelesai = runCatching { repo.wizardIzinSelesai() }.getOrDefault(false)
+        			memuatSesi = false
+        			if (pengguna != null) muatSemua()
+        		}
     }
 
     // ------------------------------------------------------------------ util
@@ -183,14 +198,48 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     // --------------------------------------------------------------- absensi
 
-    fun muatSemua() {
-        jalankan { muatSemuaLangsung() }
-    }
+    	fun muatSemua() {
+    		jalankan { muatSemuaLangsung() }
+    	}
+
+    	fun tandaiWizardIzinSelesai() {
+    		viewModelScope.launch {
+    			repo.tandaiWizardIzinSelesai()
+    			wizardIzinSelesai = true
+    		}
+    	}
+
+    	/** Memuat status absensi hari ini dari server (tanggal server, bukan jam perangkat). */
+    	fun muatAbsensiHariIni() {
+    		viewModelScope.launch {
+    			memuatAbsensiHariIni = true
+    			try {
+    				absensiHariIni = repo.absensiHariIni()
+    				absensiHariIniOffline = false
+    			} catch (error: ApiException) {
+    				absensiHariIni = null
+    				if (error.status == 401) {
+    					pengguna = null
+    					galat = "Sesi berakhir, silakan login kembali"
+    				} else {
+    					absensiHariIniOffline = true
+    				}
+    			} catch (_: Exception) {
+    				absensiHariIni = null
+    				absensiHariIniOffline = true
+    			} finally {
+    				memuatAbsensiHariIni = false
+    			}
+    		}
+    	}
 
     private suspend fun muatSemuaLangsung() {
         periode = repo.periodeAktif()
         antrean = repo.daftarAntrean()
-        riwayat = repo.riwayatAbsensi(awalBulan(), tanggalHariIni())
+        riwayat = repo.riwayatAbsensiBulanIni()
+        runCatching { absensiHariIni = repo.absensiHariIni() }
+            .onSuccess { absensiHariIniOffline = false }
+            .onFailure { absensiHariIniOffline = true }
 
         // Ringkasan di Beranda butuh jumlah dokumen & nilai terbaru.
         runCatching { rencana = repo.daftarRencana() }
@@ -207,6 +256,10 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     fun muatRiwayat(dari: String, sampai: String) {
         jalankan { riwayat = repo.riwayatAbsensi(dari, sampai) }
+    }
+
+    fun muatRiwayatBulanIni() {
+        jalankan { riwayat = repo.riwayatAbsensiBulanIni() }
     }
 
     fun kirimAbsensi(
@@ -242,7 +295,9 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
                 selesai("Absensi disimpan di perangkat dan akan dikirim otomatis")
             } else {
                 val hasilKirim = repo.kirimAbsensi(request)
-                riwayat = repo.riwayatAbsensi(awalBulan(), tanggalHariIni())
+                riwayat = repo.riwayatAbsensiBulanIni()
+                runCatching { absensiHariIni = repo.absensiHariIni() }
+                    .onSuccess { absensiHariIniOffline = false }
                 val info = buildString {
                     append("Absen ${request.jenis} tercatat pukul ${hasilKirim.data.jam}")
                     val jarak = hasilKirim.geofence.jarakM
@@ -257,7 +312,9 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         jalankan {
             val jumlah = repo.sinkronkanAntrean()
             antrean = repo.daftarAntrean()
-            riwayat = repo.riwayatAbsensi(awalBulan(), tanggalHariIni())
+            riwayat = repo.riwayatAbsensiBulanIni()
+            runCatching { absensiHariIni = repo.absensiHariIni() }
+                .onSuccess { absensiHariIniOffline = false }
             pesan = if (jumlah > 0) "$jumlah absensi berhasil dikirim" else "Tidak ada antrean yang dapat dikirim"
         }
     }

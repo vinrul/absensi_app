@@ -20,6 +20,8 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 1.4 | Logo di layar login Android | ✅ | `LoginScreen.kt` → `R.drawable.logo_polda_bali` |
 | 1.5 | Logo di top bar Android | ✅ | `MainActivity.kt` |
 | 1.6 | Ikon launcher Android memakai logo Polda Bali | ✅ | `mipmap-*/ic_launcher_foreground.png` |
+| 1.7 | Logo & header halaman login Android terpusat | ✅ | `LoginScreen.kt` |
+| 1.8 | Tampil/sembunyikan password dengan ikon mata | ✅ | `IkonMata.kt`, `trailingIcon` pada field password |
 
 ## 2. Struktur organisasi & peran
 
@@ -69,6 +71,13 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.22 | Halaman **Hari Libur** + kalender nasional/khusus satker | ✅ | tabel `hari_libur`, `/libur` |
 | 3.23 | Libur otomatis netral di penilaian absensi | ✅ | `service/penilaian.rs` + detail `hari_libur` |
 | 3.24 | Pagination seragam di semua modul daftar | ✅ | komponen `Pagination.svelte`; server-side: dashboard, penilaian, rencana, hasil, output, personel, admin, persetujuan; client-side: satker, libur, titik dinas, kesiapan, PH, absensi, rekap |
+| 3.25 | Peta interaktif OpenStreetMap untuk tambah/edit titik dinas | ✅ | `PetaPicker.svelte` (Leaflet): klik peta/geser penanda mengisi lat/lng, lingkaran radius, input manual tetap bisa; edit nama/jenis/koordinat/radius/status |
+| 3.26 | Jam server palsu untuk development | ✅ | `cargo run --bin fake -- 20-11-2026 07:45`; endpoint `/dev/waktu` hanya aktif bila `APP__ALLOW_FAKE_TIME=true`; produksi memakai jam sistem |
+| 3.27 | Alur absensi Android bertahap | ✅ | tombol besar → validasi peta/GPS → pilihan status → kirim/simpan offline |
+| 3.28 | Tombol absen adaptif status hari ini | ✅ | hanya Masuk bila belum masuk; hanya Pulang bila sudah masuk; dua tombol bila status server tidak dapat diambil |
+| 3.29 | Peta absensi Android (OSM) + radius & titik terdekat | ✅ | `PetaAbsensi.kt` (osmdroid), marker lokasi, titik dinas, radius, akurasi |
+| 3.30 | Wizard izin pertama kali sebelum login | ✅ | `WizardIzinScreen.kt`: lokasi, kamera, notifikasi, WorkManager/penyimpanan + alasan tiap izin |
+| 3.31 | Riwayat absensi di halaman terpisah | ✅ | tombol **Riwayat Absensi** pada halaman awal tab Absensi |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 
@@ -112,9 +121,9 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 6.1 | Seed baru: 1 Polda, 9 Polres, 21 Satker, 145 personel + 5 admin | ✅ | `cargo run --bin seed -- --reset` |
 | 6.2 | Akun admin per level + pimpinan + atasan + personel | ✅ | lihat tabel di bawah |
 | 6.3 | Data contoh jadwal PH (63 jadwal) | ✅ | |
-| 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–11 |
+| 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–12 |
 | 6.5 | Database uji terpisah `kinerja_test` | ✅ | jangan dicampur dengan data demo |
-| 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (39 cek) |
+| 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (48 cek) |
 | 6.7 | Validator OpenAPI | ✅ | `bun tools/uji/openapi-check.js` |
 | 6.8 | Pembuatan periode otomatis diuji | ✅ | `bun tools/uji/periode-auto-check.js` (menghapus periode DB uji dahulu) |
 
@@ -154,7 +163,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 67 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode |
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 70 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/dev/waktu` |
 | 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
 | 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
 | 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
@@ -172,9 +181,12 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.4 | `bun run check` (dashboard) | ✅ | 0 error |
 | 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
 | 9.6 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
-| 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 39/39 cek lulus |
-| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid |
+| 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 48/48 cek lulus |
+| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (70 path) |
 | 9.9 | Pagination & form personel (combobox pangkat) | ✅ | `bun run check` 0 error, `bun run build` sukses; verifikasi visual di browser tetap disarankan |
+| 9.10 | Uji API titik dinas (tambah/ubah jenis & koordinat/hapus) | ✅ | 3 cek tambahan pada `api-smoke.js` |
+| 9.11 | Uji jam palsu development | ✅ | 6 cek tambahan: aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
+| 9.12 | Alur absensi Android + peta + wizard izin | ✅ | diuji di emulator API 34: wizard, peta/radius, tombol adaptif, status otomatis, offline, riwayat |
 
 ## 10. Yang belum dikerjakan (backlog)
 
@@ -191,3 +203,4 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 10.9 | Uji perangkat nyata (Android 8 & 13) | P1 | emulator sudah |
 | 10.10 | Push FCM untuk notifikasi daring | P3 | pengingat lokal sudah memenuhi kebutuhan |
 | 10.11 | Utoipa/OpenAPI otomatis | P3 | `openapi.json` manual + validator |
+| 10.12 | Cache titik dinas untuk absensi offline sejak awal | P2 | saat offline total, radius belum diketahui sampai ada sinyal |

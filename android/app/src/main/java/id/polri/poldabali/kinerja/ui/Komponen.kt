@@ -217,6 +217,7 @@ fun tanggalIndo(iso: String): String = runCatching {
 fun labelStatusKehadiran(status: String): String = when (status) {
     "dinas_kantor" -> "Dinas Kantor"
     "dinas_luar" -> "Dinas Luar"
+    "ph" -> "PH (Perintah Hadir)"
     "piket" -> "Piket/Shift"
     "libur_nasional" -> "Libur Nasional"
     "cuti" -> "Cuti"
@@ -259,7 +260,7 @@ fun warnaKategori(kategori: String): Color = when (kategori) {
 }
 
 fun warnaStatusKehadiran(status: String): Color = when (status) {
-    "dinas_kantor", "piket", "dinas_luar" -> Warna.Hijau
+    "dinas_kantor", "piket", "dinas_luar", "ph" -> Warna.Hijau
     "tanpa_keterangan" -> Warna.Merah
     "libur_nasional" -> Warna.TeksLembut
     else -> Warna.Kuning
