@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:18-alpine
+    container_name: kinerja-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-kinerja}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kinerja_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-kinerja_db}
+      TZ: Asia/Makassar
+      PGTZ: Asia/Makassar
+    ports:
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      # PostgreSQL 18 menyimpan data di /var/lib/postgresql/18/docker,
+      # jadi mount harus di /var/lib/postgresql (bukan .../data).
+      - ./data/pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kinerja} -d ${POSTGRES_DB:-kinerja_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: kinerja-api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      APP__DATABASE_URL: postgres://${POSTGRES_USER:-kinerja}:${POSTGRES_PASSWORD:-kinerja_dev}@db:5432/${POSTGRES_DB:-kinerja}
+      APP__HOST: 0.0.0.0
+      APP__PORT: 8080
+      APP__JWT_SECRET: ${JWT_SECRET:-ubah-secret-ini-di-produksi-minimal-32-karakter}
+      APP__UPLOAD_DIR: /data/uploads
+      APP__RUN_MIGRATIONS: "true"
+      TZ: Asia/Makassar
+    volumes:
+      - ./data/uploads:/data/uploads
+    ports:
+      - "${API_PORT:-8080}:8080"
+
+  web:
+    image: nginx:1.29-alpine
+    container_name: kinerja-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./data/web:/usr/share/nginx/html:ro
+    ports:
+      - "${WEB_PORT:-8088}:80"

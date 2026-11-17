@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!--
+      Server Polda berjalan di jaringan internal (LAN) dan umumnya tanpa TLS.
+      Untuk produksi, pasang sertifikat dan ubah cleartextTrafficPermitted ke false.
+    -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

@@ -1,0 +1,1181 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "API Absensi & Penilaian Kinerja Personel Polda Bali",
+    "version": "0.1.0",
+    "description": "REST API untuk absensi berbasis geolokasi, rencana kerja, hasil kerja, output, dan penilaian kinerja personel Polda Bali dan Polres jajaran. Autentikasi memakai bearer token (JWT). Klien browser memakai cookie refresh, klien mobile mengirim refresh_token di body."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "tags": [
+    { "name": "auth", "description": "Login, refresh, profil sesi" },
+    { "name": "master", "description": "Satker, personel, titik dinas" },
+    { "name": "absensi", "description": "Kehadiran, geofence, verifikasi" },
+    { "name": "ph", "description": "PH / Strong Point: jadwal per satker, absensi ber-lokasi, rekap" },
+    { "name": "rencana", "description": "Rencana kerja dan persetujuan" },
+    { "name": "hasil", "description": "Realisasi hasil kerja" },
+    { "name": "output", "description": "Bukti hasil kerja" },
+    { "name": "lampiran", "description": "Unggah dan unduh berkas" },
+    { "name": "penilaian", "description": "Periode, bobot, perhitungan nilai" },
+    { "name": "dashboard", "description": "Agregat untuk dashboard pimpinan" },
+    { "name": "laporan", "description": "Laporan cetak dan CSV" },
+    { "name": "sistem", "description": "Kesehatan, notifikasi, audit" }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "schemas": {
+      "Role": {
+        "type": "string",
+        "enum": [
+          "admin_sistem",
+          "admin_polda",
+          "admin_satker_polda",
+          "admin_polres",
+          "admin_satker_polres",
+          "personel",
+          "atasan",
+          "pimpinan",
+          "pimpinan_polda",
+          "pimpinan_satker_polda",
+          "pimpinan_polres",
+          "pimpinan_satker_polres"
+        ]
+      },
+      "RoleScope": {
+        "type": "object",
+        "properties": {
+          "role": { "$ref": "#/components/schemas/Role" },
+          "scope_satker_id": { "type": "string", "format": "uuid", "nullable": true },
+          "scope_satker_nama": { "type": "string", "nullable": true },
+          "scope_level": { "type": "string", "enum": ["polda", "polres", "satker"], "nullable": true }
+        },
+        "required": ["role"]
+      },
+      "RoleScopeInput": {
+        "type": "object",
+        "description": "Peran beserta cakupan satker. Peran admin/pimpinan ber-scope wajib mengisi scope_satker_id.",
+        "properties": {
+          "role": { "$ref": "#/components/schemas/Role" },
+          "scope_satker_id": { "type": "string", "format": "uuid", "nullable": true }
+        },
+        "required": ["role"]
+      },
+      "AdminAkun": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "username": { "type": "string" },
+          "nama": { "type": "string" },
+          "satker_id": { "type": "string", "format": "uuid" },
+          "satker_nama": { "type": "string" },
+          "satker_level": { "type": "string", "enum": ["polda", "polres", "satker"] },
+          "is_active": { "type": "boolean" },
+          "must_change_password": { "type": "boolean" },
+          "role": { "$ref": "#/components/schemas/RoleScope" }
+        },
+        "required": ["id", "username", "nama", "satker_id", "is_active"]
+      },
+      "JadwalPhRequest": {
+        "type": "object",
+        "properties": {
+          "satker_id": { "type": "string", "format": "uuid" },
+          "strong_point_id": { "type": "string", "format": "uuid" },
+          "tanggal": { "type": "string", "format": "date" },
+          "jam_mulai": { "type": "string", "example": "20:00" },
+          "jam_selesai": { "type": "string", "example": "23:00" },
+          "catatan": { "type": "string", "nullable": true },
+          "personel": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "properties": {
+                "personel_id": { "type": "string", "format": "uuid" },
+                "peran": { "type": "string", "nullable": true, "description": "Mis. ketua / anggota" }
+              },
+              "required": ["personel_id"]
+            }
+          }
+        },
+        "required": ["satker_id", "strong_point_id", "tanggal", "jam_mulai", "jam_selesai", "personel"]
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "string" },
+              "message": { "type": "string" }
+            },
+            "required": ["code", "message"]
+          }
+        },
+        "required": ["error"]
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "Isi salah satu: `username` untuk akun admin atau `nrp` untuk personel. `client=android` hanya menerima akun personel.",
+        "properties": {
+          "nrp": { "type": "string", "nullable": true, "example": "85000001" },
+          "username": { "type": "string", "nullable": true, "example": "superuser" },
+          "password": { "type": "string", "format": "password" },
+          "device_id": { "type": "string", "nullable": true },
+          "client": { "type": "string", "enum": ["web", "android"], "default": "web" }
+        },
+        "required": ["password"]
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "access_token": { "type": "string" },
+          "refresh_token": { "type": "string" },
+          "token_type": { "type": "string", "example": "Bearer" },
+          "expires_in": { "type": "integer", "example": 900 },
+          "user": { "$ref": "#/components/schemas/Pengguna" }
+        }
+      },
+      "Pengguna": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "nrp": { "type": "string", "nullable": true },
+          "username": { "type": "string", "nullable": true },
+          "jenis_akun": { "type": "string", "enum": ["admin", "personel"] },
+          "nama": { "type": "string" },
+          "pangkat": { "type": "string" },
+          "jabatan": { "type": "string" },
+          "satker_id": { "type": "string", "format": "uuid" },
+          "satker_nama": { "type": "string" },
+          "satker_level": { "type": "string", "enum": ["polda", "polres", "satker"] },
+          "roles": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Role" }
+          },
+          "role_scopes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/RoleScope" }
+          },
+          "must_change_password": { "type": "boolean" },
+          "atasan_id": { "type": "string", "format": "uuid", "nullable": true }
+        }
+      },
+      "AbsensiRequest": {
+        "type": "object",
+        "properties": {
+          "client_uuid": { "type": "string", "format": "uuid", "description": "Kunci idempotensi antrean offline" },
+          "jenis": { "type": "string", "enum": ["masuk", "pulang"] },
+          "status_kehadiran": {
+            "type": "string",
+            "enum": ["dinas_kantor", "dinas_luar", "piket", "libur_nasional", "cuti", "izin", "sakit", "tanpa_keterangan"]
+          },
+          "captured_at": { "type": "string", "format": "date-time" },
+          "latitude": { "type": "number", "nullable": true },
+          "longitude": { "type": "number", "nullable": true },
+          "akurasi_m": { "type": "number", "nullable": true },
+          "is_mock_suspect": { "type": "boolean" },
+          "is_offline": { "type": "boolean" },
+          "device_id": { "type": "string", "nullable": true },
+          "foto_base64": { "type": "string", "nullable": true, "description": "JPEG/PNG base64, maks 5 MB" }
+        },
+        "required": ["client_uuid", "jenis", "status_kehadiran", "captured_at"]
+      },
+      "RencanaRequest": {
+        "type": "object",
+        "properties": {
+          "periode_id": { "type": "string", "format": "uuid", "nullable": true },
+          "program": { "type": "string" },
+          "kegiatan": { "type": "string" },
+          "uraian": { "type": "string" },
+          "tujuan": { "type": "string", "nullable": true },
+          "jenis": {
+            "type": "string",
+            "enum": ["harian", "mingguan", "bulanan", "triwulan", "penugasan_khusus"]
+          },
+          "dasar_jenis": { "type": "string", "enum": ["sp", "tor", "perintah_lisan"], "nullable": true },
+          "dasar_nomor": { "type": "string", "nullable": true },
+          "target_kuantitas": { "type": "number", "nullable": true },
+          "satuan": { "type": "string", "nullable": true },
+          "target_waktu": { "type": "string", "format": "date", "nullable": true },
+          "tanggal_mulai": { "type": "string", "format": "date" },
+          "tanggal_selesai": { "type": "string", "format": "date" },
+          "tahapan": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "uraian": { "type": "string" },
+                "target_kuantitas": { "type": "number", "nullable": true },
+                "satuan": { "type": "string", "nullable": true }
+              }
+            }
+          },
+          "ajukan": { "type": "boolean" }
+        },
+        "required": ["program", "kegiatan", "uraian", "tanggal_mulai", "tanggal_selesai"]
+      },
+      "KeputusanRequest": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["disetujui", "perlu_revisi", "ditolak"] },
+          "catatan": { "type": "string", "nullable": true }
+        },
+        "required": ["status"]
+      },
+      "Penilaian": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "personel_id": { "type": "string", "format": "uuid" },
+          "periode_id": { "type": "string", "format": "uuid" },
+          "skor_absensi": { "type": "number" },
+          "skor_rencana_kerja": { "type": "number" },
+          "skor_hasil_kerja": { "type": "number" },
+          "skor_output": { "type": "number" },
+          "nilai_akhir": { "type": "number" },
+          "kategori": { "type": "string", "enum": ["sangat_baik", "baik", "cukup", "perlu_pembinaan"] }
+        }
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Login dengan NRP dan password",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginRequest" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Berhasil",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LoginResponse" } } }
+          },
+          "401": { "description": "NRP atau password salah", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+          "429": { "description": "Terlalu banyak percobaan login" }
+        }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Perbarui access token (rotasi refresh token)",
+        "security": [],
+        "description": "Browser mengirim cookie httpOnly; klien mobile mengirim {refresh_token} di body.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "refresh_token": { "type": "string", "nullable": true } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Token baru" }, "401": { "description": "Sesi tidak valid" } }
+      }
+    },
+    "/auth/logout": { "post": { "tags": ["auth"], "summary": "Cabut refresh token", "responses": { "200": { "description": "Berhasil keluar" } } } },
+    "/auth/me": { "get": { "tags": ["auth"], "summary": "Profil pengguna aktif", "responses": { "200": { "description": "Profil", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pengguna" } } } } } } },
+    "/auth/change-password": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Ganti password",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "old_password": { "type": "string" }, "new_password": { "type": "string" } },
+                "required": ["old_password", "new_password"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Password diperbarui" }, "401": { "description": "Password lama salah" } }
+      }
+    },
+    "/satker": {
+      "get": { "tags": ["master"], "summary": "Daftar satker sesuai cakupan akses", "responses": { "200": { "description": "Daftar satker" } } },
+      "post": {
+        "tags": ["master"],
+        "summary": "Tambah satker (admin)",
+        "description": "Admin hanya dapat menambah satker di bawah cakupannya. Level `polda` hanya boleh akar tunggal; `polres` di bawah polda; `satker` di bawah polda atau polres.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "parent_id": { "type": "string", "format": "uuid", "nullable": true },
+                  "level": { "type": "string", "enum": ["polda", "polres", "satker"] },
+                  "nama": { "type": "string" },
+                  "kode": { "type": "string", "description": "Unik" },
+                  "alamat": { "type": "string", "nullable": true },
+                  "timezone": { "type": "string", "enum": ["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura"] },
+                  "hari_kerja": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 7 }, "description": "1=Senin ... 7=Minggu" },
+                  "jam_masuk": { "type": "string", "example": "07:30" },
+                  "jam_pulang": { "type": "string", "example": "16:00" },
+                  "jam_pulang_sabtu": { "type": "string", "nullable": true, "example": "12:00", "description": "Jam pulang khusus Sabtu untuk hari kerja setengah hari" }
+                },
+                "required": ["level", "nama", "kode"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Satker dibuat" }, "403": { "description": "Di luar cakupan admin" }, "409": { "description": "Kode sudah dipakai" } }
+      }
+    },
+    "/satker/{id}": {
+      "get": { "tags": ["master"], "summary": "Detail satker", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
+      "patch": {
+        "tags": ["master"],
+        "summary": "Ubah satker dan jam kerja (admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nama": { "type": "string" },
+                  "kode": { "type": "string" },
+                  "alamat": { "type": "string", "nullable": true },
+                  "timezone": { "type": "string", "enum": ["Asia/Jakarta", "Asia/Makassar", "Asia/Jayapura"] },
+                  "hari_kerja": { "type": "array", "items": { "type": "integer", "minimum": 1, "maximum": 7 } },
+                  "is_active": { "type": "boolean" },
+                  "jam_masuk": { "type": "string", "example": "07:30" },
+                  "jam_pulang": { "type": "string", "example": "16:00" },
+                  "jam_pulang_sabtu": { "type": "string", "nullable": true, "example": "12:00" },
+                  "hapus_jam_pulang_sabtu": { "type": "boolean", "description": "Set true untuk mengosongkan jam pulang Sabtu" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Diperbarui" }, "403": { "description": "Di luar cakupan admin" } }
+      }
+    },
+    "/admin": {
+      "get": {
+        "tags": ["master"],
+        "summary": "Daftar akun admin (admin global/Polda/Polres)",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "q", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Daftar akun admin" }, "403": { "description": "Bukan admin Polda/Polres/global" } }
+      },
+      "post": {
+        "tags": ["master"],
+        "summary": "Tambah akun admin (terpisah dari personel)",
+        "description": "Username wajib unik. Admin global tidak memakai cakupan; admin Polda/Polres/Satker wajib memakai scope_satker_id. Admin Polres hanya dapat membuat admin_satker_polres; admin Polda hanya admin_satker_polda.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "example": "admin_polres" },
+                  "nama": { "type": "string" },
+                  "pangkat": { "type": "string", "nullable": true },
+                  "jabatan": { "type": "string", "nullable": true },
+                  "satker_id": { "type": "string", "format": "uuid" },
+                  "role": { "type": "string", "enum": ["admin_sistem", "admin_polda", "admin_satker_polda", "admin_polres", "admin_satker_polres"] },
+                  "scope_satker_id": { "type": "string", "format": "uuid", "nullable": true },
+                  "password": { "type": "string", "format": "password", "nullable": true, "description": "Kosongkan untuk Admin#2026" }
+                },
+                "required": ["username", "nama", "satker_id", "role"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Akun admin dibuat", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminAkun" } } } }, "403": { "description": "Di luar cakupan" }, "409": { "description": "Username sudah dipakai" } }
+      }
+    },
+    "/admin/{id}": {
+      "get": { "tags": ["master"], "summary": "Detail akun admin", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdminAkun" } } } } } },
+      "patch": {
+        "tags": ["master"],
+        "summary": "Ubah akun admin",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string" },
+                  "nama": { "type": "string" },
+                  "satker_id": { "type": "string", "format": "uuid" },
+                  "is_active": { "type": "boolean" },
+                  "role": { "type": "string", "enum": ["admin_sistem", "admin_polda", "admin_satker_polda", "admin_polres", "admin_satker_polres"] },
+                  "scope_satker_id": { "type": "string", "format": "uuid", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Diperbarui" }, "422": { "description": "Tidak boleh menonaktifkan admin global terakhir" } }
+      }
+    },
+    "/admin/{id}/reset-password": {
+      "post": {
+        "tags": ["master"],
+        "summary": "Reset password akun admin",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "password": { "type": "string", "format": "password", "nullable": true } } }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Password direset" } }
+      }
+    },
+    "/personel": {
+      "get": {
+        "tags": ["master"],
+        "summary": "Daftar personel sesuai cakupan satker",
+        "description": "Hanya akun dengan jenis_akun=personel. Akun admin dikelola melalui /admin.",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "unit", "in": "query", "schema": { "type": "string" } },
+          { "name": "q", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Daftar personel" } }
+      },
+      "post": {
+        "tags": ["master"],
+        "summary": "Tambah personel (admin)",
+        "description": "Hanya untuk akun personel. Atasan wajib satu satker dan bukan diri sendiri; peran admin harus lewat /admin.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nrp": { "type": "string" },
+                  "nama": { "type": "string" },
+                  "pangkat": { "type": "string" },
+                  "jabatan": { "type": "string" },
+                  "satker_id": { "type": "string", "format": "uuid" },
+                  "atasan_id": { "type": "string", "format": "uuid", "nullable": true },
+                  "phone": { "type": "string", "nullable": true },
+                  "password": { "type": "string", "format": "password", "nullable": true },
+                  "roles": { "type": "array", "items": { "$ref": "#/components/schemas/RoleScopeInput" } }
+                },
+                "required": ["nrp", "nama", "pangkat", "jabatan", "satker_id"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Personel dibuat" }, "403": { "description": "Di luar cakupan admin" }, "422": { "description": "Atasan tidak satu satker / NRP duplikat" } }
+      }
+    },
+    "/personel/{id}": {
+      "get": { "tags": ["master"], "summary": "Detail personel", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
+      "patch": {
+        "tags": ["master"],
+        "summary": "Ubah personel (admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nama": { "type": "string" },
+                  "pangkat": { "type": "string" },
+                  "jabatan": { "type": "string" },
+                  "satker_id": { "type": "string", "format": "uuid" },
+                  "atasan_id": { "type": "string", "format": "uuid", "nullable": true },
+                  "hapus_atasan": { "type": "boolean" },
+                  "phone": { "type": "string", "nullable": true },
+                  "is_active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Diperbarui" }, "403": { "description": "Di luar cakupan admin" } }
+      }
+    },
+    "/personel/{id}/roles": {
+      "get": { "tags": ["master"], "summary": "Daftar peran dan cakupan personel", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Daftar peran" } } },
+      "post": {
+        "tags": ["master"],
+        "summary": "Ganti peran personel (admin)",
+        "description": "Mengganti seluruh peran. Admin global tidak dapat dicabut dari admin terakhir.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "roles": { "type": "array", "items": { "$ref": "#/components/schemas/RoleScopeInput" } }
+                },
+                "required": ["roles"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Peran diperbarui" }, "403": { "description": "Di luar cakupan admin" }, "422": { "description": "Cakupan peran tidak valid" } }
+      }
+    },
+    "/personel/{id}/reset-password": {
+      "post": {
+        "tags": ["master"],
+        "summary": "Reset password personel (admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": { "password": { "type": "string", "format": "password", "nullable": true, "description": "Kosongkan untuk password acak" } }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Password direset; respons memuat password sementara bila diminta acak" }, "403": { "description": "Di luar cakupan admin" } }
+      }
+    },
+    "/titik-dinas": {
+      "get": { "tags": ["master"], "summary": "Daftar titik dinas", "parameters": [{ "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Daftar titik" } } },
+      "post": { "tags": ["master"], "summary": "Tambah titik dinas (admin/atasan)", "responses": { "200": { "description": "Titik dibuat" } } }
+    },
+    "/titik-dinas/{id}": {
+      "patch": { "tags": ["master"], "summary": "Ubah titik dinas", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diperbarui" } } },
+      "delete": { "tags": ["master"], "summary": "Hapus titik dinas", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Dihapus" } } }
+    },
+    "/ph/strong-point": {
+      "get": { "tags": ["ph"], "summary": "Daftar strong point dalam cakupan satker", "responses": { "200": { "description": "Daftar strong point" } } },
+      "post": {
+        "tags": ["ph"],
+        "summary": "Tambah strong point (admin)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "satker_id": { "type": "string", "format": "uuid" },
+                  "nama": { "type": "string" },
+                  "alamat": { "type": "string", "nullable": true },
+                  "latitude": { "type": "number" },
+                  "longitude": { "type": "number" },
+                  "radius_m": { "type": "integer", "description": "Default 100" }
+                },
+                "required": ["satker_id", "nama", "latitude", "longitude"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Dibuat" }, "403": { "description": "Di luar cakupan admin" } }
+      }
+    },
+    "/ph/strong-point/{id}": {
+      "patch": {
+        "tags": ["ph"],
+        "summary": "Ubah strong point (admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nama": { "type": "string" },
+                  "alamat": { "type": "string", "nullable": true },
+                  "latitude": { "type": "number" },
+                  "longitude": { "type": "number" },
+                  "radius_m": { "type": "integer" },
+                  "is_active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Diperbarui" }, "403": { "description": "Di luar cakupan admin" } }
+      },
+      "delete": { "tags": ["ph"], "summary": "Hapus strong point (admin)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Dihapus" }, "409": { "description": "Masih dipakai jadwal" } } }
+    },
+    "/ph/jadwal": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Daftar jadwal PH satu bulan (pengelola)",
+        "parameters": [
+          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Daftar jadwal" } }
+      },
+      "post": {
+        "tags": ["ph"],
+        "summary": "Susun jadwal PH (admin satker)",
+        "description": "Menolak (422) bila personel sudah punya jadwal PH pada jam yang beririsan di tanggal yang sama.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JadwalPhRequest" } } } },
+        "responses": { "200": { "description": "Jadwal dibuat" }, "403": { "description": "Di luar cakupan admin" }, "422": { "description": "Jadwal bentrok / personel tidak valid" } }
+      }
+    },
+    "/ph/jadwal/saya": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Jadwal PH milik pengguna",
+        "parameters": [{ "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } }],
+        "responses": { "200": { "description": "Daftar jadwal + strong point" } }
+      }
+    },
+    "/ph/jadwal/{id}": {
+      "get": { "tags": ["ph"], "summary": "Detail jadwal PH + personel", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" }, "403": { "description": "Bukan peserta/pengelola" } } },
+      "put": {
+        "tags": ["ph"],
+        "summary": "Ubah jadwal PH (admin satker)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JadwalPhRequest" } } } },
+        "responses": { "200": { "description": "Diperbarui" }, "422": { "description": "Satker tidak boleh dipindah / bentrok" } }
+      },
+      "delete": { "tags": ["ph"], "summary": "Hapus jadwal PH (admin satker)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Dihapus" }, "409": { "description": "Sudah ada absensi" } } }
+    },
+    "/ph/absensi": {
+      "post": {
+        "tags": ["ph"],
+        "summary": "Check-in / check-out PH (wajib lokasi)",
+        "description": "Lokasi wajib diisi untuk check-in maupun check-out dan harus berada dalam radius strong point. Idempoten terhadap client_uuid.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "client_uuid": { "type": "string", "format": "uuid" },
+                  "jadwal_ph_id": { "type": "string", "format": "uuid" },
+                  "jenis": { "type": "string", "enum": ["masuk", "pulang"] },
+                  "captured_at": { "type": "string", "format": "date-time" },
+                  "latitude": { "type": "number", "description": "Wajib" },
+                  "longitude": { "type": "number", "description": "Wajib" },
+                  "akurasi_m": { "type": "number", "nullable": true },
+                  "is_mock_suspect": { "type": "boolean" },
+                  "is_offline": { "type": "boolean" },
+                  "foto_base64": { "type": "string", "nullable": true }
+                },
+                "required": ["client_uuid", "jadwal_ph_id", "jenis", "captured_at", "latitude", "longitude"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Tercatat" }, "403": { "description": "Bukan peserta jadwal" }, "409": { "description": "Sudah absen untuk jenis ini" }, "422": { "description": "Di luar radius / GPS tidak ada / di luar jam jadwal" } }
+      }
+    },
+    "/ph/absensi/saya": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Riwayat absensi PH sendiri",
+        "parameters": [{ "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } }],
+        "responses": { "200": { "description": "Riwayat" } }
+      }
+    },
+    "/ph/absensi/jadwal/{id}": {
+      "get": { "tags": ["ph"], "summary": "Absensi PH sebuah jadwal (pengelola)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Daftar absensi" }, "403": { "description": "Di luar cakupan" } } }
+    },
+    "/ph/absensi/{id}/verifikasi": {
+      "post": {
+        "tags": ["ph"],
+        "summary": "Verifikasi absensi PH (atasan/admin)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "type": "object", "properties": { "catatan": { "type": "string", "nullable": true } } } }
+          }
+        },
+        "responses": { "200": { "description": "Terverifikasi" }, "403": { "description": "Bukan atasan/admin cakupan" } }
+      }
+    },
+    "/ph/rekap": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Rekap PH per personel per bulan",
+        "parameters": [
+          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Rekap PH" }, "403": { "description": "Di luar cakupan" } }
+      }
+    },
+    "/absensi": {
+      "post": {
+        "tags": ["absensi"],
+        "summary": "Catat absensi masuk/pulang",
+        "description": "Idempoten terhadap client_uuid. Menolak (422) bila di luar radius titik dinas untuk status yang membutuhkan radius.",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AbsensiRequest" } } } },
+        "responses": {
+          "200": { "description": "Tercatat (termasuk pengiriman ulang antrean offline)" },
+          "409": { "description": "Sudah absen pada tanggal dan jenis yang sama" },
+          "422": { "description": "Di luar radius / GPS tidak ada" }
+        }
+      },
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Daftar absensi satker (atasan/admin)",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "tanggal", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "perlu_verifikasi", "in": "query", "schema": { "type": "boolean" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Daftar absensi" } }
+      }
+    },
+    "/absensi/saya": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Riwayat absensi sendiri",
+        "parameters": [
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" } }
+        ],
+        "responses": { "200": { "description": "Riwayat" } }
+      }
+    },
+    "/absensi/rekap": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Rekap kehadiran per personel",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "unit", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Rekap" } }
+      }
+    },
+    "/absensi/titik-terdekat": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Titik dinas terdekat dan status radius",
+        "parameters": [
+          { "name": "latitude", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "longitude", "in": "query", "required": true, "schema": { "type": "number" } },
+          { "name": "akurasi_m", "in": "query", "schema": { "type": "number" } }
+        ],
+        "responses": { "200": { "description": "Titik dan geofence" } }
+      }
+    },
+    "/absensi/{id}/verifikasi": {
+      "post": { "tags": ["absensi"], "summary": "Verifikasi absensi offline/mock", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Terverifikasi" } } }
+    },
+    "/rencana-kerja": {
+      "get": {
+        "tags": ["rencana"],
+        "summary": "Daftar rencana kerja",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["draft", "diajukan", "disetujui", "perlu_revisi", "ditolak"] } },
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Daftar rencana" } }
+      },
+      "post": {
+        "tags": ["rencana"],
+        "summary": "Buat rencana kerja (opsional langsung diajukan)",
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RencanaRequest" } } } },
+        "responses": { "200": { "description": "Rencana dibuat" } }
+      }
+    },
+    "/rencana-kerja/persetujuan": {
+      "get": { "tags": ["rencana"], "summary": "Rencana yang menunggu keputusan atasan", "responses": { "200": { "description": "Daftar" } } }
+    },
+    "/rencana-kerja/{id}": {
+      "get": { "tags": ["rencana"], "summary": "Detail rencana + tahapan + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
+      "patch": { "tags": ["rencana"], "summary": "Ubah rencana (draft/revisi)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diperbarui" } } }
+    },
+    "/rencana-kerja/{id}/ajukan": {
+      "post": { "tags": ["rencana"], "summary": "Ajukan rencana ke atasan", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diajukan" } } }
+    },
+    "/rencana-kerja/{id}/keputusan": {
+      "post": {
+        "tags": ["rencana"],
+        "summary": "Keputusan atasan atas rencana",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/KeputusanRequest" } } } },
+        "responses": { "200": { "description": "Diputuskan" }, "403": { "description": "Bukan atasan langsung" } }
+      }
+    },
+    "/hasil-kerja": {
+      "get": {
+        "tags": ["hasil"],
+        "summary": "Daftar hasil kerja",
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["draft", "diajukan", "terverifikasi", "perlu_revisi"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Daftar" } }
+      },
+      "post": {
+        "tags": ["hasil"],
+        "summary": "Lapor realisasi hasil kerja",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "rencana_id": { "type": "string", "format": "uuid" },
+                  "uraian_pelaksanaan": { "type": "string" },
+                  "progres_persen": { "type": "number" },
+                  "jumlah_realisasi": { "type": "number", "nullable": true },
+                  "kendala": { "type": "string", "nullable": true },
+                  "tanggal_realisasi": { "type": "string", "format": "date" }
+                },
+                "required": ["rencana_id", "uraian_pelaksanaan", "progres_persen", "tanggal_realisasi"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Terkirim" }, "422": { "description": "Rencana belum disetujui" } }
+      }
+    },
+    "/hasil-kerja/{id}": {
+      "get": { "tags": ["hasil"], "summary": "Detail hasil kerja", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } }
+    },
+    "/hasil-kerja/{id}/verifikasi": {
+      "post": {
+        "tags": ["hasil"],
+        "summary": "Verifikasi hasil kerja (hitung skor kuantitas/kualitas/waktu)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "setuju": { "type": "boolean" },
+                  "skor_kualitas": { "type": "number", "nullable": true },
+                  "catatan": { "type": "string", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Terverifikasi / perlu revisi" } }
+      }
+    },
+    "/output": {
+      "get": { "tags": ["output"], "summary": "Daftar output", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "description": "Daftar" } } },
+      "post": {
+        "tags": ["output"],
+        "summary": "Buat output dari hasil kerja terverifikasi",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "hasil_kerja_id": { "type": "string", "format": "uuid" },
+                  "jenis_output": {
+                    "type": "string",
+                    "enum": ["laporan", "dokumen_pendukung", "foto", "video", "data_diagram", "berita_acara", "surat_nota_dinas", "link_sistem"]
+                  },
+                  "judul": { "type": "string" },
+                  "uraian": { "type": "string", "nullable": true },
+                  "tanggal_hasil": { "type": "string", "format": "date" },
+                  "url_eksternal": { "type": "string", "nullable": true }
+                },
+                "required": ["hasil_kerja_id", "jenis_output", "judul", "tanggal_hasil"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Dibuat" } }
+      }
+    },
+    "/output/{id}": {
+      "get": { "tags": ["output"], "summary": "Detail output + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } }
+    },
+    "/output/{id}/ajukan": {
+      "post": { "tags": ["output"], "summary": "Ajukan output untuk verifikasi", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diajukan" } } }
+    },
+    "/output/{id}/verifikasi": {
+      "post": { "tags": ["output"], "summary": "Verifikasi output", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Disetujui / perlu revisi" } } }
+    },
+    "/lampiran": {
+      "post": {
+        "tags": ["lampiran"],
+        "summary": "Unggah berkas (multipart)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "owner_type": { "type": "string", "enum": ["rencana", "hasil", "output", "absensi"] },
+                  "owner_id": { "type": "string", "format": "uuid" },
+                  "kategori": { "type": "string", "enum": ["lampiran", "bukti", "foto"] },
+                  "file": { "type": "string", "format": "binary" }
+                },
+                "required": ["owner_type", "owner_id", "file"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Tersimpan" }, "413": { "description": "Melebihi batas ukuran" }, "422": { "description": "Format tidak didukung" } }
+      }
+    },
+    "/lampiran/raw/{key}": {
+      "get": { "tags": ["lampiran"], "summary": "Unduh berkas (butuh bearer token)", "parameters": [{ "name": "key", "in": "path", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "description": "Berkas" } } }
+    },
+    "/lampiran/{id}": {
+      "delete": { "tags": ["lampiran"], "summary": "Hapus lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Dihapus" } } }
+    },
+    "/periode": {
+      "get": { "tags": ["penilaian"], "summary": "Daftar periode", "responses": { "200": { "description": "Daftar" } } },
+      "post": { "tags": ["penilaian"], "summary": "Buat periode + bobot default (admin)", "responses": { "200": { "description": "Dibuat" } } }
+    },
+    "/periode/{id}/bobot": {
+      "put": {
+        "tags": ["penilaian"],
+        "summary": "Atur bobot indikator (total harus 100)",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "absensi": { "type": "number" },
+                  "rencana_kerja": { "type": "number" },
+                  "hasil_kerja": { "type": "number" },
+                  "output": { "type": "number" }
+                },
+                "required": ["absensi", "rencana_kerja", "hasil_kerja", "output"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Bobot diperbarui" }, "422": { "description": "Total bobot bukan 100" } }
+      }
+    },
+    "/periode/{id}/tutup": {
+      "post": { "tags": ["penilaian"], "summary": "Tutup periode (admin global)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Ditutup" }, "403": { "description": "Hanya admin global" } } }
+    },
+    "/periode/{id}/buka": {
+      "post": {
+        "tags": ["penilaian"],
+        "summary": "Buka kembali periode yang sudah ditutup (admin global)",
+        "description": "Status kembali open dan data dapat diubah lagi. Alasan disimpan untuk audit.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": { "type": "object", "properties": { "alasan": { "type": "string", "nullable": true } } }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Dibuka kembali" }, "403": { "description": "Hanya admin global" }, "422": { "description": "Periode sudah terbuka" } }
+      }
+    },
+    "/periode/{id}/kesiapan": {
+      "get": {
+        "tags": ["penilaian"],
+        "summary": "Kesiapan satker untuk menutup periode",
+        "description": "Admin melihat satker dalam cakupannya beserta jumlah personel, yang sudah dinilai, dan status siap ditutup.",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "responses": { "200": { "description": "Daftar kesiapan + ringkasan" }, "403": { "description": "Bukan admin" } }
+      }
+    },
+    "/periode/{id}/kesiapan/{satker_id}": {
+      "post": {
+        "tags": ["penilaian"],
+        "summary": "Tandai/batalkan siap ditutup untuk satu satker",
+        "description": "Hanya admin dengan cakupan satker tersebut dan hanya saat periode terbuka.",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "siap": { "type": "boolean" },
+                  "catatan": { "type": "string", "nullable": true, "maxLength": 500 }
+                },
+                "required": ["siap"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Status kesiapan diperbarui" }, "403": { "description": "Di luar cakupan admin" }, "422": { "description": "Periode ditutup / satker bukan level satker" } }
+      }
+    },
+    "/libur": {
+      "get": {
+        "tags": ["penilaian"],
+        "summary": "Kalender hari libur",
+        "parameters": [{ "name": "tahun", "in": "query", "schema": { "type": "integer" } }],
+        "responses": { "200": { "description": "Libur nasional + libur satker dalam cakupan" } }
+      },
+      "post": {
+        "tags": ["penilaian"],
+        "summary": "Tambah hari libur (admin)",
+        "description": "satker_id NULL = libur nasional (admin global). satker_id terisi = libur khusus satker (admin dalam cakupan).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tanggal": { "type": "string", "format": "date" },
+                  "nama": { "type": "string" },
+                  "jenis": { "type": "string", "enum": ["nasional", "cuti_bersama", "khusus"] },
+                  "satker_id": { "type": "string", "format": "uuid", "nullable": true }
+                },
+                "required": ["tanggal", "nama", "jenis"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Dibuat" }, "403": { "description": "Di luar cakupan admin" }, "409": { "description": "Tanggal sudah terdaftar" } }
+      }
+    },
+    "/libur/{id}": {
+      "patch": {
+        "tags": ["penilaian"],
+        "summary": "Ubah hari libur",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tanggal": { "type": "string", "format": "date" },
+                  "nama": { "type": "string" },
+                  "jenis": { "type": "string", "enum": ["nasional", "cuti_bersama", "khusus"] },
+                  "is_active": { "type": "boolean" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Diperbarui" }, "403": { "description": "Di luar cakupan admin" } }
+      },
+      "delete": { "tags": ["penilaian"], "summary": "Hapus hari libur", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Dihapus" }, "403": { "description": "Di luar cakupan admin" } } }
+    },
+    "/penilaian": {
+      "get": {
+        "tags": ["penilaian"],
+        "summary": "Daftar penilaian periode",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "unit", "in": "query", "schema": { "type": "string" } },
+          { "name": "kategori", "in": "query", "schema": { "type": "string", "enum": ["sangat_baik", "baik", "cukup", "perlu_pembinaan"] } }
+        ],
+        "responses": { "200": { "description": "Daftar penilaian" } }
+      }
+    },
+    "/penilaian/{periode_id}/hitung": {
+      "post": { "tags": ["penilaian"], "summary": "Hitung ulang penilaian seluruh personel dalam cakupan", "parameters": [{ "name": "periode_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Hasil perhitungan" } } }
+    },
+    "/penilaian/personel/{personel_id}": {
+      "get": {
+        "tags": ["penilaian"],
+        "summary": "Rincian nilai + komponen perhitungan",
+        "parameters": [
+          { "name": "personel_id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Rincian", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Penilaian" } } } } }
+      }
+    },
+    "/penilaian/{id}/keputusan": {
+      "post": { "tags": ["penilaian"], "summary": "Catatan & keputusan pimpinan", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Disimpan" } } }
+    },
+    "/dashboard/ringkasan": {
+      "get": {
+        "tags": ["dashboard"],
+        "summary": "KPI dashboard",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Ringkasan" } }
+      }
+    },
+    "/dashboard/capaian-indikator": { "get": { "tags": ["dashboard"], "summary": "Rata-rata per indikator", "responses": { "200": { "description": "Capaian" } } } },
+    "/dashboard/tren": { "get": { "tags": ["dashboard"], "summary": "Tren nilai beberapa periode", "parameters": [{ "name": "bulan", "in": "query", "schema": { "type": "integer" } }], "responses": { "200": { "description": "Tren" } } } },
+    "/dashboard/sebaran-kategori": { "get": { "tags": ["dashboard"], "summary": "Sebaran kategori kinerja", "responses": { "200": { "description": "Sebaran" } } } },
+    "/dashboard/rekap": { "get": { "tags": ["dashboard"], "summary": "Tabel rekap berpaginasi", "responses": { "200": { "description": "Rekap" } } } },
+    "/laporan/penilaian": {
+      "get": {
+        "tags": ["laporan"],
+        "summary": "Data laporan penilaian (JSON atau CSV)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Laporan" } }
+      }
+    },
+    "/notifikasi": {
+      "get": { "tags": ["sistem"], "summary": "Notifikasi pengguna", "parameters": [{ "name": "belum_dibaca", "in": "query", "schema": { "type": "boolean" } }], "responses": { "200": { "description": "Daftar notifikasi" } } }
+    },
+    "/notifikasi/{id}/baca": {
+      "post": { "tags": ["sistem"], "summary": "Tandai notifikasi dibaca", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Ditandai" } } }
+    },
+    "/audit": {
+      "get": {
+        "tags": ["sistem"],
+        "summary": "Audit log mutasi (admin)",
+        "parameters": [
+          { "name": "entitas", "in": "query", "schema": { "type": "string" } },
+          { "name": "actor_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Daftar audit" }, "403": { "description": "Hanya admin" } }
+      }
+    }
+  }
+}

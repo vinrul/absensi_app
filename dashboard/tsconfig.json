@@ -1,0 +1,14 @@
+{
+	"extends": "$app/tsconfig",
+	"include": ["src", "test", "*"],
+	"exclude": ["src/service-worker"],
+	"compilerOptions": {
+		"moduleResolution": "bundler",
+		"module": "esnext",
+		"target": "es2022",
+		"strict": true,
+		"paths": {
+			"#lib/*": ["./src/lib/*"]
+		}
+	}
+}

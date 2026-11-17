@@ -1,0 +1,33 @@
+# Backend
+/backend/target/
+/backend/.env
+/backend/.sqlx/
+/backend/*.log
+
+# Dashboard
+/dashboard/node_modules/
+/dashboard/build/
+/dashboard/.svelte-kit/
+/dashboard/.env
+/dashboard/.env.*
+
+# Android
+/android/.gradle/
+/android/build/
+/android/app/build/
+/android/local.properties
+/android/.idea/
+/android/.kotlin/
+/android/captures/
+*.hprof
+
+# Deploy data
+/deploy/data/
+/deploy/.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Konfigurasi lokal agen/tool
+/.commandcode/

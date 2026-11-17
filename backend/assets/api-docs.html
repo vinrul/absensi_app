@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="id">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>API — Absensi &amp; Penilaian Kinerja Polda Bali</title>
+		<style>
+			:root {
+				--navy: #0b2545;
+				--gold: #d4a017;
+				--bg: #f1f5f9;
+				--line: #e2e8f0;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+				background: var(--bg);
+				color: #1e293b;
+			}
+			header {
+				background: var(--navy);
+				color: #fff;
+				padding: 24px 20px;
+			}
+			header h1 {
+				margin: 0 0 4px;
+				font-size: 20px;
+			}
+			header p {
+				margin: 0;
+				color: #adc5e1;
+				font-size: 13px;
+				max-width: 760px;
+				line-height: 1.5;
+			}
+			main {
+				max-width: 980px;
+				margin: 0 auto;
+				padding: 20px;
+			}
+			.toolbar {
+				display: flex;
+				gap: 8px;
+				flex-wrap: wrap;
+				margin-bottom: 16px;
+			}
+			.toolbar input,
+			.toolbar select {
+				padding: 8px 10px;
+				border: 1px solid #cbd5e1;
+				border-radius: 8px;
+				font-size: 13px;
+				background: #fff;
+			}
+			.toolbar input {
+				flex: 1;
+				min-width: 220px;
+			}
+			section {
+				margin-bottom: 22px;
+			}
+			section > h2 {
+				font-size: 13px;
+				text-transform: uppercase;
+				letter-spacing: 0.06em;
+				color: #64748b;
+				margin: 0 0 8px;
+			}
+			.ep {
+				background: #fff;
+				border: 1px solid var(--line);
+				border-radius: 10px;
+				margin-bottom: 8px;
+				overflow: hidden;
+			}
+			.ep summary {
+				cursor: pointer;
+				padding: 10px 12px;
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				font-size: 13px;
+				list-style: none;
+			}
+			.ep summary::-webkit-details-marker {
+				display: none;
+			}
+			.m {
+				font-size: 10px;
+				font-weight: 700;
+				padding: 3px 7px;
+				border-radius: 5px;
+				color: #fff;
+				min-width: 58px;
+				text-align: center;
+			}
+			.GET {
+				background: #0284c7;
+			}
+			.POST {
+				background: #059669;
+			}
+			.PUT,
+			.PATCH {
+				background: #d97706;
+			}
+			.DELETE {
+				background: #e11d48;
+			}
+			.path {
+				font-family: ui-monospace, 'Cascadia Code', monospace;
+				font-weight: 600;
+			}
+			.sum {
+				color: #64748b;
+				margin-left: auto;
+				text-align: right;
+				font-size: 12px;
+			}
+			.body {
+				border-top: 1px solid var(--line);
+				padding: 12px;
+				font-size: 12.5px;
+				background: #f8fafc;
+			}
+			.body p {
+				margin: 0 0 8px;
+				color: #475569;
+				line-height: 1.5;
+			}
+			.body table {
+				width: 100%;
+				border-collapse: collapse;
+			}
+			.body th,
+			.body td {
+				text-align: left;
+				padding: 4px 6px;
+				border-bottom: 1px solid var(--line);
+			}
+			.body th {
+				color: #64748b;
+				font-weight: 600;
+				font-size: 11px;
+				text-transform: uppercase;
+			}
+			code {
+				font-family: ui-monospace, 'Cascadia Code', monospace;
+				background: #e2e8f0;
+				padding: 1px 4px;
+				border-radius: 4px;
+				font-size: 11.5px;
+			}
+			footer {
+				padding: 10px 20px 30px;
+				color: #94a3b8;
+				font-size: 12px;
+				text-align: center;
+			}
+			.error {
+				background: #fee2e2;
+				color: #b91c1c;
+				padding: 12px;
+				border-radius: 8px;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>API Absensi &amp; Penilaian Kinerja Personel</h1>
+			<p>
+				Dokumentasi ini dibuat dari <code>openapi.json</code> yang disajikan server. Autentikasi
+				memakai <strong>bearer token</strong>; login lewat <code>POST /api/v1/auth/login</code>.
+				Berkas mentah tersedia di <a href="/api-docs/openapi.json" style="color: #e8c766"
+					>/api-docs/openapi.json</a
+				>.
+			</p>
+		</header>
+
+		<main>
+			<div class="toolbar">
+				<input id="cari" placeholder="Cari path atau ringkasan…" />
+				<select id="tag"><option value="">Semua tag</option></select>
+			</div>
+			<div id="daftar">Memuat spesifikasi…</div>
+		</main>
+
+		<footer>
+			Server Polda Bali · gunakan HTTPS di produksi · permintaan login dibatasi 5/menit per IP
+		</footer>
+
+		<script>
+			const wadah = document.getElementById('daftar');
+			const cari = document.getElementById('cari');
+			const pilihTag = document.getElementById('tag');
+			let semua = [];
+
+			function el(tag, kelas, teks) {
+				const node = document.createElement(tag);
+				if (kelas) node.className = kelas;
+				if (teks !== undefined) node.textContent = teks;
+				return node;
+			}
+
+			function tampilkan() {
+				const kata = cari.value.toLowerCase().trim();
+				const tag = pilihTag.value;
+				wadah.innerHTML = '';
+
+				const kelompok = {};
+				for (const { path, method, op } of semua) {
+					if (tag && (op.tags || ['lainnya'])[0] !== tag) continue;
+					if (kata && !(path + ' ' + (op.summary || '')).toLowerCase().includes(kata)) continue;
+					const kunci = (op.tags || ['lainnya'])[0];
+					(kelompok[kunci] = kelompok[kunci] || []).push({ path, method, op });
+				}
+
+				const nama = Object.keys(kelompok).sort();
+				if (!nama.length) {
+					wadah.appendChild(el('p', 'error', 'Tidak ada endpoint yang cocok.'));
+					return;
+				}
+
+				for (const tag of nama) {
+					const bagian = el('section');
+					bagian.appendChild(el('h2', null, tag));
+					for (const { path, method, op } of kelompok[tag]) {
+						const detail = el('details', 'ep');
+						const ringkas = el('summary');
+						ringkas.appendChild(el('span', 'm ' + method, method));
+						ringkas.appendChild(el('span', 'path', '/api/v1' + path));
+						ringkas.appendChild(el('span', 'sum', op.summary || ''));
+						detail.appendChild(ringkas);
+
+						const isi = el('div', 'body');
+						if (op.description) isi.appendChild(el('p', null, op.description));
+
+						const parameter = op.parameters || [];
+						if (parameter.length) {
+							const tabel = el('table');
+							const kepala = el('tr');
+							['Nama', 'Lokasi', 'Tipe', 'Wajib'].forEach((teks) =>
+								kepala.appendChild(el('th', null, teks))
+							);
+							tabel.appendChild(kepala);
+							for (const p of parameter) {
+								const baris = el('tr');
+								baris.appendChild(el('td', null, p.name));
+								baris.appendChild(el('td', null, p.in));
+								baris.appendChild(el('td', null, (p.schema && p.schema.type) || '-'));
+								baris.appendChild(el('td', null, p.required ? 'ya' : 'tidak'));
+								tabel.appendChild(baris);
+							}
+							isi.appendChild(tabel);
+						}
+
+						if (!parameter.length && !op.description) {
+							isi.appendChild(el('p', null, 'Tidak ada parameter khusus.'));
+						}
+						detail.appendChild(isi);
+						bagian.appendChild(detail);
+					}
+					wadah.appendChild(bagian);
+				}
+			}
+
+			fetch('/api-docs/openapi.json')
+				.then((r) => r.json())
+				.then((spec) => {
+					for (const [path, isi] of Object.entries(spec.paths || {})) {
+						for (const [method, op] of Object.entries(isi)) {
+							semua.push({ path, method: method.toUpperCase(), op });
+						}
+					}
+					semua.sort((a, b) => a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
+					const tag = new Set(semua.map((e) => (e.op.tags || ['lainnya'])[0]));
+					for (const t of [...tag].sort()) {
+						const opsi = el('option', null, t);
+						opsi.value = t;
+						pilihTag.appendChild(opsi);
+					}
+					tampilkan();
+				})
+				.catch(() => {
+					wadah.innerHTML = '';
+					wadah.appendChild(el('p', 'error', 'Gagal memuat /api-docs/openapi.json'));
+				});
+
+			cari.addEventListener('input', tampilkan);
+			pilihTag.addEventListener('change', tampilkan);
+		</script>
+	</body>
+</html>

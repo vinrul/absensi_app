@@ -1,0 +1,193 @@
+# Checklist Pekerjaan — Struktur Organisasi, Modul PH, dan Pengingat
+
+Terakhir diperbarui: 17 November 2026.
+
+Legenda: ✅ selesai & terverifikasi · 🟡 selesai, butuh uji manual di lapangan · ⬜ belum dikerjakan.
+
+Dokumen ini memetakan seluruh rekomendasi audit awal dan permintaan restrukturisasi
+ke kondisi kode saat ini. Rincian teknis ada di [`HANDOFF.md`](HANDOFF.md), aturan
+nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
+
+---
+
+## 1. Logo & identitas
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 1.1 | Logo Polda Bali di halaman login dashboard | ✅ | `dashboard/static/logo-polda-bali.png` |
+| 1.2 | Logo di sidebar & header mobile dashboard | ✅ | `(app)/+layout.svelte` |
+| 1.3 | Logo pada kop cetak laporan | ✅ | `laporan/+page.svelte` |
+| 1.4 | Logo di layar login Android | ✅ | `LoginScreen.kt` → `R.drawable.logo_polda_bali` |
+| 1.5 | Logo di top bar Android | ✅ | `MainActivity.kt` |
+| 1.6 | Ikon launcher Android memakai logo Polda Bali | ✅ | `mipmap-*/ic_launcher_foreground.png` |
+
+## 2. Struktur organisasi & peran
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 2.1 | Tiga level organisasi: Polda → Polres → Satker | ✅ | `satker_level` = `polda`, `polres`, `satker` |
+| 2.2 | Satker dapat berada di bawah Polda maupun di bawah Polres | ✅ | `satker.parent_id` + validasi hierarki `service/akses.rs` |
+| 2.3 | 12 peran: 5 admin, 4 pimpinan ber-scope, pimpinan, atasan, personel | ✅ | `domain/enums.rs` |
+| 2.4 | Cakupan peran per satker (`scope_satker_id`) | ✅ | migrasi `0005_role_scope.sql`, unique `NULLS NOT DISTINCT` |
+| 2.5 | Admin global tidak bisa dicabut dari admin global terakhir | ✅ | validasi `count_admin_global` |
+| 2.6 | Admin Polda mengelola seluruh satker di bawah Polda | ✅ | resolusi cakupan rekursif |
+| 2.7 | Admin Satker Polda hanya satkernya sendiri | ✅ | |
+| 2.8 | Admin Polres mengelola satker di bawah Polres | ✅ | |
+| 2.9 | Admin Satker Polres hanya satkernya sendiri | ✅ | |
+| 2.10 | Pimpinan mengikuti cakupan yang sama (Polda/Polres/Satker) | ✅ | `is_pimpinan_any`, `require_satker` |
+| 2.11 | Personel hanya melihat data sendiri | ✅ | daftar absensi, penilaian, lampiran |
+| 2.12 | RBAC diterapkan di seluruh modul | ✅ | absensi, rekap, dashboard, penilaian, laporan, audit, lampiran, PH |
+| 2.13 | Akun admin dan personel dipisahkan secara logis (`jenis_akun`) | ✅ | migrasi `0007_jenis_akun.sql` |
+| 2.14 | Admin memakai username (tanpa NRP), personel memakai NRP | ✅ | constraint `personel_identitas_check` |
+| 2.15 | Login Android hanya untuk akun personel (termasuk pimpinan) | ✅ | `client=android` + `KanalLogin`; admin 403 |
+
+## 3. Dashboard admin (kekurangan yang dilaporkan)
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 3.1 | Menu & halaman **Satker & Jam Kerja** | ✅ | `dashboard/src/routes/(app)/satker/+page.svelte` |
+| 3.2 | Tambah satker baru (pilih induk & level) | ✅ | level `polda` hanya akar tunggal; kode unik |
+| 3.3 | Ubah satker, aktif/nonaktif | ✅ | |
+| 3.4 | Jam masuk & jam pulang per satker | ✅ | format `HH:MM`, divalidasi server |
+| 3.5 | Hari kerja per satker | ✅ | checkbox 1–7 (Senin–Minggu) |
+| 3.6 | Menu & halaman **Data Personel** | ✅ | `(app)/personel/+page.svelte`, hanya akun personel |
+| 3.7 | Tambah personel (NRP, nama, pangkat, jabatan, satker, atasan) | ✅ | pangkat memakai combobox 21 tingkat Polri (terendah→tertinggi); unit & email tidak lagi diminta |
+| 3.8 | Ubah personel & nonaktifkan | ✅ | |
+| 3.9 | Atur peran + cakupan satker dari UI | ✅ | `GET|POST /personel/{id}/roles` |
+| 3.10 | Reset password personel | ✅ | `POST /personel/{id}/reset-password` |
+| 3.11 | Pencarian & filter satker | ✅ | filter unit dihapus dari form personel |
+| 3.12 | Halaman **Akun Admin** terpisah (username, peran, cakupan) | ✅ | `(app)/admin/+page.svelte`, `/admin` |
+| 3.13 | Admin Polda hanya dapat membuat admin_satker_polda | ✅ | validasi `boleh_membuat_role` |
+| 3.14 | Admin Polres hanya dapat membuat admin_satker_polres | ✅ | |
+| 3.15 | Reset password & nonaktifkan akun admin | ✅ | `POST /admin/{id}/reset-password` |
+| 3.16 | Zona waktu memakai combo box 3 opsi | ✅ | WIB/WITA/WIT divalidasi server |
+| 3.17 | Jam pulang Sabtu setengah hari (10:00/12:00) | ✅ | `satker.jam_pulang_sabtu`, dipakai penilaian |
+| 3.18 | Periode bulan berjalan dibuat otomatis | ✅ | `find_or_current` + `pastikan_bulan_ini` |
+| 3.19 | Admin global dapat membuka kembali periode tertutup | ✅ | `POST /periode/{id}/buka` + alasan audit |
+| 3.20 | Halaman **Kesiapan Periode** per satker | ✅ | jumlah personel, dinilai, belum, status |
+| 3.21 | Admin satker menandai siap; admin global memantau semua | ✅ | tabel `periode_satker_kesiapan` |
+| 3.22 | Halaman **Hari Libur** + kalender nasional/khusus satker | ✅ | tabel `hari_libur`, `/libur` |
+| 3.23 | Libur otomatis netral di penilaian absensi | ✅ | `service/penilaian.rs` + detail `hari_libur` |
+| 3.24 | Pagination seragam di semua modul daftar | ✅ | komponen `Pagination.svelte`; server-side: dashboard, penilaian, rencana, hasil, output, personel, admin, persetujuan; client-side: satker, libur, titik dinas, kesiapan, PH, absensi, rekap |
+
+## 4. Modul PH / Strong Point (terpisah dari absensi harian)
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 4.1 | Tabel `strong_point`, `jadwal_ph`, `jadwal_ph_personel`, `absensi_ph` | ✅ | migrasi `0006_ph.sql` |
+| 4.2 | CRUD strong point per satker (titik + radius) | ✅ | dashboard tab **Strong Point** |
+| 4.3 | Jadwal PH per satker per bulan | ✅ | filter `?bulan=YYYY-MM&satker_id=` |
+| 4.4 | Satu jadwal berisi banyak personel + peran | ✅ | mis. ketua/anggota |
+| 4.5 | Deteksi bentrok jadwal personel | ✅ | `repo/ph.rs::ada_bentrok` (jam beririsan) |
+| 4.6 | Tiap personel dapat jadwal berbeda tiap bulan | ✅ | 63 jadwal contoh pada seed |
+| 4.7 | Check-in PH **wajib lokasi** | ✅ | HTTP 422 bila GPS kosong |
+| 4.8 | Check-out PH **wajib lokasi** | ✅ | lokasi diambil ulang saat check-out |
+| 4.9 | Validasi radius strong point sisi server | ✅ | jarak dihitung Haversine |
+| 4.10 | Idempotensi `client_uuid` | ✅ | kirim ulang tidak menggandakan |
+| 4.11 | Rekap PH terpisah (check-in/out per orang) | ✅ | `GET /ph/rekap` + tab **Rekap PH** |
+| 4.12 | Hari ber-jadwal PH dikeluarkan dari skor absensi harian | ✅ | `service/penilaian.rs` + detail `hari_ph` |
+| 4.13 | Absensi PH tidak mengubah bobot 20/20/30/30 | ✅ | hanya rekap PH terpisah |
+| 4.14 | Verifikasi absensi PH oleh atasan/admin | ✅ | `POST /ph/absensi/{id}/verifikasi` |
+| 4.15 | Tab **PH** di aplikasi Android | ✅ | jadwal, check-in, check-out |
+| 4.16 | Antrean offline untuk absensi PH | ⬜ | absensi PH saat ini butuh koneksi |
+| 4.17 | Ekspor CSV rekap PH | ⬜ | baru JSON + tampilan dashboard |
+
+## 5. Pengingat jadwal tanpa FCM
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 5.1 | Notifikasi lokal Android (WorkManager) | ✅ | `sync/Pengingat.kt` |
+| 5.2 | Pengingat H-1 pukul 19:00 waktu perangkat | ✅ | dijadwalkan per jadwal |
+| 5.3 | Pengingat 60 menit sebelum jam mulai | ✅ | |
+| 5.4 | Penjadwalan ulang otomatis saat jadwal dimuat | ✅ | `KinerjaViewModel.muatPh()` |
+| 5.5 | Izin `POST_NOTIFICATIONS` Android 13+ | ✅ | diminta di `MainActivity` |
+| 5.6 | Channel notifikasi terdaftar saat aplikasi dibuat | ✅ | `App.kt` |
+| 5.7 | Pusat notifikasi di dashboard web | ⬜ | API `/notifikasi` ada, UI belum |
+| 5.8 | Push daring (FCM) | ⬜ | tidak diperlukan untuk pengingat lokal |
+
+## 6. Reset data demo & database uji
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 6.1 | Seed baru: 1 Polda, 9 Polres, 21 Satker, 145 personel + 5 admin | ✅ | `cargo run --bin seed -- --reset` |
+| 6.2 | Akun admin per level + pimpinan + atasan + personel | ✅ | lihat tabel di bawah |
+| 6.3 | Data contoh jadwal PH (63 jadwal) | ✅ | |
+| 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–11 |
+| 6.5 | Database uji terpisah `kinerja_test` | ✅ | jangan dicampur dengan data demo |
+| 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (39 cek) |
+| 6.7 | Validator OpenAPI | ✅ | `bun tools/uji/openapi-check.js` |
+| 6.8 | Pembuatan periode otomatis diuji | ✅ | `bun tools/uji/periode-auto-check.js` (menghapus periode DB uji dahulu) |
+
+### Akun demo (seed)
+
+| Peran | Username / NRP | Password |
+|---|---|---|
+| Admin global | `superuser` | `Superuser#2026` |
+| Admin Polda | `admin_polda` | `AdminPolda#2026` |
+| Admin Satker Polda | `admin_satker_polda` | `AdminSatker#2026` |
+| Admin Polres | `admin_polres` | `AdminPolres#2026` |
+| Admin Satker Polres | `admin_satker_polres` | `AdminSatker#2026` |
+| Pimpinan Polda | `000002` | `Pimpinan#2026` |
+| Pimpinan Polres | `000022` | `PimpinanPolres#2026` |
+| Pimpinan Satker Polda | `000012` | `PimpinanSatker#2026` |
+| Pimpinan Satker Polres | `000023` | `PimpinanSatker#2026` |
+| Atasan | `000100` | `Atasan#2026` |
+| Personel | `85000001` | `Polri#2026` |
+
+> Untuk uji manual, gunakan `kinerja_db`. Untuk unit/e2e otomatis, gunakan `kinerja_test`
+> agar data demo tidak tercemar.
+
+## 7. Keamanan & audit
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 7.1 | Setiap mutasi `/api/v1` masuk `audit_log` | ✅ | middleware |
+| 7.2 | Audit hanya admin global | ✅ | |
+| 7.3 | Lampiran mentah dicek kepemilikan/cakupan | ✅ | `GET /lampiran/raw/{key}` |
+| 7.4 | Hapus lampiran dicek pemilik/admin | ✅ | |
+| 7.5 | Password di-hash Argon2id | ✅ | |
+| 7.6 | Rate limit login | ✅ | 5/menit/IP |
+| 7.7 | UI audit log di dashboard | ⬜ | masih via API |
+| 7.8 | HTTPS + cookie `Secure` di produksi | ⬜ | lihat backlog P1 |
+
+## 8. Dokumentasi
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 67 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode |
+| 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
+| 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
+| 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
+| 8.5 | `docs/UAT.md` diperbarui | ✅ | skenario admin satker/personel/PH |
+| 8.6 | `README.md` diperbarui | ✅ | akun, fitur, jumlah data |
+| 8.7 | Dokumen checklist ini | ✅ | `docs/CHECKLIST.md` |
+
+## 9. Verifikasi teknis (dijalankan ulang 17 November 2026)
+
+| # | Perintah | Status | Hasil |
+|---|---|---|---|
+| 9.1 | `cargo fmt --check` | ✅ | bersih |
+| 9.2 | `cargo clippy --all-targets -- -D warnings` | ✅ | tanpa peringatan |
+| 9.3 | `cargo test` | ✅ | 30 test lulus |
+| 9.4 | `bun run check` (dashboard) | ✅ | 0 error |
+| 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
+| 9.6 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
+| 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 39/39 cek lulus |
+| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid |
+| 9.9 | Pagination & form personel (combobox pangkat) | ✅ | `bun run check` 0 error, `bun run build` sukses; verifikasi visual di browser tetap disarankan |
+
+## 10. Yang belum dikerjakan (backlog)
+
+| # | Item | Prioritas | Alasan |
+|---|---|---|---|
+| 10.1 | Antrean offline absensi PH | P1 | PH biasanya di lokasi dengan sinyal; perlu keputusan produk |
+| 10.2 | Pusat notifikasi & pengingat di dashboard | P2 | API `/notifikasi` sudah tersedia |
+| 10.3 | UI audit log di Pengaturan | P2 | API `GET /audit` sudah tersedia |
+| 10.4 | Peta pemilihan titik dinas/strong point | P2 | saat ini input koordinat manual |
+| 10.5 | Ekspor PDF server-side (kop + QR) | P2 | cetak A4 browser sudah jalan |
+| 10.6 | Ekspor CSV rekap PH | P2 | |
+| 10.7 | Jadwalkan backup + uji restore | P1 | skrip ada, cron belum |
+| 10.8 | HTTPS produksi + `cleartextTrafficPermitted=false` | P1 | |
+| 10.9 | Uji perangkat nyata (Android 8 & 13) | P1 | emulator sudah |
+| 10.10 | Push FCM untuk notifikasi daring | P3 | pengingat lokal sudah memenuhi kebutuhan |
+| 10.11 | Utoipa/OpenAPI otomatis | P3 | `openapi.json` manual + validator |

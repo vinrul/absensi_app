@@ -1,0 +1,163 @@
+@import 'tailwindcss';
+
+@theme {
+	--color-navy-50: #eef3f9;
+	--color-navy-100: #d6e2f0;
+	--color-navy-200: #adc5e1;
+	--color-navy-300: #7fa3ce;
+	--color-navy-400: #4f7cb5;
+	--color-navy-500: #2f5c93;
+	--color-navy-600: #1d4573;
+	--color-navy-700: #12355a;
+	--color-navy-800: #0b2545;
+	--color-navy-900: #071a33;
+
+	--color-gold-400: #e8c766;
+	--color-gold-500: #d4a017;
+	--color-gold-600: #b3860f;
+
+	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+	html {
+		-webkit-text-size-adjust: 100%;
+	}
+
+	body {
+		background-color: var(--color-slate-100);
+		color: var(--color-slate-800);
+		font-family: var(--font-sans);
+	}
+
+	*:focus-visible {
+		outline: 2px solid var(--color-gold-500);
+		outline-offset: 2px;
+	}
+}
+
+@layer components {
+	.card {
+		background-color: white;
+		border-radius: 0.75rem;
+		border: 1px solid var(--color-slate-200);
+		box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		border-radius: 0.5rem;
+		padding: 0.5rem 1rem;
+		font-size: 0.875rem;
+		font-weight: 500;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease;
+		cursor: pointer;
+	}
+
+	.btn-primary {
+		background-color: var(--color-navy-800);
+		color: white;
+	}
+
+	.btn-primary:hover {
+		background-color: var(--color-navy-700);
+	}
+
+	.btn-gold {
+		background-color: var(--color-gold-500);
+		color: var(--color-navy-900);
+	}
+
+	.btn-gold:hover {
+		background-color: var(--color-gold-400);
+	}
+
+	.btn-ghost {
+		background-color: transparent;
+		color: var(--color-slate-600);
+	}
+
+	.btn-ghost:hover {
+		background-color: var(--color-slate-100);
+	}
+
+	.btn:disabled {
+		opacity: 0.55;
+		cursor: not-allowed;
+	}
+
+	.input {
+		width: 100%;
+		border-radius: 0.5rem;
+		border: 1px solid var(--color-slate-300);
+		background-color: white;
+		padding: 0.5rem 0.75rem;
+		font-size: 0.875rem;
+	}
+
+	.input:focus {
+		border-color: var(--color-navy-400);
+		outline: none;
+	}
+
+	.label {
+		display: block;
+		margin-bottom: 0.25rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--color-slate-600);
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+	}
+
+	.th {
+		padding: 0.625rem 0.75rem;
+		text-align: left;
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: var(--color-slate-500);
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		white-space: nowrap;
+	}
+
+	.td {
+		padding: 0.625rem 0.75rem;
+		font-size: 0.875rem;
+		vertical-align: middle;
+	}
+}
+
+/* ---------------------------------------------------------------- cetak A4 */
+@media print {
+	@page {
+		size: A4 portrait;
+		margin: 15mm;
+	}
+
+	body {
+		background: white;
+	}
+
+	.no-print {
+		display: none !important;
+	}
+
+	.cetak-area {
+		box-shadow: none !important;
+		border: none !important;
+	}
+
+	table {
+		font-size: 10pt;
+	}
+
+	thead {
+		display: table-header-group;
+	}
+}
