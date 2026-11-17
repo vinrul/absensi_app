@@ -13,10 +13,12 @@ import id.polri.poldabali.kinerja.data.AbsensiPh
 import id.polri.poldabali.kinerja.data.AbsensiPhRequest
 import id.polri.poldabali.kinerja.data.AbsensiRequest
 import id.polri.poldabali.kinerja.data.ApiException
+import id.polri.poldabali.kinerja.data.BerkasLampiran
 import id.polri.poldabali.kinerja.data.Graf
 import id.polri.poldabali.kinerja.data.Hasil
 import id.polri.poldabali.kinerja.data.HasilRequest
 import id.polri.poldabali.kinerja.data.JadwalPhSaya
+import id.polri.poldabali.kinerja.data.Lampiran
 import id.polri.poldabali.kinerja.data.Output
 import id.polri.poldabali.kinerja.data.OutputRequest
 import id.polri.poldabali.kinerja.data.Pengguna
@@ -24,6 +26,7 @@ import id.polri.poldabali.kinerja.data.PenilaianDetailResponse
 import id.polri.poldabali.kinerja.data.Periode
 import id.polri.poldabali.kinerja.data.Rencana
 import id.polri.poldabali.kinerja.data.RencanaRequest
+import id.polri.poldabali.kinerja.data.UbahRencanaRequest
 import id.polri.poldabali.kinerja.sync.Pengingat
 import id.polri.poldabali.kinerja.sync.Sinkronisasi
 import kotlinx.coroutines.launch
@@ -73,6 +76,13 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     var rencana by mutableStateOf<List<Rencana>>(emptyList())
         private set
+
+    var persetujuan by mutableStateOf<List<Rencana>>(emptyList())
+        private set
+
+    /** Atasan langsung atau pimpinan yang ditunjuk sebagai atasan dapat memutuskan rencana. */
+    val bisaMenyetujuiRencana: Boolean
+        get() = pengguna?.roles?.any { it == "atasan" || it.startsWith("pimpinan") } == true
 
     var hasil by mutableStateOf<List<Hasil>>(emptyList())
         private set
@@ -180,6 +190,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
             pengguna = null
             riwayat = emptyList()
             rencana = emptyList()
+            persetujuan = emptyList()
             hasil = emptyList()
             output = emptyList()
             nilai = null
@@ -242,7 +253,10 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
             .onFailure { absensiHariIniOffline = true }
 
         // Ringkasan di Beranda butuh jumlah dokumen & nilai terbaru.
-        runCatching { rencana = repo.daftarRencana() }
+        runCatching { rencana = daftarRencanaSaya() }
+        if (bisaMenyetujuiRencana) {
+            runCatching { persetujuan = repo.daftarPersetujuan() }
+        }
         runCatching { hasil = repo.daftarHasil() }
         runCatching { output = repo.daftarOutput() }
         runCatching { muatPhLangsung() }
@@ -322,14 +336,94 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     // --------------------------------------------------------- rencana kerja
 
     fun muatRencana() {
-        jalankan { rencana = repo.daftarRencana() }
+        jalankan { rencana = daftarRencanaSaya() }
     }
 
-    fun buatRencana(request: RencanaRequest, selesai: () -> Unit) {
+    private suspend fun daftarRencanaSaya(): List<Rencana> = repo.daftarRencana(pengguna?.id)
+
+    fun simpanRencana(
+        request: RencanaRequest,
+        lampiran: List<BerkasLampiran>,
+        selesai: () -> Unit
+    ) {
         jalankan {
-            repo.buatRencana(request)
-            rencana = repo.daftarRencana()
-            pesan = "Rencana kerja disimpan"
+            val dibuat = repo.buatRencana(request)
+
+            var gagalUnggah = 0
+            lampiran.forEach { berkas ->
+                runCatching { repo.unggahLampiranRencana(dibuat.id, berkas) }
+                    .onFailure { gagalUnggah++ }
+            }
+
+            rencana = daftarRencanaSaya()
+            pesan = if (request.ajukan) {
+                "Rencana kerja diajukan ke atasan"
+            } else {
+                "Rencana kerja disimpan sebagai draft"
+            }
+            if (gagalUnggah > 0) {
+                galat = "$gagalUnggah dari ${lampiran.size} lampiran gagal diunggah"
+            } else if (lampiran.isNotEmpty()) {
+                pesan = "$pesan · ${lampiran.size} lampiran terunggah"
+            }
+            selesai()
+        }
+    }
+
+    /** Memuat detail rencana (termasuk tahapan & lampiran) untuk mode ubah. */
+    fun muatDetailRencana(id: String, selesai: (Rencana) -> Unit) {
+        viewModelScope.launch {
+            sedangMemproses = true
+            galat = null
+            try {
+                selesai(repo.detailRencana(id))
+            } catch (error: ApiException) {
+                if (error.status == 401) {
+                    pengguna = null
+                    galat = "Sesi berakhir, silakan login kembali"
+                } else {
+                    galat = error.message
+                }
+            } catch (error: Exception) {
+                galat = error.message ?: "Terjadi kesalahan"
+            } finally {
+                sedangMemproses = false
+            }
+        }
+    }
+
+    fun ubahRencana(
+        id: String,
+        request: UbahRencanaRequest,
+        lampiranBaru: List<BerkasLampiran>,
+        lampiranDihapus: List<String>,
+        ajukan: Boolean,
+        selesai: () -> Unit
+    ) {
+        jalankan {
+            repo.ubahRencana(id, request)
+
+            if (ajukan) repo.ajukanRencana(id)
+
+            var gagalLampiran = 0
+            lampiranDihapus.forEach { lampiranId ->
+                runCatching { repo.hapusLampiran(lampiranId) }
+                    .onFailure { gagalLampiran++ }
+            }
+            lampiranBaru.forEach { berkas ->
+                runCatching { repo.unggahLampiranRencana(id, berkas) }
+                    .onFailure { gagalLampiran++ }
+            }
+
+            rencana = daftarRencanaSaya()
+            pesan = if (ajukan) {
+                "Rencana kerja diajukan ulang ke atasan"
+            } else {
+                "Perubahan rencana kerja disimpan"
+            }
+            if (gagalLampiran > 0) {
+                galat = "$gagalLampiran lampiran gagal diproses"
+            }
             selesai()
         }
     }
@@ -337,8 +431,51 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     fun ajukanRencana(id: String) {
         jalankan {
             repo.ajukanRencana(id)
-            rencana = repo.daftarRencana()
+            rencana = daftarRencanaSaya()
             pesan = "Rencana kerja diajukan ke atasan"
+        }
+    }
+
+    // ------------------------------------------------- persetujuan rencana
+
+    fun muatPersetujuan() {
+        if (!bisaMenyetujuiRencana) return
+        jalankan { persetujuan = repo.daftarPersetujuan() }
+    }
+
+    fun putuskanRencana(
+        id: String,
+        status: String,
+        catatan: String?,
+        selesai: () -> Unit
+    ) {
+        jalankan {
+            repo.putuskanRencana(id, status, catatan)
+            persetujuan = repo.daftarPersetujuan()
+            rencana = daftarRencanaSaya()
+            pesan = when (status) {
+                "disetujui" -> "Rencana kerja disetujui"
+                "perlu_revisi" -> "Rencana dikembalikan untuk revisi"
+                else -> "Rencana kerja ditolak"
+            }
+            selesai()
+        }
+    }
+
+    fun unduhLampiran(
+        lampiran: Lampiran,
+        selesai: (ByteArray) -> Unit,
+        gagal: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                selesai(repo.unduhLampiran(lampiran.storageKey))
+            } catch (error: ApiException) {
+                if (error.status == 401) pengguna = null
+                gagal(error.message ?: "Gagal mengunduh lampiran")
+            } catch (error: Exception) {
+                gagal(error.message ?: "Gagal mengunduh lampiran")
+            }
         }
     }
 

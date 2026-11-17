@@ -163,6 +163,35 @@ class Api(private val sesi: PenyimpananSesi) {
         hasil.second
     }
 
+    /** Mengunduh berkas biner (mis. lampiran) dengan bearer token + refresh otomatis. */
+    suspend fun unduh(path: String): ByteArray {
+        val url = alamat() + path.removePrefix("/")
+        var hasil = unduhSekali(url)
+
+        if (hasil.first == 401 && segarkan()) {
+            hasil = unduhSekali(url)
+        }
+
+        val (status, isi) = hasil
+        if (status !in 200..299) {
+            throw ApiException(status, pesanError(isi.toString(Charsets.UTF_8), status))
+        }
+        return isi
+    }
+
+    private suspend fun unduhSekali(url: String): Pair<Int, ByteArray> = withContext(Dispatchers.IO) {
+        val pembangun = Request.Builder().url(url).get()
+        sesi.aksesToken()?.let { pembangun.header("Authorization", "Bearer $it") }
+
+        try {
+            klien.newCall(pembangun.build()).execute().use { respons ->
+                respons.code to (respons.body?.bytes() ?: ByteArray(0))
+            }
+        } catch (galat: IOException) {
+            throw ApiException(0, "Tidak dapat terhubung ke server. Periksa jaringan atau alamat server.")
+        }
+    }
+
     companion object {
         /** Emulator: 10.0.2.2 menuju localhost mesin pengembang. */
         const val ALAMAT_BAWAAN = "http://10.0.2.2:8080/api/v1/"

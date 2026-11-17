@@ -197,6 +197,13 @@ export interface Tahapan {
 	target_kuantitas: number | null;
 	satuan: string | null;
 	bobot: number | null;
+	program?: string | null;
+	kegiatan?: string | null;
+	tujuan?: string | null;
+	indikator_kinerja?: string | null;
+	target_kualitas?: string | null;
+	tanggal_mulai?: string | null;
+	tanggal_selesai?: string | null;
 }
 
 export interface Lampiran {

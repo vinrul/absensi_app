@@ -78,6 +78,17 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.29 | Peta absensi Android (OSM) + radius & titik terdekat | ✅ | `PetaAbsensi.kt` (osmdroid), marker lokasi, titik dinas, radius, akurasi |
 | 3.30 | Wizard izin pertama kali sebelum login | ✅ | `WizardIzinScreen.kt`: lokasi, kamera, notifikasi, WorkManager/penyimpanan + alasan tiap izin |
 | 3.31 | Riwayat absensi di halaman terpisah | ✅ | tombol **Riwayat Absensi** pada halaman awal tab Absensi |
+| 3.32 | Wizard input rencana kerja Android 4 langkah | ✅ | `WizardRencana.kt`: jenis → dasar tugas → rincian kegiatan → lampiran; **Simpan Draf** & **Ajukan ke Atasan** |
+| 3.33 | Rincian kegiatan multi-entri dengan field lengkap | ✅ | program, kegiatan, uraian, tujuan, indikator, target kuantitas/kualitas, tanggal mulai/selesai; migrasi `0013` menambah kolom pada `rencana_tahapan`; detail dashboard menampilkan seluruh field |
+| 3.34 | Lampiran lebih dari satu berkas pada wizard | ✅ | pemilih dokumen multi-select; tiap berkas diunggah ke `POST /lampiran` setelah rencana tersimpan |
+| 3.35 | Tab **Nilai** dan **PH** disembunyikan sementara dari bottom nav | ✅ | bottom bar 5 tab; ringkasan nilai tetap tampil di Beranda, kode layar lama dipertahankan |
+| 3.36 | Ubah draft / perbaiki rencana yang diminta revisi | ✅ | tombol **Ubah Rencana** / **Perbaiki Rencana** membuka wizard terisi data lama, catatan atasan, rincian, dan lampiran; `PATCH /rencana-kerja/{id}` mengganti tahapan secara transaksional |
+| 3.37 | Date picker untuk seluruh tanggal rencana | ✅ | `FieldTanggal` + `DatePickerDialog` Material 3: tanggal dasar, tanggal mulai/selesai kegiatan; tanpa input teks |
+| 3.38 | Persetujuan rencana di Android untuk atasan/pimpinan | ✅ | kartu **Persetujuan Rencana** di Beranda + tombol **Tinjau Persetujuan** di tab Rencana; daftar `GET /rencana-kerja/persetujuan`, detail rincian + lampiran, keputusan Setujui / Minta Revisi / Tolak |
+| 3.39 | Dual role atasan sekaligus bawahan | ✅ | tab Rencana memuat rencana sendiri (`personel_id`) sekaligus tombol persetujuan bawahan; Beranda menampilkan jumlah yang menunggu; seed: `000100` → `85000001` dan `000100` → `000002` |
+| 3.40 | Pimpinan dapat menjadi atasan langsung | ✅ | gate `list_persetujuan`/`keputusan` menerima `pimpinan_any`; menu Persetujuan dashboard tampil untuk pimpinan |
+| 3.41 | Penampil lampiran PDF & gambar di Android | ✅ | `LihatLampiran.kt`: unduh via `GET /lampiran/raw`, PDF dirender `PdfRenderer` (maks. 10 halaman), gambar dengan pinch-zoom; tombol **Lihat** pada detail persetujuan dan lampiran wizard |
+| 3.42 | Detail rencana untuk semua status | ✅ | tombol **Lihat Detail Rencana** pada kartu disetujui/diajukan/ditolak; **Lihat Detail** pada draft/revisi; dialog menampilkan status, rincian, lampiran (dapat dibuka), dan catatan atasan |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 
@@ -97,7 +108,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.12 | Hari ber-jadwal PH dikeluarkan dari skor absensi harian | ✅ | `service/penilaian.rs` + detail `hari_ph` |
 | 4.13 | Absensi PH tidak mengubah bobot 20/20/30/30 | ✅ | hanya rekap PH terpisah |
 | 4.14 | Verifikasi absensi PH oleh atasan/admin | ✅ | `POST /ph/absensi/{id}/verifikasi` |
-| 4.15 | Tab **PH** di aplikasi Android | ✅ | jadwal, check-in, check-out |
+| 4.15 | Tab **PH** di aplikasi Android | 🟡 | disembunyikan sementara dari bottom nav (permintaan pengguna); kode `PhScreen` tetap ada |
 | 4.16 | Antrean offline untuk absensi PH | ⬜ | absensi PH saat ini butuh koneksi |
 | 4.17 | Ekspor CSV rekap PH | ⬜ | baru JSON + tampilan dashboard |
 
@@ -121,11 +132,14 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 6.1 | Seed baru: 1 Polda, 9 Polres, 21 Satker, 145 personel + 5 admin | ✅ | `cargo run --bin seed -- --reset` |
 | 6.2 | Akun admin per level + pimpinan + atasan + personel | ✅ | lihat tabel di bawah |
 | 6.3 | Data contoh jadwal PH (63 jadwal) | ✅ | |
-| 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–12 |
+| 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–13 |
 | 6.5 | Database uji terpisah `kinerja_test` | ✅ | jangan dicampur dengan data demo |
 | 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (48 cek) |
 | 6.7 | Validator OpenAPI | ✅ | `bun tools/uji/openapi-check.js` |
 | 6.8 | Pembuatan periode otomatis diuji | ✅ | `bun tools/uji/periode-auto-check.js` (menghapus periode DB uji dahulu) |
+| 6.9 | Contoh rencana draft, diajukan, dan perlu revisi untuk akun Android | ✅ | seed `--reset`: 3 dokumen + tahapan rincian + catatan revisi untuk NRP `85000001` |
+| 6.10 | Contoh rantai dual-role atasan → pimpinan | ✅ | seed: rencana `000100` berstatus `diajukan` ke atasan `000002` |
+| 6.11 | Lampiran contoh PDF & gambar pada pengajuan | ✅ | seed menulis file ke `APP__UPLOAD_DIR`: PDF+PNG untuk `85000001` dan personel lain `85210022`, PDF untuk `000100` dan rencana revisi |
 
 ### Akun demo (seed)
 
@@ -187,6 +201,11 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.10 | Uji API titik dinas (tambah/ubah jenis & koordinat/hapus) | ✅ | 3 cek tambahan pada `api-smoke.js` |
 | 9.11 | Uji jam palsu development | ✅ | 6 cek tambahan: aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
 | 9.12 | Alur absensi Android + peta + wizard izin | ✅ | diuji di emulator API 34: wizard, peta/radius, tombol adaptif, status otomatis, offline, riwayat |
+| 9.13 | Wizard rencana kerja Android | ✅ | diuji di emulator API 34: 2 kegiatan, 2 lampiran PDF, simpan draf, ajukan; data tersimpan di `rencana_tahapan` + `lampiran` |
+| 9.14 | Persetujuan rencana Android + dual-role | ✅ | emulator: `000100` melihat kartu persetujuan di Beranda dan tombol di tab Rencana; hanya rencana `85000001` yang tampil, 1 rencana sendiri tetap di daftar; revisi tanpa catatan ditolak, dengan catatan tersimpan; `000002` juga dapat membuka persetujuan |
+| 9.15 | Lampiran contoh PDF/PNG dapat diunduh | ✅ | `GET /lampiran/raw/{key}` → 200, `application/pdf`/`image/png`, signature `%PDF`/PNG valid; detail persetujuan Android menampilkan kedua berkas |
+| 9.16 | Penampil lampiran Android | ✅ | emulator: PDF `SP-123-Pengungkapan.pdf` dirender satu halaman; PNG `Bukti-Transaksi.png` tampil penuh, pinch-zoom berfungsi |
+| 9.17 | Detail rencana berstatus disetujui | ✅ | emulator: kartu disetujui menampilkan **Lihat Detail Rencana**; dialog memuat status Disetujui, rincian, dan lampiran `Laporan-Pelaksanaan-Tahap-1.pdf` yang dapat dibuka |
 
 ## 10. Yang belum dikerjakan (backlog)
 

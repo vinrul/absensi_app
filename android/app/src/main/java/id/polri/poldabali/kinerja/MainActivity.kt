@@ -18,7 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -56,9 +55,7 @@ import id.polri.poldabali.kinerja.ui.BerandaScreen
 import id.polri.poldabali.kinerja.ui.HasilScreen
 import id.polri.poldabali.kinerja.ui.KinerjaViewModel
 import id.polri.poldabali.kinerja.ui.LoginScreen
-import id.polri.poldabali.kinerja.ui.NilaiScreen
 import id.polri.poldabali.kinerja.ui.OutputScreen
-import id.polri.poldabali.kinerja.ui.PhScreen
 import id.polri.poldabali.kinerja.ui.ProfilScreen
 import id.polri.poldabali.kinerja.ui.RencanaScreen
 import id.polri.poldabali.kinerja.ui.WizardIzinScreen
@@ -81,9 +78,7 @@ private val DAFTAR_TAB = listOf(
     Tab("Absensi", Icons.Filled.Place),
     Tab("Rencana", Icons.AutoMirrored.Filled.List),
     Tab("Hasil", Icons.Filled.CheckCircle),
-    Tab("Output", Icons.Filled.Star),
-    Tab("Nilai", Icons.Filled.Person),
-    Tab("PH", Icons.Filled.DateRange)
+    Tab("Output", Icons.Filled.Star)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -123,7 +118,7 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
 
     var tabAktif by rememberSaveable { mutableStateOf(0) }
     var bukaProfil by rememberSaveable { mutableStateOf(false) }
-    var pindahKeNilai by rememberSaveable { mutableStateOf(false) }
+    var bukaPersetujuanRencana by rememberSaveable { mutableStateOf(false) }
 
     if (bukaProfil) {
         Scaffold(
@@ -150,11 +145,6 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
             }
         }
         return
-    }
-
-    if (pindahKeNilai) {
-        tabAktif = 5
-        pindahKeNilai = false
     }
 
     Scaffold(
@@ -199,7 +189,6 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                         selected = tabAktif == indeks,
                         onClick = {
                             tabAktif = indeks
-                            if (indeks == 6) vm.muatPh()
                         },
                         icon = { Icon(tab.ikon, contentDescription = tab.label) },
                         label = { Text(tab.label, maxLines = 1) }
@@ -213,14 +202,19 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                 0 -> BerandaScreen(
                     vm = vm,
                     onBukaAbsensi = { tabAktif = 1 },
-                    onBukaNilai = { tabAktif = 5 }
+                    onBukaPersetujuan = {
+                        bukaPersetujuanRencana = true
+                        tabAktif = 2
+                    }
                 )
                 1 -> AbsensiScreen(vm)
-                2 -> RencanaScreen(vm)
+                2 -> RencanaScreen(
+                    vm = vm,
+                    mintaBukaPersetujuan = bukaPersetujuanRencana,
+                    onPersetujuanDibuka = { bukaPersetujuanRencana = false }
+                )
                 3 -> HasilScreen(vm)
                 4 -> OutputScreen(vm)
-                5 -> NilaiScreen(vm)
-                else -> PhScreen(vm)
             }
         }
     }

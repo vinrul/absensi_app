@@ -48,7 +48,7 @@
 		{ href: '/absensi/rekap', label: 'Rekap Kehadiran', icon: 'users', roles: dashboardRole },
 		{ href: '/absensi/titik-dinas', label: 'Titik Dinas', icon: 'pin', roles: pengelolaRole },
 		{ href: '/rencana-kerja', label: 'Rencana Kerja', icon: 'rencana', roles: semuaRole },
-		{ href: '/persetujuan', label: 'Persetujuan', icon: 'check', roles: pengelolaRole },
+		{ href: '/persetujuan', label: 'Persetujuan', icon: 'check', roles: dashboardRole },
 		{ href: '/hasil-kerja', label: 'Hasil Kerja', icon: 'hasil', roles: semuaRole },
 		{ href: '/output', label: 'Output', icon: 'output', roles: semuaRole },
 		{ href: '/penilaian', label: 'Penilaian', icon: 'penilaian', roles: dashboardRole },

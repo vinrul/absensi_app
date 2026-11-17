@@ -16,7 +16,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
 | Area | Bukti |
 |---|---|
-| Skema DB + seed demo (1 Polda, 9 Polres, 21 Satker, 145 personel + 5 admin) | `cargo run --bin seed -- --reset` |
+| Skema DB + seed demo (1 Polda, 9 Polres, 21 Satker, 145 personel + 5 admin) | `cargo run --bin seed -- --reset`; lampiran contoh PDF/PNG ikut ditulis ke `APP__UPLOAD_DIR` |
 | Struktur 3 level (polda → polres → satker) + 12 peran ber-scope | `service/akses.rs`, migrasi `0003`/`0005` |
 | Akun admin terpisah secara logis (`jenis_akun=admin`, username, tanpa NRP) | migrasi `0007`, halaman **Akun Admin** |
 | Login berkanal: admin hanya web, Android hanya akun personel | `routes/auth.rs`, `KanalLogin` |
@@ -37,11 +37,11 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
 | Absensi + geofence + antrean offline | e2e: dalam radius 200, luar radius 422, duplikat 409 |
-| Rencana kerja + persetujuan + lampiran | e2e alur penuh |
+| Rencana kerja + persetujuan + lampiran | e2e alur penuh + wizard Android 4 langkah (jenis → dasar → rincian kegiatan → lampiran); seed menyediakan contoh draft/diajukan/perlu revisi |
 | Hasil kerja + output + verifikasi | e2e, skor tersimpan |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs` + hari PH dikecualikan |
 | Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser |
-| Aplikasi Android (login, absensi GPS, offline, PH, 7 tab) | APK debug terbentuk |
+| Aplikasi Android (login, absensi GPS, offline, wizard rencana, persetujuan atasan, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
 | Dokumentasi API | `/docs` (70 path), `/api-docs/openapi.json` |
@@ -208,8 +208,38 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
 **Android**
 - Satu `KinerjaViewModel` menangani semua state & pemanggilan repo; layar Compose hanya
   memanggil method VM.
-- Navigasi: bottom bar 7 tab (Beranda, Absensi, Rencana, Hasil, Output, Nilai, PH) +
-  Profil lewat ikon di top bar (tanpa Navigation-Compose).
+- Navigasi: bottom bar 5 tab (Beranda, Absensi, Rencana, Hasil, Output) + Profil lewat ikon
+  di top bar (tanpa Navigation-Compose). Tab **Nilai** dan **PH** disembunyikan sementara;
+  `NilaiScreen`/`PhScreen` masih ada di kode dan dapat diaktifkan kembali.
+- **Persetujuan di Android** (`ui/PersetujuanScreen.kt`) dibuka dari kartu **Persetujuan Rencana**
+  di Beranda atau tombol **Tinjau Persetujuan** pada tab Rencana (tanpa tab terpisah).
+  Daftar `GET /rencana-kerja/persetujuan` hanya memuat bawahan langsung berstatus `diajukan`,
+  dilengkapi dialog detail rincian + lampiran, lalu keputusan Setujui / Minta Revisi / Tolak
+  lewat `POST /rencana-kerja/{id}/keputusan`. Catatan wajib saat meminta revisi.
+- **Dual role**: tab Rencana memakai filter `personel_id` milik akun yang login, sedangkan tombol
+  persetujuan menampilkan bawahan langsung. Dengan begitu akun seperti `000100` tetap dapat
+  mengajukan rencana ke `000002` sekaligus memutuskan rencana `85000001`. Pimpinan yang ditunjuk
+  sebagai `atasan_id` juga boleh memutuskan (gate backend + menu dashboard diperluas).
+- **Penampil lampiran** (`ui/LihatLampiran.kt`): unduh biner lewat `Api.unduh`/`GET /lampiran/raw`
+  dengan bearer token, lalu render PDF memakai `PdfRenderer` (maks. 10 halaman) atau tampilkan
+  gambar dengan pinch-zoom. Dipakai dari detail persetujuan dan daftar lampiran wizard.
+- **Detail rencana** (`DialogDetailRencana`) dapat dibuka dari setiap kartu Rencana, termasuk
+  status `disetujui`/`diajukan`/`ditolak` lewat **Lihat Detail Rencana**, serta dari
+  draft/revisi lewat **Lihat Detail**.
+- **Wizard rencana kerja** (`ui/WizardRencana.kt`): langkah jenis → dasar tugas → rincian kegiatan
+  (bisa banyak entri, lihat `rencana_tahapan`) → lampiran multi-berkas. Tombol **Simpan Draf**
+  (`ajukan=false`) dan **Ajukan ke Atasan** (`ajukan=true`); lampiran diunggah setelah rencana
+  tersimpan karena `POST /lampiran` membutuhkan `owner_id`.
+- **Mode ubah** dipakai untuk status `draft`/`perlu_revisi`: detail dimuat lewat
+  `GET /rencana-kerja/{id}`, wizard terisi otomatis (termasuk catatan atasan), lalu
+  `PATCH /rencana-kerja/{id}` mengganti rincian kegiatan dalam satu transaksi. Tombol
+  **Simpan Perubahan** dan **Ajukan Ulang ke Atasan**. Lampiran lama dapat dihapus (dihapus saat
+  simpan) dan berkas baru ditambahkan.
+- Semua tanggal memakai `FieldTanggal` + `DatePickerDialog` Material 3 (tidak ada input tanggal manual).
+- Satu pengajuan wizard = satu baris `rencana_kerja`; rincian kegiatan disimpan sebagai
+  `rencana_tahapan` dengan kolom tambahan (migrasi `0013`) agar tetap satu alur persetujuan.
+- Filter `/rencana-kerja/persetujuan`: `atasan_id` dan status `diajukan` sekarang digabung dengan
+  `AND` (sebelumnya `OR` membuat atasan melihat semua rencana dalam cakupan).
 - DTO @Serializable dengan `JsonNamingStrategy.SnakeCase` — jangan menulis `@SerialName` manual.
 - Tanggal ISO (`yyyy-MM-dd`), waktu kirim `Instant.now().toString()`.
 
@@ -268,7 +298,7 @@ GET    /docs              # di luar /api/v1
 `personel.nrp` hanya wajib untuk `jenis_akun='personel'`; `personel.username` hanya wajib
 untuk `jenis_akun='admin'` (constraint `personel_identitas_check`).
 
-Migrasi: `backend/migrations/0001_init.sql` … `0011_hari_libur.sql`. Status absensi
+Migrasi: `backend/migrations/0001_init.sql` … `0013_rencana_tahapan_rincian.sql`. Status absensi
 `libur_nasional` menggantikan nama lama `ph` (nama `ph` sekarang khusus modul PH).
 Tambah migrasi baru = file `000N_nama.sql` lalu `sqlx migrate run` + `cargo sqlx prepare` bila
 memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).

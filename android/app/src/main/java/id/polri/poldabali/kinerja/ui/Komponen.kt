@@ -49,8 +49,8 @@ fun Kartu(
 }
 
 @Composable
-fun JudulBagian(teks: String, keterangan: String? = null) {
-    Column(Modifier.fillMaxWidth()) {
+fun JudulBagian(teks: String, keterangan: String? = null, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
         Text(teks, style = MaterialTheme.typography.titleMedium, color = Warna.Teks)
         if (keterangan != null) {
             Text(
@@ -234,6 +234,15 @@ fun labelStatusRencana(status: String): String = when (status) {
     "perlu_revisi" -> "Perlu Revisi"
     "ditolak" -> "Ditolak"
     else -> status
+}
+
+fun labelJenisRencana(jenis: String): String = when (jenis) {
+    "harian" -> "Harian"
+    "mingguan" -> "Mingguan"
+    "bulanan" -> "Bulanan"
+    "triwulan" -> "Triwulanan/Semester"
+    "penugasan_khusus" -> "Penugasan Khusus"
+    else -> jenis
 }
 
 fun labelStatusOutput(status: String): String = when (status) {

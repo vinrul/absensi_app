@@ -93,9 +93,9 @@ pub async fn list_persetujuan(
     user: AuthUser,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<ListResponse<RencanaRow>>> {
-    if !(user.is_admin_any() || user.is_atasan()) {
+    if !(user.is_admin_any() || user.is_atasan() || user.is_pimpinan_any()) {
         return Err(AppError::Forbidden(
-            "Hanya atasan atau admin yang dapat melihat persetujuan".into(),
+            "Hanya atasan, pimpinan, atau admin yang dapat melihat persetujuan".into(),
         ));
     }
 
@@ -166,6 +166,32 @@ pub struct TahapanRequest {
     pub target_kuantitas: Option<f64>,
     pub satuan: Option<String>,
     pub bobot: Option<f64>,
+    pub program: Option<String>,
+    pub kegiatan: Option<String>,
+    pub tujuan: Option<String>,
+    pub indikator_kinerja: Option<String>,
+    pub target_kualitas: Option<String>,
+    pub tanggal_mulai: Option<NaiveDate>,
+    pub tanggal_selesai: Option<NaiveDate>,
+}
+
+fn tahapan_baru(items: Vec<TahapanRequest>) -> Vec<NewTahapan> {
+    items
+        .into_iter()
+        .map(|item| NewTahapan {
+            uraian: item.uraian,
+            target_kuantitas: item.target_kuantitas,
+            satuan: item.satuan,
+            bobot: item.bobot,
+            program: item.program,
+            kegiatan: item.kegiatan,
+            tujuan: item.tujuan,
+            indikator_kinerja: item.indikator_kinerja,
+            target_kualitas: item.target_kualitas,
+            tanggal_mulai: item.tanggal_mulai,
+            tanggal_selesai: item.tanggal_selesai,
+        })
+        .collect()
 }
 
 #[derive(Debug, Deserialize)]
@@ -220,17 +246,7 @@ pub async fn create_rencana(
     }
 
     let id = Uuid::now_v7();
-    let tahapan = req
-        .tahapan
-        .unwrap_or_default()
-        .into_iter()
-        .map(|item| NewTahapan {
-            uraian: item.uraian,
-            target_kuantitas: item.target_kuantitas,
-            satuan: item.satuan,
-            bobot: item.bobot,
-        })
-        .collect();
+    let tahapan = req.tahapan.map(tahapan_baru).unwrap_or_default();
 
     rencana::create(
         &state.pool,
@@ -326,6 +342,7 @@ pub async fn update_rencana(
             target_waktu: req.target_waktu,
             tanggal_mulai: req.tanggal_mulai,
             tanggal_selesai: req.tanggal_selesai,
+            tahapan: req.tahapan.map(tahapan_baru),
         },
     )
     .await?;
@@ -351,6 +368,7 @@ pub struct UpdateRencanaRequest {
     pub target_waktu: Option<NaiveDate>,
     pub tanggal_mulai: Option<NaiveDate>,
     pub tanggal_selesai: Option<NaiveDate>,
+    pub tahapan: Option<Vec<TahapanRequest>>,
 }
 
 pub async fn ajukan_rencana(
@@ -409,9 +427,9 @@ pub async fn keputusan_rencana(
     Path(id): Path<Uuid>,
     Json(req): Json<KeputusanRequest>,
 ) -> AppResult<Json<RencanaDetail>> {
-    if !(user.is_admin_any() || user.is_atasan()) {
+    if !(user.is_admin_any() || user.is_atasan() || user.is_pimpinan_any()) {
         return Err(AppError::Forbidden(
-            "Hanya atasan atau admin yang dapat memutuskan rencana".into(),
+            "Hanya atasan, pimpinan, atau admin yang dapat memutuskan rencana".into(),
         ));
     }
 

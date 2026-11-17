@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -23,7 +24,7 @@ import id.polri.poldabali.kinerja.ui.theme.Warna
 fun BerandaScreen(
     vm: KinerjaViewModel,
     onBukaAbsensi: () -> Unit,
-    onBukaNilai: () -> Unit
+    onBukaPersetujuan: () -> Unit
 ) {
     	val pengguna = vm.pengguna
     	val statusServer = vm.absensiHariIni
@@ -81,6 +82,53 @@ fun BerandaScreen(
             )
         }
 
+        if (vm.bisaMenyetujuiRencana) {
+            Kartu {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "Persetujuan Rencana",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Warna.Teks
+                        )
+                        Text(
+                            "Rencana kerja bawahan langsung yang menunggu keputusan Anda.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Warna.TeksLembut
+                        )
+                    }
+                    Lencana(
+                        "${vm.persetujuan.size}",
+                        if (vm.persetujuan.isEmpty()) Warna.TeksLembut else Warna.Kuning
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (vm.persetujuan.isEmpty()) {
+                        "Tidak ada rencana yang menunggu keputusan."
+                    } else {
+                        "${vm.persetujuan.size} rencana menunggu keputusan Anda."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Warna.Teks
+                )
+                Spacer(Modifier.height(10.dp))
+                TombolUtama(
+                    teks = if (vm.persetujuan.isEmpty()) {
+                        "Buka Persetujuan"
+                    } else {
+                        "Tinjau Persetujuan (${vm.persetujuan.size})"
+                    },
+                    aktif = !vm.sedangMemproses,
+                    onClick = onBukaPersetujuan
+                )
+            }
+        }
+
         if (vm.antrean.isNotEmpty()) {
             Kartu {
                 JudulBagian(
@@ -135,8 +183,6 @@ fun BerandaScreen(
                 BarNilai("Rencana Kerja", nilai.skorRencanaKerja, Warna.Biru)
                 BarNilai("Hasil Kerja", nilai.skorHasilKerja, Warna.Navy)
                 BarNilai("Output", nilai.skorOutput, Warna.Gold)
-                Spacer(Modifier.height(6.dp))
-                TombolKedua(teks = "Lihat rincian", onClick = onBukaNilai)
             }
         }
 

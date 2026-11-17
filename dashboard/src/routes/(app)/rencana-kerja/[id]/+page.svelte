@@ -165,10 +165,27 @@
 				{#if detail.tahapan.length}
 					<div class="mt-5">
 						<h3 class="text-xs font-semibold tracking-wide text-slate-500 uppercase">Rincian Tahapan</h3>
-						<ol class="mt-2 space-y-1 text-sm text-slate-700">
+						<ol class="mt-2 space-y-2 text-sm text-slate-700">
 							{#each detail.tahapan as tahap}
-								<li>{tahap.urutan}. {tahap.uraian}
-									{#if tahap.target_kuantitas}<span class="text-xs text-slate-500">({tahap.target_kuantitas} {tahap.satuan ?? ''})</span>{/if}
+								<li class="rounded-lg bg-slate-50 p-2">
+									<p class="font-medium text-slate-800">{tahap.urutan}. {tahap.kegiatan ?? tahap.uraian}</p>
+									{#if tahap.program}
+										<p class="text-xs text-slate-500">{tahap.program}</p>
+									{/if}
+									{#if tahap.kegiatan}
+										<p class="mt-1">{tahap.uraian}</p>
+									{/if}
+									<p class="mt-1 text-xs text-slate-500">
+										{#if tahap.target_kuantitas}Target {tahap.target_kuantitas} {tahap.satuan ?? ''}{/if}
+										{#if tahap.target_kualitas} · Kualitas {tahap.target_kualitas}{/if}
+										{#if tahap.tanggal_mulai} · {tahap.tanggal_mulai} → {tahap.tanggal_selesai}{/if}
+									</p>
+									{#if tahap.tujuan}
+										<p class="text-xs text-slate-500">Tujuan: {tahap.tujuan}</p>
+									{/if}
+									{#if tahap.indikator_kinerja}
+										<p class="text-xs text-slate-500">Indikator: {tahap.indikator_kinerja}</p>
+									{/if}
 								</li>
 							{/each}
 						</ol>

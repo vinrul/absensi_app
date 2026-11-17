@@ -46,6 +46,13 @@ pub struct TahapanRow {
     pub target_kuantitas: Option<f64>,
     pub satuan: Option<String>,
     pub bobot: Option<f64>,
+    pub program: Option<String>,
+    pub kegiatan: Option<String>,
+    pub tujuan: Option<String>,
+    pub indikator_kinerja: Option<String>,
+    pub target_kualitas: Option<String>,
+    pub tanggal_mulai: Option<NaiveDate>,
+    pub tanggal_selesai: Option<NaiveDate>,
 }
 
 const LIST_SQL: &str = r#"
@@ -61,11 +68,8 @@ const LIST_SQL: &str = r#"
        AND ($2::uuid IS NULL OR r.personel_id = $2)
        AND ($3::status_rencana IS NULL OR r.status = $3)
        AND ($4::uuid IS NULL OR r.periode_id = $4)
-       AND (
-             $5::uuid IS NULL
-             OR r.atasan_id = $5
-             OR ($6::bool AND r.status = 'diajukan')
-           )
+       AND ($5::uuid IS NULL OR r.atasan_id = $5)
+       AND (NOT $6::bool OR r.status = 'diajukan')
      ORDER BY r.created_at DESC
      LIMIT $7 OFFSET $8
 "#;
@@ -77,11 +81,8 @@ const LIST_COUNT: &str = r#"
        AND ($2::uuid IS NULL OR r.personel_id = $2)
        AND ($3::status_rencana IS NULL OR r.status = $3)
        AND ($4::uuid IS NULL OR r.periode_id = $4)
-       AND (
-             $5::uuid IS NULL
-             OR r.atasan_id = $5
-             OR ($6::bool AND r.status = 'diajukan')
-           )
+       AND ($5::uuid IS NULL OR r.atasan_id = $5)
+       AND (NOT $6::bool OR r.status = 'diajukan')
 "#;
 
 pub struct ListFilter {
@@ -165,7 +166,8 @@ pub async fn by_personel(
 pub async fn tahapan(pool: &PgPool, rencana_id: Uuid) -> AppResult<Vec<TahapanRow>> {
     const SQL: &str = r#"
         SELECT id, urutan, uraian, target_kuantitas::float8 AS target_kuantitas, satuan,
-               bobot::float8 AS bobot
+               bobot::float8 AS bobot, program, kegiatan, tujuan, indikator_kinerja,
+               target_kualitas, tanggal_mulai, tanggal_selesai
           FROM rencana_tahapan
          WHERE rencana_id = $1
          ORDER BY urutan
@@ -181,6 +183,13 @@ pub struct NewTahapan {
     pub target_kuantitas: Option<f64>,
     pub satuan: Option<String>,
     pub bobot: Option<f64>,
+    pub program: Option<String>,
+    pub kegiatan: Option<String>,
+    pub tujuan: Option<String>,
+    pub indikator_kinerja: Option<String>,
+    pub target_kualitas: Option<String>,
+    pub tanggal_mulai: Option<NaiveDate>,
+    pub tanggal_selesai: Option<NaiveDate>,
 }
 
 pub struct NewRencana {
@@ -252,22 +261,46 @@ pub async fn create(pool: &PgPool, data: &NewRencana) -> AppResult<()> {
         .await?;
 
     for (index, tahap) in data.tahapan.iter().enumerate() {
-        sqlx::query(
-            "INSERT INTO rencana_tahapan (id, rencana_id, urutan, uraian, target_kuantitas, satuan, bobot)
-             VALUES ($1, $2, $3, $4, $5::float8::numeric, $6, $7::float8::numeric)",
-        )
-        .bind(Uuid::now_v7())
-        .bind(data.id)
-        .bind(index as i32 + 1)
-        .bind(&tahap.uraian)
-        .bind(tahap.target_kuantitas)
-        .bind(&tahap.satuan)
-        .bind(tahap.bobot)
-        .execute(&mut *tx)
-        .await?;
+        simpan_tahapan(&mut tx, data.id, index, tahap).await?;
     }
 
     tx.commit().await?;
+    Ok(())
+}
+
+async fn simpan_tahapan(
+    conn: &mut sqlx::PgConnection,
+    rencana_id: Uuid,
+    index: usize,
+    tahap: &NewTahapan,
+) -> AppResult<()> {
+    sqlx::query(
+        "INSERT INTO rencana_tahapan (
+             id, rencana_id, urutan, uraian, target_kuantitas, satuan, bobot,
+             program, kegiatan, tujuan, indikator_kinerja, target_kualitas,
+             tanggal_mulai, tanggal_selesai
+         )
+         VALUES (
+             $1, $2, $3, $4, $5::float8::numeric, $6, $7::float8::numeric,
+             $8, $9, $10, $11, $12, $13, $14
+         )",
+    )
+    .bind(Uuid::now_v7())
+    .bind(rencana_id)
+    .bind(index as i32 + 1)
+    .bind(&tahap.uraian)
+    .bind(tahap.target_kuantitas)
+    .bind(&tahap.satuan)
+    .bind(tahap.bobot)
+    .bind(&tahap.program)
+    .bind(&tahap.kegiatan)
+    .bind(&tahap.tujuan)
+    .bind(&tahap.indikator_kinerja)
+    .bind(&tahap.target_kualitas)
+    .bind(tahap.tanggal_mulai)
+    .bind(tahap.tanggal_selesai)
+    .execute(conn)
+    .await?;
     Ok(())
 }
 
@@ -288,6 +321,7 @@ pub struct UpdateRencana {
     pub target_waktu: Option<NaiveDate>,
     pub tanggal_mulai: Option<NaiveDate>,
     pub tanggal_selesai: Option<NaiveDate>,
+    pub tahapan: Option<Vec<NewTahapan>>,
 }
 
 pub async fn update(pool: &PgPool, id: Uuid, data: &UpdateRencana) -> AppResult<()> {
@@ -312,6 +346,8 @@ pub async fn update(pool: &PgPool, id: Uuid, data: &UpdateRencana) -> AppResult<
          WHERE id = $1
     "#;
 
+    let mut tx = pool.begin().await?;
+
     sqlx::query(SQL)
         .bind(id)
         .bind(&data.program)
@@ -330,9 +366,21 @@ pub async fn update(pool: &PgPool, id: Uuid, data: &UpdateRencana) -> AppResult<
         .bind(data.target_waktu)
         .bind(data.tanggal_mulai)
         .bind(data.tanggal_selesai)
-        .execute(pool)
+        .execute(&mut *tx)
         .await?;
 
+    if let Some(tahapan) = &data.tahapan {
+        sqlx::query("DELETE FROM rencana_tahapan WHERE rencana_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+
+        for (index, tahap) in tahapan.iter().enumerate() {
+            simpan_tahapan(&mut tx, id, index, tahap).await?;
+        }
+    }
+
+    tx.commit().await?;
     Ok(())
 }
 

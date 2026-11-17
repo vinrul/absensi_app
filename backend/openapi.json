@@ -189,14 +189,18 @@
           "kegiatan": { "type": "string" },
           "uraian": { "type": "string" },
           "tujuan": { "type": "string", "nullable": true },
+          "indikator_kinerja": { "type": "string", "nullable": true },
           "jenis": {
             "type": "string",
             "enum": ["harian", "mingguan", "bulanan", "triwulan", "penugasan_khusus"]
           },
           "dasar_jenis": { "type": "string", "enum": ["sp", "tor", "perintah_lisan"], "nullable": true },
           "dasar_nomor": { "type": "string", "nullable": true },
+          "dasar_tanggal": { "type": "string", "format": "date", "nullable": true },
+          "dasar_perihal": { "type": "string", "nullable": true },
           "target_kuantitas": { "type": "number", "nullable": true },
           "satuan": { "type": "string", "nullable": true },
+          "target_kualitas": { "type": "string", "nullable": true },
           "target_waktu": { "type": "string", "format": "date", "nullable": true },
           "tanggal_mulai": { "type": "string", "format": "date" },
           "tanggal_selesai": { "type": "string", "format": "date" },
@@ -207,8 +211,17 @@
               "properties": {
                 "uraian": { "type": "string" },
                 "target_kuantitas": { "type": "number", "nullable": true },
-                "satuan": { "type": "string", "nullable": true }
-              }
+                "satuan": { "type": "string", "nullable": true },
+                "bobot": { "type": "number", "nullable": true },
+                "program": { "type": "string", "nullable": true },
+                "kegiatan": { "type": "string", "nullable": true },
+                "tujuan": { "type": "string", "nullable": true },
+                "indikator_kinerja": { "type": "string", "nullable": true },
+                "target_kualitas": { "type": "string", "nullable": true },
+                "tanggal_mulai": { "type": "string", "format": "date", "nullable": true },
+                "tanggal_selesai": { "type": "string", "format": "date", "nullable": true }
+              },
+              "required": ["uraian"]
             }
           },
           "ajukan": { "type": "boolean" }
@@ -834,7 +847,7 @@
     },
     "/rencana-kerja/{id}": {
       "get": { "tags": ["rencana"], "summary": "Detail rencana + tahapan + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
-      "patch": { "tags": ["rencana"], "summary": "Ubah rencana (draft/revisi)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diperbarui" } } }
+      "patch": { "tags": ["rencana"], "summary": "Ubah rencana (draft/revisi) termasuk rincian kegiatan", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diperbarui" } } }
     },
     "/rencana-kerja/{id}/ajukan": {
       "post": { "tags": ["rencana"], "summary": "Ajukan rencana ke atasan", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diajukan" } } }

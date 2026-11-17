@@ -162,6 +162,8 @@ data class Rencana(
     val jenis: String = "bulanan",
     val dasarJenis: String? = null,
     val dasarNomor: String? = null,
+    val dasarTanggal: String? = null,
+    val dasarPerihal: String? = null,
     val targetKuantitas: Double? = null,
     val satuan: String? = null,
     val targetKualitas: String? = null,
@@ -170,7 +172,42 @@ data class Rencana(
     val tanggalSelesai: String,
     val status: String = "draft",
     val catatanAtasan: String? = null,
-    val jumlahRevisi: Int = 0
+    val jumlahRevisi: Int = 0,
+    val personelNama: String? = null,
+    val personelNrp: String? = null,
+    val unit: String? = null,
+    val tahapan: List<Tahapan> = emptyList(),
+    val lampiran: List<Lampiran> = emptyList()
+)
+
+@Serializable
+data class Tahapan(
+    val id: String,
+    val urutan: Int = 0,
+    val uraian: String,
+    val targetKuantitas: Double? = null,
+    val satuan: String? = null,
+    val bobot: Double? = null,
+    val program: String? = null,
+    val kegiatan: String? = null,
+    val tujuan: String? = null,
+    val indikatorKinerja: String? = null,
+    val targetKualitas: String? = null,
+    val tanggalMulai: String? = null,
+    val tanggalSelesai: String? = null
+)
+
+@Serializable
+data class Lampiran(
+    val id: String,
+    val ownerType: String = "",
+    val ownerId: String = "",
+    val kategori: String = "",
+    val fileName: String = "",
+    val mime: String = "",
+    val sizeBytes: Long = 0,
+    val storageKey: String = "",
+    val createdAt: String = ""
 )
 
 @Serializable
@@ -184,6 +221,7 @@ data class RencanaRequest(
     val jenis: String = "bulanan",
     val dasarJenis: String? = null,
     val dasarNomor: String? = null,
+    val dasarTanggal: String? = null,
     val dasarPerihal: String? = null,
     val targetKuantitas: Double? = null,
     val satuan: String? = null,
@@ -196,11 +234,45 @@ data class RencanaRequest(
 )
 
 @Serializable
+data class KeputusanRequest(
+    val status: String,
+    val catatan: String? = null
+)
+
+@Serializable
+data class UbahRencanaRequest(
+    val program: String,
+    val kegiatan: String,
+    val uraian: String,
+    val tujuan: String? = null,
+    val indikatorKinerja: String? = null,
+    val jenis: String = "bulanan",
+    val dasarJenis: String? = null,
+    val dasarNomor: String? = null,
+    val dasarTanggal: String? = null,
+    val dasarPerihal: String? = null,
+    val targetKuantitas: Double? = null,
+    val satuan: String? = null,
+    val targetKualitas: String? = null,
+    val targetWaktu: String? = null,
+    val tanggalMulai: String,
+    val tanggalSelesai: String,
+    val tahapan: List<TahapanRequest> = emptyList()
+)
+
+@Serializable
 data class TahapanRequest(
     val uraian: String,
     val targetKuantitas: Double? = null,
     val satuan: String? = null,
-    val bobot: Double? = null
+    val bobot: Double? = null,
+    val program: String? = null,
+    val kegiatan: String? = null,
+    val tujuan: String? = null,
+    val indikatorKinerja: String? = null,
+    val targetKualitas: String? = null,
+    val tanggalMulai: String? = null,
+    val tanggalSelesai: String? = null
 )
 
 // ----------------------------------------------------------------- hasil kerja

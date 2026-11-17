@@ -116,8 +116,25 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 ### FR-03 Rencana kerja
 - Wajib: program, kegiatan, uraian, tanggal mulai/selesai, periode.
 - Opsional: tujuan, indikator, dasar tugas (jenis/nomor/tanggal/perihal), target, tahapan, lampiran.
+- Android menyediakan wizard 4 langkah: jenis rencana → dasar tugas → rincian kegiatan → lampiran.
+  Rincian kegiatan dapat ditambah lebih dari satu; tiap entri memuat program, kegiatan, uraian,
+  tujuan, indikator, target kuantitas/kualitas, dan tanggal mulai/selesai (tabel
+  `rencana_tahapan`). Satu wizard menghasilkan satu rencana sehingga satu alur persetujuan.
+- Wizard dapat menyimpan **draf** (masih dapat diubah) atau langsung **mengajukan ke atasan**;
+  lampiran multi-berkas diunggah setelah rencana tersimpan.
+- Rencana berstatus `draft`/`perlu_revisi` dapat dibuka kembali di Android (**Ubah/Perbaiki Rencana**).
+  Wizard terisi data lama beserta catatan atasan; perubahan dikirim lewat `PATCH /rencana-kerja/{id}`
+  yang juga mengganti daftar rincian kegiatan, lalu dapat langsung diajukan ulang.
+- Semua tanggal (dasar tugas, mulai/selesai kegiatan) dipilih lewat **date picker**, bukan input teks.
+- Lampiran yang sudah tersimpan dapat dilihat langsung di Android: PDF dirender per halaman dan
+  gambar ditampilkan penuh dengan pinch-zoom; tidak memerlukan aplikasi eksternal.
 - Hanya pemilik dapat mengubah, dan hanya saat status `draft`/`perlu_revisi`.
 - Atasan langsung (atau admin) memutuskan; permintaan revisi wajib menyertakan catatan.
+- Persetujuan dapat dilakukan lewat dashboard web maupun tombol **Persetujuan Rencana** di
+  Android (kartu di Beranda dan tombol di tab Rencana). Yang berhak adalah pemilik `atasan_id`
+  pada rencana tersebut; pimpinan yang ditunjuk sebagai atasan langsung juga dapat memutuskan.
+- Akun dual-role (atasan sekaligus bawahan) tetap dapat mengajukan rencana sendiri ke atasannya
+  dan memutuskan rencana bawahannya; daftar rencana pribadi dipisahkan dari daftar persetujuan.
 - Notifikasi dikirim ke atasan saat diajukan dan ke personel saat diputuskan.
 
 ### FR-04 Hasil kerja

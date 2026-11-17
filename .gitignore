@@ -3,6 +3,7 @@
 /backend/.env
 /backend/.sqlx/
 /backend/*.log
+/backend/data-test/
 
 # Dashboard
 /dashboard/node_modules/

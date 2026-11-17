@@ -140,13 +140,19 @@ class Repositori(
         return json.decodeFromString(ListSerializer(Periode.serializer()), teks).firstOrNull()
     }
 
-    suspend fun daftarRencana(): List<Rencana> {
-        val teks = api.panggil("GET", "rencana-kerja?per_page=50")
+    suspend fun daftarRencana(personelId: String? = null): List<Rencana> {
+        val filter = if (personelId != null) "&personel_id=$personelId" else ""
+        val teks = api.panggil("GET", "rencana-kerja?per_page=50$filter")
         return json.decodeFromString(ListResponse.serializer(Rencana.serializer()), teks).data
     }
 
     suspend fun daftarRencanaDisetujui(): List<Rencana> =
         daftarRencana().filter { it.status == "disetujui" }
+
+    suspend fun detailRencana(id: String): Rencana {
+        val teks = api.panggil("GET", "rencana-kerja/$id")
+        return json.decodeFromString(Rencana.serializer(), teks)
+    }
 
     suspend fun buatRencana(request: RencanaRequest): Rencana {
         val body = json.encodeToString(RencanaRequest.serializer(), request)
@@ -154,8 +160,38 @@ class Repositori(
         return json.decodeFromString(Rencana.serializer(), teks)
     }
 
+    suspend fun ubahRencana(id: String, request: UbahRencanaRequest): Rencana {
+        val body = json.encodeToString(UbahRencanaRequest.serializer(), request)
+        val teks = api.panggil("PATCH", "rencana-kerja/$id", body)
+        return json.decodeFromString(Rencana.serializer(), teks)
+    }
+
     suspend fun ajukanRencana(id: String) {
         api.panggil("POST", "rencana-kerja/$id/ajukan")
+    }
+
+    suspend fun daftarPersetujuan(): List<Rencana> {
+        val teks = api.panggil("GET", "rencana-kerja/persetujuan?per_page=50")
+        return json.decodeFromString(ListResponse.serializer(Rencana.serializer()), teks).data
+    }
+
+    suspend fun putuskanRencana(id: String, status: String, catatan: String?) {
+        val body = json.encodeToString(
+            KeputusanRequest.serializer(),
+            KeputusanRequest(status = status, catatan = catatan)
+        )
+        api.panggil("POST", "rencana-kerja/$id/keputusan", body)
+    }
+
+    suspend fun unggahLampiranRencana(rencanaId: String, berkas: BerkasLampiran) {
+        api.unggah("rencana", rencanaId, "lampiran", berkas.nama, berkas.mime, berkas.isi)
+    }
+
+    suspend fun unduhLampiran(storageKey: String): ByteArray =
+        api.unduh("lampiran/raw/$storageKey")
+
+    suspend fun hapusLampiran(lampiranId: String) {
+        api.panggil("DELETE", "lampiran/$lampiranId")
     }
 
     // ------------------------------------------------------------ hasil kerja

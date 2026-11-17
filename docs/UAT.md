@@ -76,7 +76,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C6 | Nyalakan data → kirim antrean | Terkirim sekali (tidak duplikat), antrean kosong | ⬜ | |
 | C7 | Lihat daftar absensi satker | Hanya data sendiri | ✅ | API |
 | C8 | Buka dashboard pimpinan | 403 (tidak berhak) | ✅ | API |
-| C9 | Buka tab **PH** | Jadwal PH bulan ini tampil | ✅ | UI |
+| C9 | Buka tab **PH** | Tab disembunyikan sementara dari bottom nav; fitur PH tetap tersedia lewat kode/API | ⬜ | permintaan pengguna |
 | C10 | Check-in PH tanpa GPS | 422 "Lokasi GPS wajib diambil untuk absensi PH" | ✅ | API |
 | C11 | Check-in PH di luar radius strong point | 422 dengan jarak aktual | ✅ | API |
 | C12 | Check-out PH dari lokasi berbeda (mis. rumah) | Ditolak 422 (wajib lokasi & radius) | ✅ | API |
@@ -95,6 +95,16 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C25 | Riwayat absensi | Terbuka di halaman terpisah dan memuat riwayat bulan berjalan | ✅ | emulator |
 | C26 | Jam server palsu `20-11-2026 07:45` | Absensi tercatat tanggal 20 Nov 2026 pukul 07:45; reset mengembalikan jam sistem | ✅ | API + emulator |
 | C27 | Pilih status **PH (Perintah Hadir)** | Tersimpan sebagai status `ph` dan dihitung hadir | ✅ | API |
+| C28 | Buka tab Rencana → **+ Baru** | Wizard langkah 1 (jenis rencana) tampil; bottom nav hanya 5 tab | ✅ | emulator |
+| C29 | Pilih jenis, isi dasar SP, tambah 2 kegiatan | Langkah 3 menampilkan daftar rincian dengan ubah/hapus; field target & tanggal tervalidasi | ✅ | emulator |
+| C30 | Tambah 2 lampiran PDF sekaligus | Langkah 4 menampilkan dua berkas; dapat dihapus sebelum simpan | ✅ | emulator |
+| C31 | Tekan **Simpan Draf** | Kembali ke daftar, kartu berstatus Draft, lampiran terunggah, pesan sukses | ✅ | emulator + DB |
+| C32 | Tekan **Ajukan ke Atasan** | Kartu berubah menjadi Diajukan dan notifikasi terkirim ke atasan | ✅ | emulator + API |
+| C33 | Buka rencana `perlu_revisi` → **Perbaiki Rencana** | Wizard terisi jenis, dasar tugas, rincian kegiatan, lampiran lama, dan catatan atasan | ✅ | emulator |
+| C34 | Pilih tanggal lewat kalender | Date picker tampil; tanggal dasar dan tanggal kegiatan tersimpan sesuai pilihan | ✅ | emulator + DB |
+| C35 | **Simpan Perubahan** lalu **Ajukan Ulang ke Atasan** | Perubahan tersimpan (status tetap `perlu_revisi`), lalu berubah `diajukan` setelah diajukan ulang | ✅ | emulator + API |
+| C36 | Jalankan `seed --reset` lalu buka tab Rencana | Tampil 5 dokumen: 2 disetujui, 1 draft, 1 diajukan, 1 perlu revisi dengan catatan atasan | ✅ | seed + emulator |
+| C37 | Buka **Lihat Detail Rencana** pada rencana disetujui | Dialog menampilkan status Disetujui, rincian kegiatan, lampiran PDF, dan catatan; lampiran dapat dibuka | ✅ | emulator |
 
 ## D. Atasan Langsung (`000100` / `Atasan#2026`)
 
@@ -110,6 +120,13 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | D8 | Verifikasi absensi PH satker lain | 403 | ✅ | API |
 | D9 | Menyusun jadwal PH | Hanya admin satker; atasan ditolak | ✅ | API |
 | D10 | Kelola titik dinas satker | Titik aktif/nonaktif berubah, radius valid 10–5000 m | ✅ | UI |
+| D11 | Login Android sebagai atasan (`000100`) | Kartu **Persetujuan Rencana** tampil di Beranda; tombol **Tinjau Persetujuan** membuka daftar bawahan langsung berstatus `diajukan` di tab Rencana | ✅ | emulator |
+| D12 | Buka detail lalu **Minta Revisi** tanpa catatan | Validasi wajib catatan; setelah diisi status `perlu_revisi` dan `jumlah_revisi` bertambah | ✅ | emulator + DB |
+| D13 | Dual role: buka tab Rencana | Rencana milik `000100` tetap tampil, sekaligus tombol persetujuan; rencana `85000001` hanya tampil setelah tombol ditekan | ✅ | emulator |
+| D14 | Login pimpinan `000002` | Rencana `000100` tampil di daftar persetujuan (pimpinan sebagai atasan langsung) | ✅ | emulator + API |
+| D15 | Buka detail pengajuan dengan lampiran | Lampiran PDF dan PNG tampil dengan nama & ukuran; kedua berkas dapat diunduh | ✅ | emulator + API |
+| D16 | Persetujuan dari personel berbeda | Daftar memuat rencana `85000001` dan `85210022`; keduanya memiliki lampiran PDF+PNG | ✅ | emulator + API |
+| D17 | Tekan **Lihat** pada lampiran PDF/gambar | PDF tampil per halaman di dalam aplikasi; gambar tampil penuh dan dapat di-zoom | ✅ | emulator |
 
 ## E. Pimpinan (`000002` / `Pimpinan#2026` dan akun ber-scope)
 

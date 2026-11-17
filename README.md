@@ -38,7 +38,7 @@ docker compose up -d db         # PostgreSQL 18 di port 5433
 
 cd ..\backend
 copy .env.example .env          # APP__DATABASE_URL ke port 5433
-cargo run --bin seed -- --reset # data demo: 1 Polda, 9 Polres, 21 satker, 145 personel + 5 admin
+cargo run --bin seed -- --reset # data demo + contoh rencana draft/diajukan/perlu revisi
 cargo run                       # API di http://127.0.0.1:8080
 ```
 
@@ -67,6 +67,20 @@ pimpinan/atasan) memakai **NRP** dan dapat login lewat web maupun Android.
 Data demo ada di database `kinerja_db`. Untuk uji otomatis gunakan database terpisah
 `kinerja_test` (lihat `tools/uji/api-smoke.js`).
 
+Seed menyertakan contoh rencana kerja untuk akun `85000001` pada tiga status:
+**Draft** (dapat diubah/diajukan), **Diajukan** (menunggu persetujuan atasan), dan
+**Perlu Revisi** (dengan catatan atasan), di samping dua rencana yang sudah disetujui.
+Ada juga satu rencana `diajukan` milik atasan `000100` yang ditujukan ke pimpinan `000002`,
+untuk menguji rantai dual-role (atasan sekaligus bawahan).
+
+Pengajuan contoh juga dilengkapi lampiran nyata di folder upload:
+
+- `85000001` — Patroli siber media sosial: **PDF + PNG**.
+- `85210022` (personel lain) — Pengungkapan jaringan penipuan daring: **PDF + PNG**.
+- `000100` — Supervisi penyelesaian perkara: **PDF**.
+- `85000001` — Sosialisasi pencegahan penipuan daring: **PDF** (status perlu revisi).
+- `85000001` — Penyelesaian berkas perkara tahap 1: **PDF** (status disetujui, untuk uji detail pasca-persetujuan).
+
 ### 2. Dashboard (Bun)
 
 ```powershell
@@ -94,6 +108,52 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 Alamat server default `http://10.0.2.2:8080/api/v1/` (emulator). Untuk perangkat
 nyata, ubah lewat menu **Profil → Server** menjadi `http://<ip-server>:8080/api/v1/`.
 
+### 4. Fake server / jam server palsu (development)
+
+Backend dapat memakai tanggal dan jam palsu untuk menguji absensi tanpa mengubah jam
+komputer. Fitur ini **hanya untuk development** dan hanya aktif bila
+`APP__ALLOW_FAKE_TIME=true` pada `backend/.env`.
+
+```env
+# backend/.env
+APP__ALLOW_FAKE_TIME=true
+```
+
+Jalankan API seperti biasa, lalu gunakan perintah `fake` dari terminal lain:
+
+```powershell
+cd F:\absensi_polda_bali\backend
+
+# aktifkan jam palsu: 20 November 2026 pukul 07:45 WITA
+cargo run --bin fake -- 20-11-2026 07:45
+
+# cek jam yang sedang dipakai
+cargo run --bin fake -- status
+
+# kembalikan ke jam sistem
+cargo run --bin fake -- reset
+```
+
+Format tanggal `DD-MM-YYYY` dan jam `HH:MM`. Zona waktu default `Asia/Makassar` (WITA);
+opsional gunakan `--zona Asia/Jakarta` atau `--zona Asia/Jayapura`:
+
+```powershell
+cargo run --bin fake -- 20-11-2026 07:45 --zona Asia/Jakarta
+```
+
+Catatan penting:
+
+- API harus **sudah berjalan** (`cargo run`) karena perintah `fake` mengirim ke endpoint
+  development `/api/v1/dev/waktu`; tidak perlu restart API saat mengganti jam.
+- Gunakan `--bin fake --`, bukan `-p fake`; proyek ini bukan workspace Cargo.
+- Jam palsu memengaruhi tanggal/jam absensi, `GET /absensi/hari-ini`, validasi tanggal,
+  dan periode berjalan. Produksi tetap memakai jam sistem karena
+  `APP__ALLOW_FAKE_TIME` default `false` dan route `/dev/*` tidak dipasang.
+- Override hilang saat proses API di-restart.
+- Data seed demo sudah memiliki absensi tanggal 1–16 November 2026. Untuk menguji
+  "belum absen" dari nol, pilih tanggal setelahnya, misalnya **20-11-2026**;
+  tanggal **11-11-2026** sudah berisi data contoh.
+
 ## Fitur utama
 
 - **Organisasi 3 level**: Polda → Polres → Satker, dengan 12 peran ber-scope
@@ -119,8 +179,16 @@ nyata, ubah lewat menu **Profil → Server** menjadi `http://<ip-server>:8080/ap
   check-in **dan check-out wajib lokasi**, verifikasi, serta rekap PH sendiri.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
   60 menit sebelum jadwal.
-- **Rencana kerja**: dasar SP/TOR, target kuantitas/kualitas/waktu, tahapan, lampiran,
-  alur persetujuan dengan catatan.
+- **Rencana kerja**: wizard 4 langkah di Android (jenis → dasar SP/TOR → rincian kegiatan →
+  lampiran), target kuantitas/kualitas/waktu, beberapa rincian kegiatan per rencana,
+  lampiran multi-berkas, date picker untuk semua tanggal, serta simpan draf, ajukan ke atasan,
+  dan perbaiki rencana yang diminta revisi dengan catatan persetujuan.
+- **Persetujuan rencana**: atasan langsung — termasuk pimpinan yang ditunjuk sebagai `atasan_id` —
+  dapat menyetujui, meminta revisi, atau menolak dari dashboard web maupun dari kartu
+  **Persetujuan Rencana** di Beranda Android/tombol **Tinjau Persetujuan** pada tab Rencana.
+  Lampiran PDF dirender langsung di aplikasi dan gambar dapat dibuka dengan pinch-zoom.
+  Akun dual-role (atasan sekaligus bawahan) melihat rencana sendiri di tab Rencana dan rencana
+  bawahannya lewat tombol persetujuan; rencana sendiri tetap diajukan ke atasannya.
 - **Hasil kerja & output**: realisasi + progres, verifikasi berskor, 8 jenis output,
   berkas bukti atau tautan.
 - **Penilaian**: periode bulanan dibuat otomatis (penutupan manual), bobot per periode

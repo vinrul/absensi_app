@@ -11,7 +11,7 @@ const BIN_API = `./target/debug/kinerja-api${AKHIRAN}`;
 console.log("Menyiapkan database uji (seed --reset)...");
 const seed = Bun.spawnSync([BIN_SEED, "--reset"], {
 	cwd: "backend",
-	env: { ...process.env, APP__DATABASE_URL: DATABASE_URL },
+	env: { ...process.env, APP__DATABASE_URL: DATABASE_URL, APP__UPLOAD_DIR: "./data-test/uploads" },
 	stdout: "inherit",
 	stderr: "inherit"
 });
@@ -26,7 +26,7 @@ const server = Bun.spawn([BIN_API], {
 		...process.env,
 		APP__DATABASE_URL: DATABASE_URL,
 		APP__PORT: String(PORT),
-		APP__RUN_MIGRATIONS: "false",
+		APP__RUN_MIGRATIONS: "true",
 		APP__UPLOAD_DIR: "./data-test/uploads",
 		APP__ALLOW_FAKE_TIME: "true"
 	},

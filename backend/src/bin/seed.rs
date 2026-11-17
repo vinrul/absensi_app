@@ -26,6 +26,44 @@ fn wita_to_utc(date: NaiveDate, hour: u32, minute: u32) -> DateTime<Utc> {
     DateTime::from_naive_utc_and_offset(naive, Utc) - Delta::hours(8)
 }
 
+/// PDF satu halaman sederhana untuk lampiran contoh (lengkap dengan xref).
+fn contoh_pdf(judul: &str, keterangan: &str) -> Vec<u8> {
+    let isi =
+        format!("BT /F1 16 Tf 72 780 Td ({judul}) Tj 0 -28 Td /F1 11 Tf ({keterangan}) Tj ET");
+    let objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>".to_string(),
+        format!("<< /Length {} >>\nstream\n{isi}\nendstream", isi.len()),
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>".to_string(),
+    ];
+
+    let mut pdf = String::from("%PDF-1.4\n");
+    let mut offsets = Vec::new();
+    for (nomor, obj) in objects.iter().enumerate() {
+        offsets.push(pdf.len());
+        pdf.push_str(&format!("{} 0 obj\n{obj}\nendobj\n", nomor + 1));
+    }
+
+    let xref = pdf.len();
+    pdf.push_str(&format!(
+        "xref\n0 {}\n0000000000 65535 f \n",
+        objects.len() + 1
+    ));
+    for offset in offsets {
+        pdf.push_str(&format!("{offset:010} 00000 n \n"));
+    }
+    pdf.push_str(&format!(
+        "trailer\n<< /Size {} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n",
+        objects.len() + 1
+    ));
+    pdf.into_bytes()
+}
+
+fn contoh_png() -> Vec<u8> {
+    include_bytes!("../../../dashboard/static/logo-polda-bali.png").to_vec()
+}
+
 struct NodeSeed {
     kode: &'static str,
     nama: String,
@@ -1030,6 +1068,485 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    // ---------------------------------------- contoh rencana per status (Android)
+    // Tiga dokumen untuk akun demo Android (NRP 85000001): draft, diajukan, perlu revisi.
+    struct ContohTahapan {
+        kegiatan: &'static str,
+        uraian: &'static str,
+        target: f64,
+        satuan: &'static str,
+        kualitas: &'static str,
+        mulai: NaiveDate,
+        selesai: NaiveDate,
+    }
+
+    struct ContohLampiran {
+        nama: &'static str,
+        mime: &'static str,
+        ext: &'static str,
+        isi: Vec<u8>,
+    }
+
+    struct ContohRencana {
+        kode: &'static str,
+        personel_id: Uuid,
+        satker_id: Uuid,
+        atasan_id: Option<Uuid>,
+        program: &'static str,
+        kegiatan: &'static str,
+        uraian: &'static str,
+        tujuan: &'static str,
+        indikator: &'static str,
+        jenis: &'static str,
+        dasar_jenis: &'static str,
+        dasar_nomor: &'static str,
+        dasar_tanggal: NaiveDate,
+        dasar_perihal: &'static str,
+        target: f64,
+        satuan: &'static str,
+        kualitas: &'static str,
+        mulai: NaiveDate,
+        selesai: NaiveDate,
+        status: &'static str,
+        catatan: Option<&'static str>,
+        diajukan: Option<DateTime<Utc>>,
+        diputuskan: Option<DateTime<Utc>>,
+        revisi: i32,
+        tahapan: Vec<ContohTahapan>,
+        lampiran: Vec<ContohLampiran>,
+    }
+
+    let personel_demo = personel_ids[0].0;
+    let satker_demo = personel_ids[0].1;
+    let atasan_demo = atasan_map.get(&satker_demo).copied();
+    let atasan_personel = atasan_demo.expect("atasan demo tersedia");
+    let personel_lain = personel_per_satker
+        .get(&satker_demo)
+        .and_then(|daftar| daftar.iter().copied().find(|id| *id != personel_demo))
+        .expect("personel lain tersedia");
+
+    let contoh_rencana = vec![
+        ContohRencana {
+            kode: "draft",
+            personel_id: personel_demo,
+            satker_id: satker_demo,
+            atasan_id: Some(atasan_personel),
+            program: "Penegakan Hukum",
+            kegiatan: "Penyusunan laporan analisis gangguan siber",
+            uraian: "Menyusun laporan analisis gangguan siber pada layanan publik daerah.",
+            tujuan: "Menyediakan bahan rekomendasi mitigasi gangguan siber.",
+            indikator: "Jumlah laporan analisis yang selesai tepat waktu",
+            jenis: "mingguan",
+            dasar_jenis: "sp",
+            dasar_nomor: "SP/120/XI/2026",
+            dasar_tanggal: awal_bulan + Delta::days(16),
+            dasar_perihal: "Analisis gangguan siber layanan publik",
+            target: 2.0,
+            satuan: "laporan",
+            kualitas: "100% lengkap",
+            mulai: awal_bulan + Delta::days(17),
+            selesai: awal_bulan + Delta::days(21),
+            status: "draft",
+            catatan: None,
+            diajukan: None,
+            diputuskan: None,
+            revisi: 0,
+            tahapan: vec![
+                ContohTahapan {
+                    kegiatan: "Pengumpulan data gangguan",
+                    uraian: "Mengumpulkan log dan laporan gangguan dari unit terkait.",
+                    target: 1.0,
+                    satuan: "berkas",
+                    kualitas: "Data lengkap",
+                    mulai: awal_bulan + Delta::days(17),
+                    selesai: awal_bulan + Delta::days(18),
+                },
+                ContohTahapan {
+                    kegiatan: "Penyusunan laporan analisis",
+                    uraian: "Menyusun laporan analisis dan rekomendasi mitigasi.",
+                    target: 1.0,
+                    satuan: "laporan",
+                    kualitas: "100% lengkap",
+                    mulai: awal_bulan + Delta::days(19),
+                    selesai: awal_bulan + Delta::days(21),
+                },
+            ],
+            lampiran: vec![],
+        },
+        ContohRencana {
+            kode: "diajukan",
+            personel_id: personel_demo,
+            satker_id: satker_demo,
+            atasan_id: Some(atasan_personel),
+            program: "Pemeliharaan Keamanan",
+            kegiatan: "Patroli siber media sosial",
+            uraian: "Melakukan patroli siber pada media sosial untuk mendeteksi konten hoaks dan penipuan.",
+            tujuan: "Menekan penyebaran konten hoaks dan penipuan daring.",
+            indikator: "Jumlah temuan konten yang ditindaklanjuti",
+            jenis: "harian",
+            dasar_jenis: "sp",
+            dasar_nomor: "SP/121/XI/2026",
+            dasar_tanggal: awal_bulan + Delta::days(16),
+            dasar_perihal: "Patroli siber media sosial",
+            target: 5.0,
+            satuan: "laporan",
+            kualitas: "Tidak ada konten hoaks yang lolos",
+            mulai: awal_bulan + Delta::days(17),
+            selesai: awal_bulan + Delta::days(21),
+            status: "diajukan",
+            catatan: None,
+            diajukan: Some(wita_to_utc(awal_bulan + Delta::days(16), 9, 0)),
+            diputuskan: None,
+            revisi: 0,
+            tahapan: vec![
+                ContohTahapan {
+                    kegiatan: "Patroli pagi",
+                    uraian: "Memantau media sosial pada pagi hari dan mencatat temuan.",
+                    target: 2.0,
+                    satuan: "laporan",
+                    kualitas: "Lengkap",
+                    mulai: awal_bulan + Delta::days(17),
+                    selesai: awal_bulan + Delta::days(18),
+                },
+                ContohTahapan {
+                    kegiatan: "Patroli sore",
+                    uraian: "Memantau media sosial pada sore hari dan menindaklanjuti temuan.",
+                    target: 3.0,
+                    satuan: "laporan",
+                    kualitas: "Lengkap",
+                    mulai: awal_bulan + Delta::days(19),
+                    selesai: awal_bulan + Delta::days(21),
+                },
+            ],
+            lampiran: vec![
+                ContohLampiran {
+                    nama: "SP-121-Patroli-Siber.pdf",
+                    mime: "application/pdf",
+                    ext: "pdf",
+                    isi: contoh_pdf(
+                        "Surat Perintah Nomor SP/121/XI/2026",
+                        "Patroli siber media sosial - Polda Bali",
+                    ),
+                },
+                ContohLampiran {
+                    nama: "Dokumentasi-Patroli-Siber.png",
+                    mime: "image/png",
+                    ext: "png",
+                    isi: contoh_png(),
+                },
+            ],
+        },
+        ContohRencana {
+            kode: "perlu-revisi",
+            personel_id: personel_demo,
+            satker_id: satker_demo,
+            atasan_id: Some(atasan_personel),
+            program: "Pembinaan Masyarakat",
+            kegiatan: "Sosialisasi pencegahan penipuan daring",
+            uraian: "Melaksanakan sosialisasi pencegahan penipuan daring kepada masyarakat.",
+            tujuan: "Meningkatkan kesadaran masyarakat terhadap modus penipuan daring.",
+            indikator: "Jumlah peserta sosialisasi dan materi tersampaikan",
+            jenis: "bulanan",
+            dasar_jenis: "tor",
+            dasar_nomor: "TOR/045/XI/2026",
+            dasar_tanggal: awal_bulan + Delta::days(10),
+            dasar_perihal: "Sosialisasi pencegahan penipuan daring",
+            target: 3.0,
+            satuan: "kegiatan",
+            kualitas: "Materi lengkap dan peserta terdata",
+            mulai: awal_bulan + Delta::days(12),
+            selesai: awal_bulan + Delta::days(20),
+            status: "perlu_revisi",
+            catatan: Some("Lengkapi target kualitas dan rincian waktu pelaksanaan."),
+            diajukan: Some(wita_to_utc(awal_bulan + Delta::days(11), 9, 0)),
+            diputuskan: Some(wita_to_utc(awal_bulan + Delta::days(12), 10, 0)),
+            revisi: 1,
+            tahapan: vec![
+                ContohTahapan {
+                    kegiatan: "Penyusunan materi",
+                    uraian: "Menyusun materi sosialisasi dan daftar peserta.",
+                    target: 1.0,
+                    satuan: "dokumen",
+                    kualitas: "Lengkap",
+                    mulai: awal_bulan + Delta::days(12),
+                    selesai: awal_bulan + Delta::days(14),
+                },
+                ContohTahapan {
+                    kegiatan: "Pelaksanaan sosialisasi",
+                    uraian: "Melaksanakan sosialisasi di lingkungan masyarakat.",
+                    target: 2.0,
+                    satuan: "kegiatan",
+                    kualitas: "Peserta terdata",
+                    mulai: awal_bulan + Delta::days(15),
+                    selesai: awal_bulan + Delta::days(20),
+                },
+            ],
+            lampiran: vec![ContohLampiran {
+                nama: "TOR-045-Sosialisasi.pdf",
+                mime: "application/pdf",
+                ext: "pdf",
+                isi: contoh_pdf(
+                    "TOR Nomor TOR/045/XI/2026",
+                    "Sosialisasi pencegahan penipuan daring",
+                ),
+            }],
+        },
+        // Atasan (000100) juga merupakan bawahan pimpinan (000002).
+        ContohRencana {
+            kode: "atasan-diajukan",
+            personel_id: atasan_personel,
+            satker_id: satker_demo,
+            atasan_id: Some(pimpinan_polda_id),
+            program: "Pengawasan dan Supervisi",
+            kegiatan: "Supervisi penyelesaian perkara bawahan",
+            uraian: "Melaksanakan supervisi berkas perkara yang ditangani personel di lingkungan satker.",
+            tujuan: "Memastikan penyelesaian perkara sesuai prosedur dan tepat waktu.",
+            indikator: "Jumlah berkas perkara yang disupervisi",
+            jenis: "bulanan",
+            dasar_jenis: "sp",
+            dasar_nomor: "SP/122/XI/2026",
+            dasar_tanggal: awal_bulan + Delta::days(17),
+            dasar_perihal: "Supervisi penyelesaian perkara",
+            target: 4.0,
+            satuan: "berkas",
+            kualitas: "Seluruh temuan ditindaklanjuti",
+            mulai: awal_bulan + Delta::days(18),
+            selesai: awal_bulan + Delta::days(22),
+            status: "diajukan",
+            catatan: None,
+            diajukan: Some(wita_to_utc(awal_bulan + Delta::days(17), 9, 0)),
+            diputuskan: None,
+            revisi: 0,
+            tahapan: vec![
+                ContohTahapan {
+                    kegiatan: "Pemeriksaan berkas",
+                    uraian: "Memeriksa kelengkapan berkas perkara bawahan.",
+                    target: 2.0,
+                    satuan: "berkas",
+                    kualitas: "Lengkap",
+                    mulai: awal_bulan + Delta::days(18),
+                    selesai: awal_bulan + Delta::days(20),
+                },
+                ContohTahapan {
+                    kegiatan: "Tindak lanjut temuan",
+                    uraian: "Menindaklanjuti temuan hasil supervisi.",
+                    target: 2.0,
+                    satuan: "berkas",
+                    kualitas: "Tuntas",
+                    mulai: awal_bulan + Delta::days(21),
+                    selesai: awal_bulan + Delta::days(22),
+                },
+            ],
+            lampiran: vec![ContohLampiran {
+                nama: "SP-122-Supervisi.pdf",
+                mime: "application/pdf",
+                ext: "pdf",
+                isi: contoh_pdf(
+                    "Surat Perintah Nomor SP/122/XI/2026",
+                    "Supervisi penyelesaian perkara bawahan",
+                ),
+            }],
+        },
+        // Personel lain di satker yang sama, juga mengajukan dengan lampiran.
+        ContohRencana {
+            kode: "personel-lain-diajukan",
+            personel_id: personel_lain,
+            satker_id: satker_demo,
+            atasan_id: Some(atasan_personel),
+            program: "Penegakan Hukum",
+            kegiatan: "Pengungkapan jaringan penipuan daring",
+            uraian: "Melakukan penyelidikan dan pengungkapan jaringan penipuan daring.",
+            tujuan: "Mengungkap jaringan penipuan daring dan menyelamatkan korban.",
+            indikator: "Jumlah tersangka dan barang bukti yang diamankan",
+            jenis: "bulanan",
+            dasar_jenis: "sp",
+            dasar_nomor: "SP/123/XI/2026",
+            dasar_tanggal: awal_bulan + Delta::days(15),
+            dasar_perihal: "Pengungkapan jaringan penipuan daring",
+            target: 1.0,
+            satuan: "kasus",
+            kualitas: "Berkas lengkap dan tersangka diamankan",
+            mulai: awal_bulan + Delta::days(16),
+            selesai: awal_bulan + Delta::days(20),
+            status: "diajukan",
+            catatan: None,
+            diajukan: Some(wita_to_utc(awal_bulan + Delta::days(15), 10, 0)),
+            diputuskan: None,
+            revisi: 0,
+            tahapan: vec![
+                ContohTahapan {
+                    kegiatan: "Penyelidikan awal",
+                    uraian: "Menelusuri laporan korban dan bukti transaksi.",
+                    target: 1.0,
+                    satuan: "berkas",
+                    kualitas: "Lengkap",
+                    mulai: awal_bulan + Delta::days(16),
+                    selesai: awal_bulan + Delta::days(18),
+                },
+                ContohTahapan {
+                    kegiatan: "Pengungkapan kasus",
+                    uraian: "Melakukan pengungkapan dan pengamanan barang bukti.",
+                    target: 1.0,
+                    satuan: "kasus",
+                    kualitas: "Tuntas",
+                    mulai: awal_bulan + Delta::days(19),
+                    selesai: awal_bulan + Delta::days(20),
+                },
+            ],
+            lampiran: vec![
+                ContohLampiran {
+                    nama: "SP-123-Pengungkapan.pdf",
+                    mime: "application/pdf",
+                    ext: "pdf",
+                    isi: contoh_pdf(
+                        "Surat Perintah Nomor SP/123/XI/2026",
+                        "Pengungkapan jaringan penipuan daring",
+                    ),
+                },
+                ContohLampiran {
+                    nama: "Bukti-Transaksi.png",
+                    mime: "image/png",
+                    ext: "png",
+                    isi: contoh_png(),
+                },
+            ],
+        },
+    ];
+
+    for contoh in &contoh_rencana {
+        let rencana_id = uid(&format!("rencana-demo-{personel_demo}-{}", contoh.kode));
+
+        sqlx::query(
+            "INSERT INTO rencana_kerja (
+                 id, personel_id, satker_id, periode_id, program, kegiatan, uraian, tujuan,
+                 indikator_kinerja, jenis, dasar_jenis, dasar_nomor, dasar_tanggal, dasar_perihal,
+                 target_kuantitas, satuan, target_kualitas, target_waktu, tanggal_mulai,
+                 tanggal_selesai, status, atasan_id, catatan_atasan, diajukan_at, diputuskan_at,
+                 jumlah_revisi
+             )
+             VALUES (
+                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jenis_rencana,
+                 $11::dasar_tugas_jenis, $12, $13, $14, $15::float8::numeric, $16, $17, $18,
+                 $19, $20, $21::status_rencana, $22, $23, $24, $25, $26
+             )",
+        )
+        .bind(rencana_id)
+        .bind(contoh.personel_id)
+        .bind(contoh.satker_id)
+        .bind(periode_id)
+        .bind(contoh.program)
+        .bind(contoh.kegiatan)
+        .bind(contoh.uraian)
+        .bind(contoh.tujuan)
+        .bind(contoh.indikator)
+        .bind(contoh.jenis)
+        .bind(contoh.dasar_jenis)
+        .bind(contoh.dasar_nomor)
+        .bind(contoh.dasar_tanggal)
+        .bind(contoh.dasar_perihal)
+        .bind(contoh.target)
+        .bind(contoh.satuan)
+        .bind(contoh.kualitas)
+        .bind(contoh.selesai)
+        .bind(contoh.mulai)
+        .bind(contoh.selesai)
+        .bind(contoh.status)
+        .bind(contoh.atasan_id)
+        .bind(contoh.catatan)
+        .bind(contoh.diajukan)
+        .bind(contoh.diputuskan)
+        .bind(contoh.revisi)
+        .execute(&pool)
+        .await?;
+
+        for (index, tahap) in contoh.tahapan.iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO rencana_tahapan (
+                     id, rencana_id, urutan, uraian, target_kuantitas, satuan,
+                     program, kegiatan, tujuan, indikator_kinerja, target_kualitas,
+                     tanggal_mulai, tanggal_selesai
+                 )
+                 VALUES (
+                     $1, $2, $3, $4, $5::float8::numeric, $6,
+                     $7, $8, $9, $10, $11, $12, $13
+                 )",
+            )
+            .bind(uid(&format!("tahap-demo-{rencana_id}-{index}")))
+            .bind(rencana_id)
+            .bind(index as i32 + 1)
+            .bind(tahap.uraian)
+            .bind(tahap.target)
+            .bind(tahap.satuan)
+            .bind(contoh.program)
+            .bind(tahap.kegiatan)
+            .bind(contoh.tujuan)
+            .bind(contoh.indikator)
+            .bind(tahap.kualitas)
+            .bind(tahap.mulai)
+            .bind(tahap.selesai)
+            .execute(&pool)
+            .await?;
+        }
+
+        for (index, lampiran) in contoh.lampiran.iter().enumerate() {
+            let lampiran_id = uid(&format!("lampiran-demo-{rencana_id}-{index}"));
+            let storage_key = format!(
+                "lampiran/{}/rencana/{rencana_id}/{lampiran_id}.{}",
+                contoh.satker_id, lampiran.ext
+            );
+            let path = settings.upload_dir.join(&storage_key);
+            if let Some(parent) = path.parent() {
+                tokio::fs::create_dir_all(parent).await?;
+            }
+            tokio::fs::write(&path, &lampiran.isi).await?;
+
+            sqlx::query(
+                "INSERT INTO lampiran (id, owner_type, owner_id, kategori, file_name, mime,
+                                       size_bytes, storage_key, uploaded_by)
+                 VALUES ($1, 'rencana'::berkas_owner, $2, 'lampiran'::berkas_kategori,
+                         $3, $4, $5, $6, $7)",
+            )
+            .bind(lampiran_id)
+            .bind(rencana_id)
+            .bind(lampiran.nama)
+            .bind(lampiran.mime)
+            .bind(lampiran.isi.len() as i64)
+            .bind(&storage_key)
+            .bind(contoh.personel_id)
+            .execute(&pool)
+            .await?;
+        }
+    }
+
+    // Lampiran pada rencana yang sudah disetujui, untuk uji detail pasca-persetujuan.
+    let rencana_disetujui = uid(&format!("rencana-{personel_demo}-1"));
+    let lampiran_disetujui = uid(&format!("lampiran-demo-disetujui-{personel_demo}"));
+    let isi_disetujui = contoh_pdf(
+        "Laporan Pelaksanaan Rencana Kerja",
+        "Penyelesaian berkas perkara tahap 1 - Polda Bali",
+    );
+    let kunci_disetujui =
+        format!("lampiran/{satker_demo}/rencana/{rencana_disetujui}/{lampiran_disetujui}.pdf");
+    let path_disetujui = settings.upload_dir.join(&kunci_disetujui);
+    if let Some(parent) = path_disetujui.parent() {
+        tokio::fs::create_dir_all(parent).await?;
+    }
+    tokio::fs::write(&path_disetujui, &isi_disetujui).await?;
+    sqlx::query(
+        "INSERT INTO lampiran (id, owner_type, owner_id, kategori, file_name, mime,
+                               size_bytes, storage_key, uploaded_by)
+         VALUES ($1, 'rencana'::berkas_owner, $2, 'lampiran'::berkas_kategori,
+                 $3, 'application/pdf', $4, $5, $6)",
+    )
+    .bind(lampiran_disetujui)
+    .bind(rencana_disetujui)
+    .bind("Laporan-Pelaksanaan-Tahap-1.pdf")
+    .bind(isi_disetujui.len() as i64)
+    .bind(&kunci_disetujui)
+    .bind(personel_demo)
+    .execute(&pool)
+    .await?;
+
     let total_personel_akun: i64 =
         sqlx::query_scalar("SELECT count(*) FROM personel WHERE jenis_akun = 'personel'")
             .fetch_one(&pool)
@@ -1053,6 +1570,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Periode   : {nama_periode} ({awal_bulan} s/d {akhir_bulan})");
     println!("  Jadwal PH : {}", jadwal_ph_rows.len());
     println!("  Hari libur: {libur_tetap_len}");
+    println!("  Rencana demo: 1 draft, 1 diajukan, 1 perlu revisi (NRP 85000001)");
+    println!("  Rencana atasan: 1 diajukan dari NRP 000100 ke pimpinan 000002");
+    println!("  Rencana personel lain: 1 diajukan dengan lampiran PDF + PNG");
+    println!("  Lampiran demo: PDF dan PNG ditulis ke folder upload");
     println!("\nAkun demo:");
     println!("  Admin global        : superuser / Superuser#2026");
     println!("  Admin Polda         : admin_polda / AdminPolda#2026");
