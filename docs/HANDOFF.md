@@ -4,7 +4,7 @@ Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan 
 Baca ini dulu sebelum mengubah kode.
 
 Terakhir diverifikasi: 17 November 2026 (backend unit test + 48 cek API pada DB uji;
-dashboard `bun run check`/`build`; APK debug; `openapi.json` 70 path).
+dashboard `bun run check`/`build`; APK debug; `openapi.json` 83 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
@@ -41,11 +41,12 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Hasil kerja + verifikasi | e2e API + wizard Android 3 langkah (pilih rencana → realisasi → bukti), draf, kirim, perbaikan; progres memakai slider 0–100 |
 | Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs` + hari PH dikecualikan |
-| Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser |
+| Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser; Rencana/Hasil/Output memiliki halaman detail + lampiran, filter periode/status/satker/personel, dan **Export PDF** lewat Chrome/Edge headless |
+| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
-| Dokumentasi API | `/docs` (70 path), `/api-docs/openapi.json` |
+| Dokumentasi API | `/docs` (83 path), `/api-docs/openapi.json` |
 | Backup script | `deploy/backup.sh` (belum dijadwalkan di server) |
 
 **Belum / pekerjaan lanjutan** — lihat §9 backlog.
@@ -205,6 +206,28 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
   `src/lib/stores/session.svelte.ts`.
 - Semua panggilan API lewat `#lib/api/client` (auto-refresh 401 sekali).
 - Gaya visual: kartu putih, navy `#0b2545`, emas `#d4a017`, teks slate.
+- `lib/components/Modal.svelte` mengunci tinggi maksimal pada viewport, membuat header/tombol tutup
+  tetap terlihat, dan menggulir isi saja. Tombol aksi diletakkan pada snippet `footer`
+  (contoh modal **Buat Rencana Kerja**) agar selalu tampil tanpa perlu menggulir.
+- Item sidebar **Absensi Saya** dan **Persetujuan** sementara disembunyikan (baris dikomentari di
+  `(app)/+layout.svelte`); halaman dan API-nya tetap aktif bila diakses langsung.
+- **Ekspor PDF** dashboard: halaman Rencana Kerja, Hasil Kerja, Output, dan **Rekap Absensi** mengirim filter ke
+  `GET /{modul}/ekspor` (absensi: `rekap/ekspor`, `verifikasi/ekspor`, `detail/ekspor`) dengan bearer token
+  lewat `apiBlob` (`#lib/api/client`), lalu mengunduh blob.
+  Backend menyusun HTML lengkap (kop + tabel + footer) via `service/laporan.rs` dan mencetaknya
+  dengan `service/pdf.rs` memakai Chrome/Edge `--headless --print-to-pdf`; lokasi browser
+  auto-detect atau `APP__CHROME_PATH`.
+- **Rekap Absensi** (`/absensi/rekap`) memakai tab lokal tanpa route baru: **Rekap Kehadiran**
+  (periode + satker), **Verifikasi** (periode + satker + personel, aksi Setujui + foto), dan
+  **Detail per Orang** (periode + satker + personel wajib). Tiap tab punya filter sendiri dan
+  memuat data saat dibuka. Tab Verifikasi/Detail memakai `GET /absensi/harian` (satu baris per
+  personel per tanggal: masuk & pulang digabung, `menit_telat` hanya untuk Dinas Kantor), rekap
+  memakai `GET /absensi/rekap` yang juga mengembalikan total `menit_telat` per personel.
+  Penyetujuan dari tab Verifikasi mengulang `POST /absensi/{id}/verifikasi` untuk setiap
+  `perlu_verifikasi_ids` pada baris tanggal tersebut.
+- **Halaman detail** dashboard: `/rencana-kerja/{id}`, `/hasil-kerja/{id}`, dan `/output/{id}`
+  memuat data lengkap + lampiran (`apiBlobUrl` → object URL, dibuka di tab baru). Tautan berasal
+  dari judul baris tabel maupun tombol **Detail**.
 
 **Android**
 - Satu `KinerjaViewModel` menangani semua state & pemanggilan repo; layar Compose hanya
@@ -292,12 +315,17 @@ GET|POST /ph/strong-point PATCH|DELETE /ph/strong-point/{id}
 GET|POST /ph/jadwal       GET /ph/jadwal/saya     GET|PUT|DELETE /ph/jadwal/{id}
 POST   /ph/absensi        GET /ph/absensi/saya    GET /ph/absensi/jadwal/{id}
 POST   /ph/absensi/{id}/verifikasi                 GET /ph/rekap
-POST   /absensi           GET  /absensi           GET /absensi/saya
-GET    /absensi/rekap     GET  /absensi/titik-terdekat   POST /absensi/{id}/verifikasi
+POST   /absensi           GET  /absensi?dari&sampai&personel_id&perlu_verifikasi   GET /absensi/saya
+GET    /absensi/harian?dari&sampai&personel_id&perlu_verifikasi   # masuk+pulang digabung
+GET    /absensi/rekap     GET  /absensi/rekap/ekspor      GET /absensi/verifikasi/ekspor
+GET    /absensi/detail/ekspor   GET /absensi/titik-terdekat   POST /absensi/{id}/verifikasi
 GET    /rencana-kerja     POST /rencana-kerja     GET /rencana-kerja/persetujuan
+GET    /rencana-kerja/ekspor?periode_id&satker_id&personel_id&status   # PDF
 GET|PATCH /rencana-kerja/{id}     POST /rencana-kerja/{id}/ajukan | /keputusan
 GET    /hasil-kerja       POST /hasil-kerja       GET /hasil-kerja/{id}   POST /hasil-kerja/{id}/verifikasi
+GET    /hasil-kerja/ekspor?periode_id&satker_id&personel_id&status     # PDF
 GET    /output            POST /output            GET|PATCH /output/{id}   GET /output/verifikasi
+GET    /output/ekspor?periode_id&satker_id&personel_id&status           # PDF
 POST   /output/{id}/ajukan | /verifikasi
 POST   /lampiran          GET  /lampiran/raw/{key} DELETE /lampiran/{id}
 GET    /periode           POST /periode           PUT /periode/{id}/bobot
@@ -395,6 +423,11 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
   `adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/<nama>.png`.
 - Foto profil disimpan di `upload_dir/foto/<personel_id>/<uuid>.<ext>` dan `personel.foto_path`
   hanya menyimpan kunci; jangan menaruh biner di database.
+- Ekspor PDF butuh Chrome/Edge terpasang. Di mesin ini `chrome.exe` dan `msedge.exe` terdeteksi;
+  bila tidak, set `APP__CHROME_PATH`. Chrome dijalankan dengan profil sementara di folder temp
+  dan seluruh berkas sementara dibersihkan setelah PDF terbentuk.
+- `kinerja-api.exe` yang sedang berjalan mengunci `target/debug` → matikan dulu sebelum
+  `cargo build` (lihat §8).
 
 ---
 

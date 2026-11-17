@@ -821,7 +821,9 @@
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
           { "name": "tanggal", "in": "query", "schema": { "type": "string", "format": "date" } },
           { "name": "perlu_verifikasi", "in": "query", "schema": { "type": "boolean" } },
-          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" } }
         ],
         "responses": { "200": { "description": "Daftar absensi" } }
       }
@@ -844,16 +846,66 @@
         "responses": { "200": { "description": "Tanggal server, absen masuk dan pulang" } }
       }
     },
+    "/absensi/harian": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Daftar absensi per tanggal (masuk & pulang digabung)",
+        "parameters": [
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "perlu_verifikasi", "in": "query", "schema": { "type": "boolean" } }
+        ],
+        "responses": { "200": { "description": "Satu baris per personel per tanggal, termasuk menit telat" } }
+      }
+    },
     "/absensi/rekap": {
       "get": {
         "tags": ["absensi"],
         "summary": "Rekap kehadiran per personel",
         "parameters": [
           { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
-          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
-          { "name": "unit", "in": "query", "schema": { "type": "string" } }
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Rekap" } }
+      }
+    },
+    "/absensi/rekap/ekspor": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Ekspor rekap kehadiran ke PDF (termasuk menit telat)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" } }
+      }
+    },
+    "/absensi/verifikasi/ekspor": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Ekspor daftar absensi menunggu verifikasi ke PDF (per tanggal)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" } }
+      }
+    },
+    "/absensi/detail/ekspor": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Ekspor detail absensi per personel ke PDF (masuk & pulang digabung)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Berkas PDF" }, "400": { "description": "Personel belum dipilih" }, "403": { "description": "Di luar cakupan" } }
       }
     },
     "/absensi/titik-terdekat": {
@@ -905,6 +957,22 @@
     "/rencana-kerja/persetujuan": {
       "get": { "tags": ["rencana"], "summary": "Rencana yang menunggu keputusan atasan", "responses": { "200": { "description": "Daftar" } } }
     },
+    "/rencana-kerja/ekspor": {
+      "get": {
+        "tags": ["rencana"],
+        "summary": "Ekspor PDF daftar rencana kerja (Chrome/Edge headless)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["draft", "diajukan", "disetujui", "perlu_revisi", "ditolak"] } }
+        ],
+        "responses": {
+          "200": { "description": "Berkas PDF", "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } } },
+          "500": { "description": "Chrome/Edge gagal dijalankan" }
+        }
+      }
+    },
     "/rencana-kerja/{id}": {
       "get": { "tags": ["rencana"], "summary": "Detail rencana + tahapan + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
       "patch": { "tags": ["rencana"], "summary": "Ubah rencana (draft/revisi) termasuk rincian kegiatan", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Diperbarui" } } }
@@ -927,6 +995,7 @@
         "summary": "Daftar hasil kerja",
         "parameters": [
           { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["draft", "diajukan", "terverifikasi", "perlu_revisi"] } },
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
           { "name": "page", "in": "query", "schema": { "type": "integer" } }
         ],
         "responses": { "200": { "description": "Daftar" } }
@@ -959,6 +1028,22 @@
     },
     "/hasil-kerja/verifikasi": {
       "get": { "tags": ["hasil"], "summary": "Hasil kerja menunggu verifikasi atasan langsung", "responses": { "200": { "description": "Daftar" } } }
+    },
+    "/hasil-kerja/ekspor": {
+      "get": {
+        "tags": ["hasil"],
+        "summary": "Ekspor PDF daftar hasil kerja (Chrome/Edge headless)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["draft", "diajukan", "terverifikasi", "perlu_revisi"] } }
+        ],
+        "responses": {
+          "200": { "description": "Berkas PDF", "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } } },
+          "500": { "description": "Chrome/Edge gagal dijalankan" }
+        }
+      }
     },
     "/hasil-kerja/{id}": {
       "get": { "tags": ["hasil"], "summary": "Detail hasil kerja + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },
@@ -996,7 +1081,7 @@
       }
     },
     "/output": {
-      "get": { "tags": ["output"], "summary": "Daftar output", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }, { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Daftar" } } },
+      "get": { "tags": ["output"], "summary": "Daftar output", "parameters": [{ "name": "status", "in": "query", "schema": { "type": "string" } }, { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }, { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Daftar" } } },
       "post": {
         "tags": ["output"],
         "summary": "Buat output dari hasil kerja terverifikasi",
@@ -1028,6 +1113,22 @@
     },
     "/output/verifikasi": {
       "get": { "tags": ["output"], "summary": "Output dalam verifikasi atasan langsung", "responses": { "200": { "description": "Daftar" } } }
+    },
+    "/output/ekspor": {
+      "get": {
+        "tags": ["output"],
+        "summary": "Ekspor PDF daftar output (Chrome/Edge headless)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["draft", "menunggu_verifikasi", "dalam_verifikasi", "disetujui", "perlu_revisi"] } }
+        ],
+        "responses": {
+          "200": { "description": "Berkas PDF", "content": { "application/pdf": { "schema": { "type": "string", "format": "binary" } } } },
+          "500": { "description": "Chrome/Edge gagal dijalankan" }
+        }
+      }
     },
     "/output/{id}": {
       "get": { "tags": ["output"], "summary": "Detail output + lampiran", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Detail" } } },

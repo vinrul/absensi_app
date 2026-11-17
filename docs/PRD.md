@@ -133,6 +133,9 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Rencana berstatus `draft`/`perlu_revisi` dapat dibuka kembali di Android (**Ubah/Perbaiki Rencana**).
   Wizard terisi data lama beserta catatan atasan; perubahan dikirim lewat `PATCH /rencana-kerja/{id}`
   yang juga mengganti daftar rincian kegiatan, lalu dapat langsung diajukan ulang.
+- Dashboard **Rencana Kerja** menyediakan filter periode, status, **satker**, dan **personel**,
+  halaman **detail** lengkap (uraian, dasar tugas, rincian tahapan, lampiran), serta tombol
+  **Export PDF** sesuai filter (kop Polda Bali, A4 landscape) memakai Chrome/Edge headless di server.
 - Semua tanggal (dasar tugas, mulai/selesai kegiatan) dipilih lewat **date picker**, bukan input teks.
 - Lampiran yang sudah tersimpan dapat dilihat langsung di Android: PDF dirender per halaman dan
   gambar ditampilkan penuh dengan pinch-zoom; tidak memerlukan aplikasi eksternal.
@@ -154,6 +157,8 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   (keterlambatan) — lihat `docs/penilaian.md`.
 - Verifikator dapat meminta revisi dengan catatan wajib. Skor kualitas dipilih memakai slider 0–100
   pada layar verifikasi Android. Layar verifikasi dibuka dari kartu di Beranda atau tab Hasil Kerja.
+- Dashboard **Hasil Kerja** menyediakan filter periode, status, satker, dan personel, halaman detail
+  beserta lampiran bukti, serta **Export PDF** sesuai filter (Chrome/Edge headless).
 
 ### FR-05 Output
 - Hanya dari hasil kerja `terverifikasi`.
@@ -167,6 +172,9 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   diisi atasan memakai slider 0–100 (bobot 40/30/30). Permintaan revisi wajib menyertakan catatan.
 - Layar verifikasi atasan menampilkan output bawahan langsung yang berstatus dalam verifikasi,
   lengkap dengan detail lampiran.
+- Dashboard **Output** menyediakan filter periode, status, satker, dan personel, halaman detail
+  (uraian, tautan, komponen nilai, catatan, lampiran), serta **Export PDF** sesuai filter
+  (Chrome/Edge headless).
 
 ### FR-06 Periode & penilaian
 - Periode bulanan dengan tanggal mulai/selesai; bobot default 20/20/30/30; total bobot harus 100.
@@ -178,6 +186,18 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - KPI: total personel, hadir hari ini, rencana, hasil, output, rata-rata nilai.
 - Grafik: capaian per indikator, tren antar periode, sebaran kategori.
 - Tabel rekap berpaginasi + rincian komponen per personel.
+- Halaman **Rekap Absensi** (`/absensi/rekap`) memiliki tiga tab dengan filter terpisah:
+  - **Rekap Kehadiran**: periode + satker; kolom hadir, telat (hari), menit telat (khusus
+    Dinas Kantor), dinas luar, piket, cuti, izin, sakit, PH, tanpa keterangan, dan menunggu
+    verifikasi. Filter subdit/bagian dihapus.
+  - **Verifikasi**: periode + satker + personel; absen masuk dan pulang pada tanggal yang sama
+    digabung menjadi satu baris, menampilkan kedua jam dan menit telat; foto absensi dan catatan
+    verifikator tersedia, dan penyetujuan memproses seluruh catatan pada tanggal tersebut.
+  - **Detail per Orang**: periode + satker + personel (wajib dipilih); riwayat harian dengan
+    pasangan jam masuk/pulang, status, menit telat, status radius, kondisi, dan catatan verifikator.
+  Setiap tab menyediakan **Export PDF** sesuai filter aktif (kop Polda Bali, A4 landscape)
+  memakai Chrome/Edge headless di server; PDF rekap memuat baris jumlah termasuk menit telat,
+  sedangkan PDF verifikasi/detail memakai baris per tanggal yang sudah digabung.
 - Semua tabel daftar berpaginasi (10 baris/halaman); modul besar memakai pagination server-side
   (`page`/`per_page` pada respons daftar).
 - Pimpinan dapat menyimpan catatan & keputusan; laporan dapat dicetak A4 atau diunduh CSV.

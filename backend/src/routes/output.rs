@@ -1,9 +1,13 @@
 use axum::Json;
 use axum::Router;
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::response::Response;
 use axum::routing::{get, post};
 use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::auth::extractor::AuthUser;
@@ -16,15 +20,17 @@ use crate::repo::output::{self, ListFilter, NewOutput, OutputRow, SkorOutput, Up
 use crate::repo::periode;
 use crate::repo::personel;
 use crate::repo::rencana;
+use crate::repo::satker;
 use crate::repo::{ListResponse, pagination};
 use crate::service::akses;
-use crate::service::scoring;
+use crate::service::{laporan, pdf, scoring, waktu};
 use crate::state::AppState;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", get(list_output).post(create_output))
         .route("/verifikasi", get(list_verifikasi_output))
+        .route("/ekspor", get(ekspor_output_pdf))
         .route("/{id}", get(detail_output).patch(update_output))
         .route("/{id}/ajukan", post(ajukan_output))
         .route("/{id}/verifikasi", post(verifikasi_output))
@@ -44,6 +50,7 @@ pub struct ListQuery {
     pub satker_id: Option<Uuid>,
     pub personel_id: Option<Uuid>,
     pub status: Option<StatusOutput>,
+    pub periode_id: Option<Uuid>,
 }
 
 pub async fn list_output(
@@ -76,6 +83,7 @@ pub async fn list_output(
             satker_ids: scope,
             personel_id,
             status: query.status,
+            periode_id: query.periode_id,
             atasan_id: None,
             hanya_diajukan: false,
             limit: per_page,
@@ -85,6 +93,218 @@ pub async fn list_output(
     .await?;
 
     Ok(Json(ListResponse::new(rows, page, per_page, total)))
+}
+
+/// Ekspor daftar output sesuai filter menjadi PDF.
+pub async fn ekspor_output_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<ListQuery>,
+) -> AppResult<Response> {
+    let mut scope = crate::routes::personel::scope_for(&state, &user).await?;
+
+    if let Some(satker_id) = query.satker_id {
+        if !scope.contains(&satker_id) {
+            return Err(AppError::Forbidden(
+                "Anda tidak berhak mengekspor output satker tersebut".into(),
+            ));
+        }
+        scope = vec![satker_id];
+    }
+
+    let claims = user.claims();
+    let personel_id = if claims.is_admin() || claims.is_atasan() || claims.is_pimpinan() {
+        query.personel_id
+    } else {
+        Some(claims.sub)
+    };
+
+    let (rows, total) = output::list(
+        &state.pool,
+        &ListFilter {
+            satker_ids: scope,
+            personel_id,
+            status: query.status,
+            periode_id: query.periode_id,
+            atasan_id: None,
+            hanya_diajukan: false,
+            limit: 5000,
+            offset: 0,
+        },
+    )
+    .await?;
+
+    let nama_satker = match query.satker_id {
+        Some(id) => satker::find(&state.pool, id)
+            .await?
+            .map(|row| row.nama)
+            .unwrap_or_else(|| "-".into()),
+        None => "Semua Satker".into(),
+    };
+    let nama_personel = match personel_id {
+        Some(id) => personel::find_by_id(&state.pool, id)
+            .await?
+            .map(|row| match row.nrp {
+                Some(nrp) => format!("{} ({})", row.nama, nrp),
+                None => row.nama,
+            })
+            .unwrap_or_else(|| "-".into()),
+        None => "Semua Personel".into(),
+    };
+    let nama_periode = match query.periode_id {
+        Some(id) => periode::find(&state.pool, id)
+            .await?
+            .map(|row| {
+                format!(
+                    "{} ({} s/d {})",
+                    row.nama,
+                    laporan::format_tanggal(row.tanggal_mulai),
+                    laporan::format_tanggal(row.tanggal_selesai)
+                )
+            })
+            .unwrap_or_else(|| "-".into()),
+        None => "Semua Periode".into(),
+    };
+    let label_status = match query.status {
+        Some(status) => label_status_output(status).to_string(),
+        None => "Semua Status".into(),
+    };
+    let dicetak_oleh = personel::find_by_id(&state.pool, user.id())
+        .await?
+        .map(|row| row.nama)
+        .unwrap_or_else(|| "-".into());
+    let dicetak_pada = (chrono::Utc::now() + chrono::Duration::hours(8))
+        .format("%d-%m-%Y %H:%M WITA")
+        .to_string();
+    let nama_satker_map: HashMap<Uuid, String> = satker::list(&state.pool)
+        .await?
+        .into_iter()
+        .map(|row| (row.id, row.nama))
+        .collect();
+
+    let mut baris = String::new();
+    for (indeks, row) in rows.iter().enumerate() {
+        baris.push_str(&format!(
+            "<tr>\
+                <td>{}</td>\
+                <td><strong>{}</strong><br><span style=\"color:#64748b\">{}</span></td>\
+                <td>{}</td>\
+                <td><strong>{}</strong><br><span style=\"color:#64748b\">{}</span></td>\
+                <td>{}</td>\
+                <td>{}</td>\
+                <td>{}</td>\
+                <td><span class=\"badge badge-{}\">{}</span></td>\
+             </tr>",
+            indeks + 1,
+            laporan::esc(row.personel_nama.as_deref().unwrap_or("-")),
+            laporan::esc(row.personel_nrp.as_deref().unwrap_or("-")),
+            laporan::esc(
+                nama_satker_map
+                    .get(&row.satker_id)
+                    .map(String::as_str)
+                    .unwrap_or("-")
+            ),
+            laporan::esc(&row.judul),
+            laporan::esc(row.uraian.as_deref().unwrap_or("-")),
+            label_jenis_output(row.jenis_output),
+            laporan::format_tanggal(row.tanggal_hasil),
+            row.skor_total
+                .map(|nilai| format!("{nilai:.2}"))
+                .unwrap_or_else(|| "-".into()),
+            row.status.as_str(),
+            label_status_output(row.status),
+        ));
+    }
+
+    let html = laporan::html(&laporan::Laporan {
+        judul: "Laporan Output / Bukti Hasil Kerja",
+        periode: &nama_periode,
+        satker: &nama_satker,
+        personel: &nama_personel,
+        status: &label_status,
+        dicetak_oleh: &dicetak_oleh,
+        dicetak_pada: &dicetak_pada,
+        kolom: vec![
+            laporan::Kolom {
+                judul: "No",
+                lebar: 4,
+            },
+            laporan::Kolom {
+                judul: "Personel",
+                lebar: 14,
+            },
+            laporan::Kolom {
+                judul: "Satker",
+                lebar: 11,
+            },
+            laporan::Kolom {
+                judul: "Judul / Uraian Output",
+                lebar: 30,
+            },
+            laporan::Kolom {
+                judul: "Jenis",
+                lebar: 11,
+            },
+            laporan::Kolom {
+                judul: "Tanggal",
+                lebar: 10,
+            },
+            laporan::Kolom {
+                judul: "Nilai",
+                lebar: 7,
+            },
+            laporan::Kolom {
+                judul: "Status",
+                lebar: 13,
+            },
+        ],
+        baris,
+        jumlah: rows.len(),
+        total,
+        catatan: None,
+    });
+    let isi_pdf = pdf::render_pdf(&html).await?;
+
+    let nama_berkas = format!(
+        "output-kerja-{}.pdf",
+        waktu::hari_ini_wita().format("%Y%m%d")
+    );
+    let disposisi = HeaderValue::from_str(&format!("attachment; filename=\"{nama_berkas}\""))
+        .unwrap_or_else(|_| HeaderValue::from_static("attachment"));
+
+    let mut response = Response::new(Body::from(isi_pdf));
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    response
+        .headers_mut()
+        .insert(header::CONTENT_DISPOSITION, disposisi);
+    Ok(response)
+}
+
+fn label_status_output(status: StatusOutput) -> &'static str {
+    match status {
+        StatusOutput::Draft => "Draft",
+        StatusOutput::MenungguVerifikasi => "Menunggu Verifikasi",
+        StatusOutput::DalamVerifikasi => "Dalam Verifikasi",
+        StatusOutput::Disetujui => "Disetujui",
+        StatusOutput::PerluRevisi => "Perlu Revisi",
+    }
+}
+
+fn label_jenis_output(jenis: JenisOutput) -> &'static str {
+    match jenis {
+        JenisOutput::Laporan => "Laporan",
+        JenisOutput::DokumenPendukung => "Dokumen Pendukung",
+        JenisOutput::Foto => "Foto Kegiatan",
+        JenisOutput::Video => "Video Kegiatan",
+        JenisOutput::DataDiagram => "Data/Diagram",
+        JenisOutput::BeritaAcara => "Berita Acara",
+        JenisOutput::SuratNotaDinas => "Surat/Nota Dinas",
+        JenisOutput::LinkSistem => "Link/Sistem",
+    }
 }
 
 pub async fn list_verifikasi_output(
@@ -107,6 +327,7 @@ pub async fn list_verifikasi_output(
             satker_ids: scope,
             personel_id: None,
             status: None,
+            periode_id: None,
             atasan_id: if user.is_admin_any() {
                 None
             } else {

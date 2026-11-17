@@ -12,7 +12,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| A1 | Buka `/docs` | Daftar 76 endpoint tampil, filter tag berfungsi | ✅ | |
+| A1 | Buka `/docs` | Daftar 108 operasi (83 path) tampil, filter tag berfungsi | ✅ | |
 | A2 | Login memakai username `superuser` | Berhasil; `jenis_akun=admin`, `nrp=null` | ✅ | API |
 | A3 | Login memakai NRP `000001` | Gagal (admin tidak punya NRP) | ✅ | API |
 | A4 | Login `superuser` dengan `client=android` | 403 "Akun admin hanya dapat masuk melalui dashboard web" | ✅ | API |
@@ -44,7 +44,19 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A30 | Tambah libur nasional + duplikat | Tersimpan; tanggal sama 409 | ✅ | API |
 | A31 | Buka daftar satker/libur/titik dinas/kesiapan/PH/absensi/rekap/persetujuan | Tiap tabel menampilkan “Menampilkan X–Y dari N” dan tombol Sebelumnya/Berikutnya; maks. 10 baris | ⬜ | UI |
 | A32 | Tambah titik dinas, klik peta OpenStreetMap | Koordinat terisi otomatis, penanda & lingkaran radius muncul; simpan berhasil | ⬜ | UI |
-| A33 | Edit titik dinas: ubah nama, jenis, koordinat/penanda, radius, status | Perubahan tersimpan dan tampil di tabel | ⬜ | API ✅; UI perlu uji visual |
+| A33 | Edit titik dinas: ubah nama, jenis, koordinat/penanda, radius, status | Perubahan tersimpan dan tampil di tabel | ✅ | API ✅; UI perlu uji visual |
+| A34 | Rencana Kerja → filter Satker lalu Personel | Daftar menyempit sesuai pilihan; pilihan personel mengikuti satker terpilih | ✅ | API + UI |
+| A35 | Rencana Kerja → **Export PDF** dengan filter | Berkas `rencana-kerja-YYYYMMDD.pdf` terunduh dari Chrome headless; kop, ringkasan filter, dan tabel sesuai data | ✅ | API |
+| A36 | Buka detail rencana dari tabel | Halaman `/rencana-kerja/{id}` menampilkan program, kegiatan, uraian, dasar tugas, target, seluruh rincian tahapan, dan lampiran yang dapat dibuka | ✅ | UI + API |
+| A37 | Buka detail hasil kerja | `/hasil-kerja/{id}` menampilkan rencana, personel, progres, realisasi, kendala, komponen nilai, catatan atasan, dan lampiran bukti | ✅ | UI + API |
+| A38 | Buka detail output | `/output/{id}` menampilkan jenis, judul, uraian, tautan, komponen nilai, catatan, dan berkas bukti | ✅ | UI + API |
+| A39 | Hasil Kerja → filter + **Export PDF** | Tabel dan PDF mengikuti periode/status/satker/personel; PDF memuat kolom personel, satker, rencana, progres, realisasi, nilai, status | ✅ | API |
+| A40 | Output → filter + **Export PDF** | Tabel dan PDF mengikuti filter; PDF memuat personel, satker, judul/uraian, jenis, tanggal, nilai, status | ✅ | API |
+| A41 | Rekap Absensi → tab **Rekap Kehadiran** | Filter hanya periode + satker (subdit/bagian dihapus); tabel memuat hadir, telat (hari), **menit telat**, DL, piket, cuti, izin, sakit, PH, TK, menunggu | ✅ | API + UI |
+| A42 | Tab **Verifikasi** → tanggal dengan absen masuk & pulang | Kedua absen tampil dalam **satu baris** (kolom Masuk/Pulang), menit telat tampil bila Dinas Kantor terlambat; Setujui memverifikasi semua catatan pada tanggal itu | ✅ | API |
+| A43 | Tab **Detail per Orang** → pilih personel | Riwayat harian digabung per tanggal: Masuk, Pulang, Status, Telat, Radius, Kondisi, Verifikasi, Catatan | ✅ | API |
+| A44 | **Export PDF** pada tiap tab | `rekap-absensi`, `verifikasi-absensi`, dan `detail-absensi` terunduh sesuai filter; rekap memuat kolom **Menit** + jumlah, verifikasi/detail memakai baris per tanggal gabungan | ✅ | API |
+| A45 | Tab Detail tanpa memilih personel | Pesan “Pilih personel terlebih dahulu”; tombol Export PDF menampilkan pesan yang sama tanpa memanggil server | ⬜ | UI |
 
 ## B. Admin ber-scope
 

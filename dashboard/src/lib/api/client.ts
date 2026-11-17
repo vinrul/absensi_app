@@ -123,3 +123,29 @@ export async function apiBlobUrl(path: string): Promise<string> {
 	const blob = await res.blob();
 	return URL.createObjectURL(blob);
 }
+
+/** Unduh berkas biner (mis. PDF) dengan bearer token dan refresh otomatis. */
+export async function apiBlob(path: string): Promise<Blob> {
+	const ambil = async () => {
+		const headers = new Headers();
+		if (accessToken) headers.set('authorization', `Bearer ${accessToken}`);
+		return fetch(`${BASE}${path}`, { headers, credentials: 'include' });
+	};
+
+	let res = await ambil();
+	if (res.status === 401 && (await refreshSession())) res = await ambil();
+
+	if (!res.ok) {
+		const teks = await res.text();
+		let pesan = `Permintaan gagal (${res.status})`;
+		try {
+			const data = JSON.parse(teks) as { error?: { code?: string; message?: string } };
+			pesan = data.error?.message ?? pesan;
+		} catch {
+			// biarkan pesan bawaan
+		}
+		throw new ApiError(res.status, 'error', pesan);
+	}
+
+	return res.blob();
+}

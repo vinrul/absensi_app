@@ -1,21 +1,30 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { api, ApiError } from '#lib/api/client';
-	import type { ListResponse, Periode, Rencana, Satker, StatusRencana } from '#lib/types';
+	import { api, apiBlob, ApiError } from '#lib/api/client';
+	import type { ListResponse, Periode, Personel, Rencana, Satker, StatusRencana } from '#lib/types';
 	import { LABEL_STATUS_RENCANA } from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 
 	let periodeList = $state<Periode[]>([]);
+	let satkerList = $state<Satker[]>([]);
+	let personelList = $state<Personel[]>([]);
 	let periodeId = $state('');
+	let satkerId = $state('');
+	let personelId = $state('');
 	let status = $state<StatusRencana | ''>('');
 	let data = $state<Rencana[]>([]);
 	let meta = $state({ page: 1, per_page: 10, total: 0 });
 	let memuat = $state(true);
+	let mengekspor = $state(false);
 	let error = $state<string | null>(null);
 	let formTerbuka = $state(false);
 	let menyimpan = $state(false);
+
+	const personelTersedia = $derived(
+		satkerId ? personelList.filter((p) => p.satker_id === satkerId) : personelList
+	);
 
 	let form = $state({
 		program: '',
@@ -54,6 +63,8 @@
 			const params = new URLSearchParams();
 			if (periodeId) params.set('periode_id', periodeId);
 			if (status) params.set('status', status);
+			if (satkerId) params.set('satker_id', satkerId);
+			if (personelId) params.set('personel_id', personelId);
 			params.set('page', String(page));
 			params.set('per_page', String(meta.per_page));
 			const hasil = await api<ListResponse<Rencana>>(`/rencana-kerja?${params}`);
@@ -63,6 +74,38 @@
 			error = err instanceof ApiError ? err.message : 'Gagal memuat rencana kerja';
 		} finally {
 			memuat = false;
+		}
+	}
+
+	function ubahSatker() {
+		const masihCocok = personelList.some(
+			(p) => p.id === personelId && (!satkerId || p.satker_id === satkerId)
+		);
+		if (!masihCocok) personelId = '';
+		muat(1);
+	}
+
+	async function eksporPdf() {
+		mengekspor = true;
+		error = null;
+		try {
+			const params = new URLSearchParams();
+			if (periodeId) params.set('periode_id', periodeId);
+			if (status) params.set('status', status);
+			if (satkerId) params.set('satker_id', satkerId);
+			if (personelId) params.set('personel_id', personelId);
+
+			const blob = await apiBlob(`/rencana-kerja/ekspor?${params}`);
+			const url = URL.createObjectURL(blob);
+			const tautan = document.createElement('a');
+			tautan.href = url;
+			tautan.download = `rencana-kerja-${new Date().toISOString().slice(0, 10)}.pdf`;
+			tautan.click();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			error = err instanceof ApiError ? err.message : 'Gagal membuat PDF';
+		} finally {
+			mengekspor = false;
 		}
 	}
 
@@ -120,8 +163,14 @@
 	}
 
 	onMount(async () => {
-		const p = await api<Periode[]>('/periode');
+		const [p, s, orang] = await Promise.all([
+			api<Periode[]>('/periode'),
+			api<Satker[]>('/satker'),
+			api<ListResponse<Personel>>('/personel?per_page=200')
+		]);
 		periodeList = p;
+		satkerList = s;
+		personelList = orang.data;
 		periodeId = p[0]?.id ?? '';
 		const hari = new Date().toISOString().slice(0, 10);
 		form.tanggal_mulai = hari;
@@ -135,7 +184,29 @@
 <svelte:head><title>Rencana Kerja — Penilaian Kinerja</title></svelte:head>
 
 <div class="space-y-4">
-	<div class="card flex flex-wrap items-end justify-between gap-3 p-4">
+	<div class="card space-y-3 p-4">
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div>
+				<h2 class="text-sm font-semibold text-slate-800">Rencana Kerja</h2>
+				<p class="text-xs text-slate-500">
+					Rencana kerja personel, target, dan status persetujuan atasan.
+				</p>
+			</div>
+			<div class="flex flex-wrap gap-2">
+				<button
+					class="btn btn-ghost border border-slate-300"
+					disabled={mengekspor}
+					onclick={eksporPdf}
+				>
+					<Icon name="download" size={16} />
+					{mengekspor ? 'Menyiapkan PDF…' : 'Export PDF'}
+				</button>
+				<button class="btn btn-primary" onclick={() => (formTerbuka = true)}>
+					<Icon name="plus" size={16} /> Buat Rencana
+				</button>
+			</div>
+		</div>
+
 		<div class="flex flex-wrap items-end gap-3">
 			<div class="min-w-44">
 				<label class="label" for="periode">Periode</label>
@@ -152,10 +223,23 @@
 					{/each}
 				</select>
 			</div>
+			<div class="min-w-48">
+				<label class="label" for="satker">Satker</label>
+				<select id="satker" class="input" bind:value={satkerId} onchange={ubahSatker}>
+					<option value="">Semua Satker</option>
+					{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
+				</select>
+			</div>
+			<div class="min-w-56">
+				<label class="label" for="personel">Personel</label>
+				<select id="personel" class="input" bind:value={personelId} onchange={() => muat(1)}>
+					<option value="">Semua Personel</option>
+					{#each personelTersedia as orang}
+						<option value={orang.id}>{orang.nama} ({orang.nrp})</option>
+					{/each}
+				</select>
+			</div>
 		</div>
-		<button class="btn btn-primary" onclick={() => (formTerbuka = true)}>
-			<Icon name="plus" size={16} /> Buat Rencana
-		</button>
 	</div>
 
 	{#if error}
@@ -227,7 +311,25 @@
 	</div>
 </div>
 
-<Modal open={formTerbuka} title="Buat Rencana Kerja" lebar="max-w-2xl" onclose={() => (formTerbuka = false)}>
+{#snippet aksiFormRencana()}
+	<div class="flex flex-wrap justify-end gap-2">
+		<button class="btn btn-ghost" onclick={() => (formTerbuka = false)}>Batal</button>
+		<button class="btn btn-ghost border border-slate-300" disabled={menyimpan} onclick={() => simpan(false)}>
+			Simpan Draft
+		</button>
+		<button class="btn btn-primary" disabled={menyimpan} onclick={() => simpan(true)}>
+			<Icon name="check" size={16} /> Ajukan ke Atasan
+		</button>
+	</div>
+{/snippet}
+
+<Modal
+	open={formTerbuka}
+	title="Buat Rencana Kerja"
+	lebar="max-w-2xl"
+	footer={aksiFormRencana}
+	onclose={() => (formTerbuka = false)}
+>
 	<div class="grid gap-3 sm:grid-cols-2">
 		<div class="sm:col-span-2">
 			<label class="label" for="program">Program</label>
@@ -307,15 +409,5 @@
 			<label class="label" for="tahapan">Rincian Tahapan (satu per baris)</label>
 			<textarea id="tahapan" class="input h-20 resize-none" bind:value={form.tahapan}></textarea>
 		</div>
-	</div>
-
-	<div class="mt-4 flex justify-end gap-2">
-		<button class="btn btn-ghost" onclick={() => (formTerbuka = false)}>Batal</button>
-		<button class="btn btn-ghost border border-slate-300" disabled={menyimpan} onclick={() => simpan(false)}>
-			Simpan Draft
-		</button>
-		<button class="btn btn-primary" disabled={menyimpan} onclick={() => simpan(true)}>
-			<Icon name="check" size={16} /> Ajukan ke Atasan
-		</button>
 	</div>
 </Modal>

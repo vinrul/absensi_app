@@ -113,6 +113,7 @@ export type StatusKehadiran =
 export interface Absensi {
 	id: string;
 	personel_id?: string;
+	satker_id?: string;
 	personel_nama?: string;
 	personel_nrp?: string;
 	personel_pangkat?: string;
@@ -131,6 +132,30 @@ export interface Absensi {
 	foto_url?: string | null;
 }
 
+/** Satu baris per personel per tanggal: absen masuk dan pulang digabung. */
+export interface AbsensiHarian {
+	personel_id: string;
+	satker_id: string;
+	personel_nama: string;
+	personel_nrp: string;
+	personel_pangkat: string;
+	unit: string | null;
+	tanggal: string;
+	masuk_jam: string | null;
+	pulang_jam: string | null;
+	status_masuk: StatusKehadiran | null;
+	status_pulang: StatusKehadiran | null;
+	is_offline: boolean;
+	is_mock_suspect: boolean;
+	luar_radius: boolean;
+	perlu_verifikasi: boolean;
+	perlu_verifikasi_ids: string[];
+	verified_at: string | null;
+	catatan_verifikator: string | null;
+	menit_telat: number;
+	foto_url: string | null;
+}
+
 export interface RekapAbsensi {
 	personel_id: string;
 	nama: string;
@@ -142,6 +167,7 @@ export interface RekapAbsensi {
 	dinas_luar: number;
 	piket: number;
 	telat: number;
+	menit_telat: number;
 	cuti: number;
 	izin: number;
 	sakit: number;
@@ -206,6 +232,11 @@ export interface Tahapan {
 	tanggal_selesai?: string | null;
 }
 
+export interface RencanaDetail extends Rencana {
+	tahapan: Tahapan[];
+	lampiran: Lampiran[];
+}
+
 export interface Lampiran {
 	id: string;
 	owner_type: string;
@@ -240,6 +271,10 @@ export interface Hasil {
 	catatan_verifikator: string | null;
 }
 
+export interface HasilDetail extends Hasil {
+	lampiran: Lampiran[];
+}
+
 export type StatusOutput =
 	| 'draft'
 	| 'menunggu_verifikasi'
@@ -254,6 +289,7 @@ export interface Output {
 	personel_id: string;
 	personel_nama: string | null;
 	personel_nrp: string | null;
+	rencana_kegiatan: string | null;
 	jenis_output: string;
 	judul: string;
 	uraian: string | null;
@@ -265,6 +301,10 @@ export interface Output {
 	skor_keabsahan: number | null;
 	skor_total: number | null;
 	catatan_verifikator: string | null;
+}
+
+export interface OutputDetail extends Output {
+	lampiran: Lampiran[];
 }
 
 export type Kategori = 'sangat_baik' | 'baik' | 'cukup' | 'perlu_pembinaan';
@@ -346,6 +386,21 @@ export const LABEL_STATUS_RENCANA: Record<StatusRencana, string> = {
 	disetujui: 'Disetujui',
 	perlu_revisi: 'Perlu Revisi',
 	ditolak: 'Ditolak'
+};
+
+export const LABEL_JENIS_RENCANA: Record<string, string> = {
+	harian: 'Harian',
+	mingguan: 'Mingguan',
+	bulanan: 'Bulanan',
+	triwulan: 'Triwulan',
+	penugasan_khusus: 'Penugasan Khusus'
+};
+
+export const LABEL_STATUS_HASIL: Record<StatusHasil, string> = {
+	draft: 'Draft',
+	diajukan: 'Menunggu Verifikasi',
+	terverifikasi: 'Terverifikasi',
+	perlu_revisi: 'Perlu Revisi'
 };
 
 export const LABEL_STATUS_OUTPUT: Record<StatusOutput, string> = {

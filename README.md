@@ -97,6 +97,10 @@ bun run build                  # hasil statis di dashboard/build
 
 > Catatan: shell mesin pengembangan ini menetapkan `NODE_ENV=production`, sehingga
 > `npm install` akan melewati devDependencies. Bun tidak terpengaruh.
+>
+> **Ekspor PDF dashboard** (mis. Rencana Kerja) dirender server memakai **Chrome/Edge
+> headless**. Pastikan salah satunya terpasang; lokasi dideteksi otomatis, atau set
+> `APP__CHROME_PATH` di `backend/.env` (contoh ada di `backend/.env.example`).
 
 ### 3. Aplikasi Android
 
@@ -248,6 +252,13 @@ Catatan penting:
   lampiran), target kuantitas/kualitas/waktu, beberapa rincian kegiatan per rencana,
   lampiran multi-berkas, date picker untuk semua tanggal, serta simpan draf, ajukan ke atasan,
   dan perbaiki rencana yang diminta revisi dengan catatan persetujuan.
+- **Rekap, detail & PDF dashboard**: Rencana Kerja, Hasil Kerja, dan Output punya halaman detail
+  lengkap beserta lampiran; tiap daftar mendukung filter periode/status/satker/personel dan tombol
+  **Export PDF** sesuai filter (kop Polda Bali, tabel A4 landscape) melalui Chrome/Edge headless.
+  **Rekap Kehadiran** dipecah menjadi tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang**
+  dengan filter terpisah dan **Export PDF** per tab; filter subdit/bagian dihapus dari rekap,
+  absen masuk/pulang pada tanggal yang sama digabung satu baris, dan keterlambatan Dinas Kantor
+  ditampilkan dalam menit.
 - **Persetujuan rencana**: atasan langsung — termasuk pimpinan yang ditunjuk sebagai `atasan_id` —
   dapat menyetujui, meminta revisi, atau menolak dari dashboard web maupun dari kartu
   **Persetujuan Rencana** di Beranda Android/tombol **Tinjau Persetujuan** pada tab Rencana.

@@ -70,7 +70,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.21 | Admin satker menandai siap; admin global memantau semua | ✅ | tabel `periode_satker_kesiapan` |
 | 3.22 | Halaman **Hari Libur** + kalender nasional/khusus satker | ✅ | tabel `hari_libur`, `/libur` |
 | 3.23 | Libur otomatis netral di penilaian absensi | ✅ | `service/penilaian.rs` + detail `hari_libur` |
-| 3.24 | Pagination seragam di semua modul daftar | ✅ | komponen `Pagination.svelte`; server-side: dashboard, penilaian, rencana, hasil, output, personel, admin, persetujuan; client-side: satker, libur, titik dinas, kesiapan, PH, absensi, rekap |
+| 3.24 | Pagination seragam di semua modul daftar | ✅ | komponen `Pagination.svelte`; server-side: dashboard, penilaian, rencana, hasil, output, personel, admin, persetujuan, verifikasi & detail absensi; client-side: satker, libur, titik dinas, kesiapan, PH, rekap kehadiran |
 | 3.25 | Peta interaktif OpenStreetMap untuk tambah/edit titik dinas | ✅ | `PetaPicker.svelte` (Leaflet): klik peta/geser penanda mengisi lat/lng, lingkaran radius, input manual tetap bisa; edit nama/jenis/koordinat/radius/status |
 | 3.26 | Jam server palsu untuk development | ✅ | `cargo run --bin fake -- 20-11-2026 07:45`; endpoint `/dev/waktu` hanya aktif bila `APP__ALLOW_FAKE_TIME=true`; produksi memakai jam sistem |
 | 3.27 | Alur absensi Android bertahap | ✅ | tombol besar → validasi peta/GPS → pilihan status → kirim/simpan offline |
@@ -87,8 +87,14 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.38 | Persetujuan rencana di Android untuk atasan/pimpinan | ✅ | kartu **Persetujuan Rencana** di Beranda + tombol **Tinjau Persetujuan** di tab Rencana; daftar `GET /rencana-kerja/persetujuan`, detail rincian + lampiran, keputusan Setujui / Minta Revisi / Tolak |
 | 3.39 | Dual role atasan sekaligus bawahan | ✅ | tab Rencana memuat rencana sendiri (`personel_id`) sekaligus tombol persetujuan bawahan; Beranda menampilkan jumlah yang menunggu; seed: `000100` → `85000001` dan `000100` → `000002` |
 | 3.40 | Pimpinan dapat menjadi atasan langsung | ✅ | gate `list_persetujuan`/`keputusan` menerima `pimpinan_any`; menu Persetujuan dashboard tampil untuk pimpinan |
+| 3.41 | Filter satker/personel + Export PDF rencana kerja | ✅ | filter dikirim ke `/rencana-kerja` dan `/rencana-kerja/ekspor`; PDF A4 landscape dibuat Chrome/Edge headless |
+| 3.42 | Detail & PDF Hasil Kerja | ✅ | `/hasil-kerja/{id}` (lampiran bukti) + filter periode/status/satker/personel dan `/hasil-kerja/ekspor` |
+| 3.43 | Detail & PDF Output | ✅ | `/output/{id}` (berkas bukti) + filter periode/status/satker/personel dan `/output/ekspor` |
 | 3.41 | Penampil lampiran PDF & gambar di Android | ✅ | `LihatLampiran.kt`: unduh via `GET /lampiran/raw`, PDF dirender `PdfRenderer` (maks. 10 halaman), gambar dengan pinch-zoom; tombol **Lihat** pada detail persetujuan dan lampiran wizard |
 | 3.42 | Detail rencana untuk semua status | ✅ | tombol **Lihat Detail Rencana** pada kartu disetujui/diajukan/ditolak; **Lihat Detail** pada draft/revisi; dialog menampilkan status, rincian, lampiran (dapat dibuka), dan catatan atasan |
+| 3.44 | Tab Rekap Absensi: kehadiran, verifikasi, detail per orang | ✅ | `absensi/rekap/+page.svelte`; tiap tab punya filter sendiri; filter subdit/bagian dihapus dari rekap; kolom **Menit** menampilkan total menit telat Dinas Kantor |
+| 3.45 | Export PDF rekap, verifikasi, dan detail absensi | ✅ | `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (Chrome/Edge headless); rekap memuat baris jumlah + menit telat |
+| 3.46 | Gabung absen masuk & pulang per tanggal | ✅ | `GET /absensi/harian` (dipakai tab Verifikasi & Detail + PDF); menit telat dihitung untuk status Dinas Kantor yang melewati jam masuk satker |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 
@@ -177,7 +183,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 76 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/dev/waktu`, hasil/output draf + verifikasi, profil/foto |
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 83 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/absensi/harian`, `/dev/waktu`, hasil/output draf + verifikasi, profil/foto, ekspor PDF rencana/hasil/output/rekap/verifikasi/detail absensi |
 | 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
 | 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
 | 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
@@ -196,7 +202,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
 | 9.6 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
 | 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 48/48 cek lulus |
-| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (76 path) |
+| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (79 path) |
 | 9.9 | Pagination & form personel (combobox pangkat) | ✅ | `bun run check` 0 error, `bun run build` sukses; verifikasi visual di browser tetap disarankan |
 | 9.10 | Uji API titik dinas (tambah/ubah jenis & koordinat/hapus) | ✅ | 3 cek tambahan pada `api-smoke.js` |
 | 9.11 | Uji jam palsu development | ✅ | 6 cek tambahan: aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
@@ -214,6 +220,9 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.23 | Slider skor verifikasi | ✅ | emulator: skor kualitas 85→62, kesesuaian 90→54 dan keabsahan 92→82 pada dialog output |
 | 9.24 | Tampil/sembunyi password & avatar Beranda | ✅ | emulator: ikon mata mengubah titik-titik menjadi `Polri#2026` dan kembali; avatar tampil di Beranda `85000001`, tidak tampil untuk `000100` |
 | 9.25 | Validasi pangkat/jabatan profil | ✅ | API: pangkat `BRIPKA`/`JENDERAL POL` diterima, `KOLONEL` ditolak 422, jabatan <3 karakter ditolak 422 |
+| 9.26 | Modal dashboard responsif | ✅ | `Modal.svelte`: tinggi maksimal `100vh-2rem`, header + tombol tutup selalu terlihat, isi digulir, footer aksi tetap tampil; modal Rencana Kerja memakai slot `footer` untuk Batal/Simpan Draft/Ajukan ke Atasan |
+| 9.27 | Filter & PDF Rencana Kerja | ✅ | API: filter satker+personel menghasilkan 2 baris; PDF 200 `application/pdf` ~89 KB (~2,2 s), semua satker ~1,0 MB dengan kolom Satker; UI: `bun run check` 0 error |
+| 9.28 | Detail & PDF Hasil/Output | ✅ | API: detail rencana (2 tahapan, 1 lampiran), detail hasil & output (lampiran terbaca); PDF hasil/output 200 `application/pdf` ~100 KB; UI: `bun run check` 0 error, `bun run build` sukses |
 
 ## 10. Yang belum dikerjakan (backlog)
 

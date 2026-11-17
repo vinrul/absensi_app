@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { api, ApiError } from '#lib/api/client';
+	import { api, apiBlob, ApiError } from '#lib/api/client';
 	import { adalahAtasan } from '#lib/stores/session.svelte';
-	import type { Hasil, ListResponse, Rencana } from '#lib/types';
+	import type { Hasil, ListResponse, Periode, Personel, Rencana, Satker, StatusHasil } from '#lib/types';
+	import { LABEL_STATUS_HASIL } from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Modal from '#lib/components/Modal.svelte';
@@ -11,7 +12,20 @@
 	let data = $state<Hasil[]>([]);
 	let meta = $state({ page: 1, per_page: 10, total: 0 });
 	let memuat = $state(true);
+	let mengekspor = $state(false);
 	let error = $state<string | null>(null);
+
+	let periodeList = $state<Periode[]>([]);
+	let satkerList = $state<Satker[]>([]);
+	let personelList = $state<Personel[]>([]);
+	let periodeId = $state('');
+	let satkerId = $state('');
+	let personelId = $state('');
+	let status = $state<StatusHasil | ''>('');
+
+	const personelTersedia = $derived(
+		satkerId ? personelList.filter((p) => p.satker_id === satkerId) : personelList
+	);
 
 	let rencanaDisetujui = $state<Rencana[]>([]);
 	let formTerbuka = $state(false);
@@ -34,13 +48,52 @@
 		memuat = true;
 		error = null;
 		try {
-			const hasil = await api<ListResponse<Hasil>>(`/hasil-kerja?page=${page}&per_page=${meta.per_page}`);
+			const params = new URLSearchParams();
+			if (periodeId) params.set('periode_id', periodeId);
+			if (status) params.set('status', status);
+			if (satkerId) params.set('satker_id', satkerId);
+			if (personelId) params.set('personel_id', personelId);
+			params.set('page', String(page));
+			params.set('per_page', String(meta.per_page));
+			const hasil = await api<ListResponse<Hasil>>(`/hasil-kerja?${params}`);
 			data = hasil.data;
 			meta = hasil.meta;
 		} catch (err) {
 			error = err instanceof ApiError ? err.message : 'Gagal memuat hasil kerja';
 		} finally {
 			memuat = false;
+		}
+	}
+
+	function ubahSatker() {
+		const masihCocok = personelList.some(
+			(p) => p.id === personelId && (!satkerId || p.satker_id === satkerId)
+		);
+		if (!masihCocok) personelId = '';
+		muat(1);
+	}
+
+	async function eksporPdf() {
+		mengekspor = true;
+		error = null;
+		try {
+			const params = new URLSearchParams();
+			if (periodeId) params.set('periode_id', periodeId);
+			if (status) params.set('status', status);
+			if (satkerId) params.set('satker_id', satkerId);
+			if (personelId) params.set('personel_id', personelId);
+
+			const blob = await apiBlob(`/hasil-kerja/ekspor?${params}`);
+			const url = URL.createObjectURL(blob);
+			const tautan = document.createElement('a');
+			tautan.href = url;
+			tautan.download = `hasil-kerja-${new Date().toISOString().slice(0, 10)}.pdf`;
+			tautan.click();
+			URL.revokeObjectURL(url);
+		} catch (err) {
+			error = err instanceof ApiError ? err.message : 'Gagal membuat PDF';
+		} finally {
+			mengekspor = false;
 		}
 	}
 
@@ -105,18 +158,77 @@
 		return 'blue';
 	}
 
-	onMount(() => muat(1));
+	onMount(async () => {
+		const [p, s, orang] = await Promise.all([
+			api<Periode[]>('/periode'),
+			api<Satker[]>('/satker'),
+			api<ListResponse<Personel>>('/personel?per_page=200')
+		]);
+		periodeList = p;
+		satkerList = s;
+		personelList = orang.data;
+		periodeId = p[0]?.id ?? '';
+		await muat(1);
+	});
 </script>
 
 <svelte:head><title>Hasil Kerja — Penilaian Kinerja</title></svelte:head>
 
 <div class="space-y-4">
-	<div class="card flex flex-wrap items-center justify-between gap-3 p-4">
-		<div>
-			<h2 class="text-sm font-semibold text-slate-800">Hasil Kerja</h2>
-			<p class="text-xs text-slate-500">Realisasi capaian dari rencana kerja yang disetujui.</p>
+	<div class="card space-y-3 p-4">
+		<div class="flex flex-wrap items-start justify-between gap-3">
+			<div>
+				<h2 class="text-sm font-semibold text-slate-800">Hasil Kerja</h2>
+				<p class="text-xs text-slate-500">Realisasi capaian dari rencana kerja yang disetujui.</p>
+			</div>
+			<div class="flex flex-wrap gap-2">
+				<button
+					class="btn btn-ghost border border-slate-300"
+					disabled={mengekspor}
+					onclick={eksporPdf}
+				>
+					<Icon name="download" size={16} />
+					{mengekspor ? 'Menyiapkan PDF…' : 'Export PDF'}
+				</button>
+				<button class="btn btn-primary" onclick={bukaForm}>
+					<Icon name="plus" size={16} /> Tambah Hasil
+				</button>
+			</div>
 		</div>
-		<button class="btn btn-primary" onclick={bukaForm}><Icon name="plus" size={16} /> Tambah Hasil</button>
+
+		<div class="flex flex-wrap items-end gap-3">
+			<div class="min-w-44">
+				<label class="label" for="periode">Periode</label>
+				<select id="periode" class="input" bind:value={periodeId} onchange={() => muat(1)}>
+					{#each periodeList as p}<option value={p.id}>{p.nama}</option>{/each}
+				</select>
+			</div>
+			<div class="min-w-40">
+				<label class="label" for="status">Status</label>
+				<select id="status" class="input" bind:value={status} onchange={() => muat(1)}>
+					<option value="">Semua status</option>
+					{#each Object.entries(LABEL_STATUS_HASIL) as [nilai, label]}
+						<option value={nilai}>{label}</option>
+					{/each}
+				</select>
+			</div>
+			<div class="min-w-48">
+				<label class="label" for="satker">Satker</label>
+				<select id="satker" class="input" bind:value={satkerId} onchange={ubahSatker}>
+					<option value="">Semua Satker</option>
+					{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
+				</select>
+			</div>
+			<div class="min-w-56">
+				<label class="label" for="personel">Personel</label>
+				<select id="personel" class="input" bind:value={personelId} onchange={() => muat(1)}>
+					<option value="">Semua Personel</option>
+					{#each personelTersedia as orang}
+						<option value={orang.id}>{orang.nama} ({orang.nrp})</option>
+					{/each}
+				</select>
+			</div>
+		</div>
 	</div>
 
 	{#if error}
@@ -140,7 +252,9 @@
 				{#each data as row}
 					<tr class="hover:bg-slate-50/70">
 						<td class="td">
-							<p class="font-medium text-slate-800">{row.rencana_kegiatan ?? '-'}</p>
+							<a class="font-medium text-navy-800 hover:underline" href="/hasil-kerja/{row.id}">
+								{row.rencana_kegiatan ?? '-'}
+							</a>
 							<p class="text-[11px] text-slate-500">{row.tanggal_realisasi}</p>
 						</td>
 						<td class="td text-slate-600">{row.personel_nama ?? '-'}</td>
@@ -149,23 +263,29 @@
 						<td class="td text-center font-semibold text-slate-800">
 							{row.skor_total != null ? row.skor_total.toFixed(1) : '-'}
 						</td>
-						<td class="td"><Badge tone={nada(row.status)}>{row.status.replace('_', ' ')}</Badge></td>
+						<td class="td"><Badge tone={nada(row.status)}>{LABEL_STATUS_HASIL[row.status]}</Badge></td>
 						<td class="td no-print">
-							{#if adalahAtasan() && row.status === 'diajukan'}
-								<button
+							<div class="flex flex-wrap gap-1">
+								<a
 									class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs"
-									onclick={() => {
-										dipilih = row;
-										setuju = true;
-										catatan = '';
-										skorKualitas = '85';
-									}}
+									href="/hasil-kerja/{row.id}"
 								>
-									Verifikasi
-								</button>
-							{:else}
-								<span class="text-slate-300">-</span>
-							{/if}
+									Detail
+								</a>
+								{#if adalahAtasan() && row.status === 'diajukan'}
+									<button
+										class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs"
+										onclick={() => {
+											dipilih = row;
+											setuju = true;
+											catatan = '';
+											skorKualitas = '85';
+										}}
+									>
+										Verifikasi
+									</button>
+								{/if}
+							</div>
 						</td>
 					</tr>
 				{:else}

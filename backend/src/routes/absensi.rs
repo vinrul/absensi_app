@@ -1,24 +1,32 @@
 use axum::Json;
 use axum::Router;
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::response::Response;
 use axum::routing::{get, post};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::auth::extractor::AuthUser;
 use crate::domain::enums::{AbsensiJenis, StatusKehadiran};
 use crate::error::{AppError, AppResult};
-use crate::repo::absensi::{self, AbsensiRow, NewAbsensi};
+use crate::repo::absensi::{
+    self, AbsensiHarianRow, AbsensiRow, ListFilter, ListHarianFilter, NewAbsensi,
+};
 use crate::repo::periode;
 use crate::repo::personel;
+use crate::repo::satker;
 use crate::repo::titik_dinas;
 use crate::repo::{ListResponse, pagination};
 use crate::service::geofence;
 use crate::service::storage;
 use crate::service::waktu::{self, ke_wita};
+use crate::service::{laporan, pdf};
 use crate::state::AppState;
 
 pub fn routes() -> Router<AppState> {
@@ -26,7 +34,11 @@ pub fn routes() -> Router<AppState> {
         .route("/", get(list_absensi).post(create_absensi))
         .route("/saya", get(list_saya))
         .route("/hari-ini", get(hari_ini))
+        .route("/harian", get(list_harian))
         .route("/rekap", get(rekap_absensi))
+        .route("/rekap/ekspor", get(ekspor_rekap_pdf))
+        .route("/verifikasi/ekspor", get(ekspor_verifikasi_pdf))
+        .route("/detail/ekspor", get(ekspor_detail_pdf))
         .route("/titik-terdekat", get(titik_terdekat))
         .route("/{id}/verifikasi", post(verifikasi_absensi))
 }
@@ -385,12 +397,15 @@ pub struct ListQuery {
     pub tanggal: Option<NaiveDate>,
     pub perlu_verifikasi: Option<bool>,
     pub personel_id: Option<Uuid>,
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct AbsensiListDto {
     pub id: Uuid,
     pub personel_id: Uuid,
+    pub satker_id: Uuid,
     pub personel_nama: String,
     pub personel_nrp: String,
     pub personel_pangkat: String,
@@ -434,12 +449,16 @@ pub async fn list_absensi(
     };
     let (rows, total) = absensi::list(
         &state.pool,
-        &scope,
-        query.tanggal,
-        query.perlu_verifikasi,
-        personel_id,
-        per_page,
-        offset,
+        &ListFilter {
+            satker_ids: scope,
+            tanggal: query.tanggal,
+            perlu_verifikasi: query.perlu_verifikasi,
+            personel_id,
+            dari: query.dari,
+            sampai: query.sampai,
+            limit: per_page,
+            offset,
+        },
     )
     .await?;
 
@@ -448,6 +467,7 @@ pub async fn list_absensi(
         .map(|row| AbsensiListDto {
             id: row.id,
             personel_id: row.personel_id,
+            satker_id: row.satker_id,
             personel_nama: row.personel_nama,
             personel_nrp: row.personel_nrp,
             personel_pangkat: row.personel_pangkat,
@@ -471,10 +491,114 @@ pub async fn list_absensi(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct HarianQuery {
+    pub page: Option<i64>,
+    pub per_page: Option<i64>,
+    pub satker_id: Option<Uuid>,
+    pub personel_id: Option<Uuid>,
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
+    pub perlu_verifikasi: Option<bool>,
+}
+
+/// Absensi per tanggal: absen masuk dan pulang digabung dalam satu baris.
+#[derive(Debug, Serialize)]
+pub struct AbsensiHarianDto {
+    pub personel_id: Uuid,
+    pub satker_id: Uuid,
+    pub personel_nama: String,
+    pub personel_nrp: String,
+    pub personel_pangkat: String,
+    pub unit: Option<String>,
+    pub tanggal: NaiveDate,
+    pub masuk_jam: Option<String>,
+    pub pulang_jam: Option<String>,
+    pub status_masuk: Option<StatusKehadiran>,
+    pub status_pulang: Option<StatusKehadiran>,
+    pub is_offline: bool,
+    pub is_mock_suspect: bool,
+    pub luar_radius: bool,
+    pub perlu_verifikasi: bool,
+    pub perlu_verifikasi_ids: Vec<Uuid>,
+    pub verified_at: Option<DateTime<Utc>>,
+    pub catatan_verifikator: Option<String>,
+    pub menit_telat: i64,
+    pub foto_url: Option<String>,
+}
+
+impl From<AbsensiHarianRow> for AbsensiHarianDto {
+    fn from(row: AbsensiHarianRow) -> Self {
+        Self {
+            personel_id: row.personel_id,
+            satker_id: row.satker_id,
+            personel_nama: row.personel_nama,
+            personel_nrp: row.personel_nrp,
+            personel_pangkat: row.personel_pangkat,
+            unit: row.unit,
+            tanggal: row.tanggal,
+            masuk_jam: row.masuk_jam.map(|jam| jam.format("%H:%M").to_string()),
+            pulang_jam: row.pulang_jam.map(|jam| jam.format("%H:%M").to_string()),
+            status_masuk: row.status_masuk,
+            status_pulang: row.status_pulang,
+            is_offline: row.is_offline,
+            is_mock_suspect: row.is_mock_suspect,
+            luar_radius: row.luar_radius,
+            perlu_verifikasi: row.perlu_verifikasi,
+            perlu_verifikasi_ids: row.perlu_verifikasi_ids,
+            verified_at: row.verified_at,
+            catatan_verifikator: row.catatan_verifikator,
+            menit_telat: row.menit_telat,
+            foto_url: row.foto_path.map(|key| format!("/files/{key}")),
+        }
+    }
+}
+
+pub async fn list_harian(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<HarianQuery>,
+) -> AppResult<Json<ListResponse<AbsensiHarianDto>>> {
+    let mut scope = crate::routes::personel::scope_for(&state, &user).await?;
+
+    if let Some(satker_id) = query.satker_id {
+        if !scope.contains(&satker_id) {
+            return Err(AppError::Forbidden(
+                "Anda tidak berhak melihat absensi satker tersebut".into(),
+            ));
+        }
+        scope = vec![satker_id];
+    }
+
+    let (page, per_page, offset) = pagination(query.page, query.per_page);
+    let hanya_pengelola = user.is_admin_any() || user.is_pimpinan_any() || user.is_atasan();
+    let personel_id = if hanya_pengelola {
+        query.personel_id
+    } else {
+        Some(user.id())
+    };
+
+    let (rows, total) = absensi::list_harian(
+        &state.pool,
+        &ListHarianFilter {
+            satker_ids: scope,
+            personel_id,
+            dari: query.dari,
+            sampai: query.sampai,
+            perlu_verifikasi: query.perlu_verifikasi,
+            limit: per_page,
+            offset,
+        },
+    )
+    .await?;
+
+    let data = rows.into_iter().map(AbsensiHarianDto::from).collect();
+    Ok(Json(ListResponse::new(data, page, per_page, total)))
+}
+
+#[derive(Debug, Deserialize)]
 pub struct RekapQuery {
     pub periode_id: Option<Uuid>,
     pub satker_id: Option<Uuid>,
-    pub unit: Option<String>,
 }
 
 pub async fn rekap_absensi(
@@ -504,7 +628,6 @@ pub async fn rekap_absensi(
         &scope,
         periode.tanggal_mulai,
         periode.tanggal_selesai,
-        query.unit.as_deref(),
     )
     .await?;
 
@@ -517,6 +640,667 @@ pub async fn rekap_absensi(
         },
         "data": rows,
     })))
+}
+
+// ---------------------------------------------------------------- ekspor PDF
+
+#[derive(Debug, Deserialize)]
+pub struct RekapEksporQuery {
+    pub periode_id: Option<Uuid>,
+    pub satker_id: Option<Uuid>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EksporQuery {
+    pub periode_id: Option<Uuid>,
+    pub satker_id: Option<Uuid>,
+    pub personel_id: Option<Uuid>,
+}
+
+fn pastikan_pengelola_absensi(user: &AuthUser) -> AppResult<()> {
+    if user.is_admin_any() || user.is_pimpinan_any() || user.is_atasan() {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden(
+            "Rekap absensi hanya untuk atasan/pimpinan/admin".into(),
+        ))
+    }
+}
+
+/// Periode terpilih + cakupan satker yang boleh diakses pengguna.
+async fn periode_dan_scope(
+    state: &AppState,
+    user: &AuthUser,
+    periode_id: Option<Uuid>,
+    satker_id: Option<Uuid>,
+    pesan_satker: &str,
+) -> AppResult<(periode::PeriodeRow, Vec<Uuid>)> {
+    let periode = periode::find_or_current(&state.pool, periode_id).await?;
+    let mut scope = crate::routes::personel::scope_for(state, user).await?;
+
+    if let Some(satker_id) = satker_id {
+        if !scope.contains(&satker_id) {
+            return Err(AppError::Forbidden(pesan_satker.into()));
+        }
+        scope = vec![satker_id];
+    }
+
+    Ok((periode, scope))
+}
+
+fn label_periode(periode: &periode::PeriodeRow) -> String {
+    format!(
+        "{} ({} s/d {})",
+        periode.nama,
+        laporan::format_tanggal(periode.tanggal_mulai),
+        laporan::format_tanggal(periode.tanggal_selesai)
+    )
+}
+
+async fn nama_satker_terpilih(state: &AppState, satker_id: Option<Uuid>) -> AppResult<String> {
+    match satker_id {
+        Some(id) => Ok(satker::find(&state.pool, id)
+            .await?
+            .map(|row| row.nama)
+            .unwrap_or_else(|| "-".into())),
+        None => Ok("Semua Satker".into()),
+    }
+}
+
+async fn nama_personel_terpilih(state: &AppState, personel_id: Option<Uuid>) -> AppResult<String> {
+    match personel_id {
+        Some(id) => Ok(personel::find_by_id(&state.pool, id)
+            .await?
+            .map(|row| match row.nrp {
+                Some(nrp) => format!("{} ({})", row.nama, nrp),
+                None => row.nama,
+            })
+            .unwrap_or_else(|| "-".into())),
+        None => Ok("Semua Personel".into()),
+    }
+}
+
+async fn nama_pencetak(state: &AppState, user: &AuthUser) -> AppResult<String> {
+    Ok(personel::find_by_id(&state.pool, user.id())
+        .await?
+        .map(|row| row.nama)
+        .unwrap_or_else(|| "-".into()))
+}
+
+fn waktu_cetak() -> String {
+    (chrono::Utc::now() + Duration::hours(8))
+        .format("%d-%m-%Y %H:%M WITA")
+        .to_string()
+}
+
+fn respons_pdf(isi: Vec<u8>, nama_berkas: String) -> Response {
+    let disposisi = HeaderValue::from_str(&format!("attachment; filename=\"{nama_berkas}\""))
+        .unwrap_or_else(|_| HeaderValue::from_static("attachment"));
+
+    let mut response = Response::new(Body::from(isi));
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    response
+        .headers_mut()
+        .insert(header::CONTENT_DISPOSITION, disposisi);
+    response
+}
+
+fn label_status_kehadiran(status: StatusKehadiran) -> &'static str {
+    match status {
+        StatusKehadiran::DinasKantor => "Dinas Kantor",
+        StatusKehadiran::DinasLuar => "Dinas Luar",
+        StatusKehadiran::Ph => "PH",
+        StatusKehadiran::Piket => "Piket/Shift",
+        StatusKehadiran::LiburNasional => "Libur Nasional",
+        StatusKehadiran::Cuti => "Cuti",
+        StatusKehadiran::Izin => "Izin",
+        StatusKehadiran::Sakit => "Sakit",
+        StatusKehadiran::TanpaKeterangan => "Tanpa Keterangan",
+    }
+}
+
+fn label_status_harian(row: &AbsensiHarianRow) -> &'static str {
+    match (row.status_masuk, row.status_pulang) {
+        (Some(status), _) => label_status_kehadiran(status),
+        (None, Some(status)) => label_status_kehadiran(status),
+        _ => "-",
+    }
+}
+
+fn label_jam(jam: Option<NaiveTime>) -> String {
+    jam.map(|nilai| nilai.format("%H:%M").to_string())
+        .unwrap_or_else(|| "-".into())
+}
+
+fn label_menit_telat(menit: i64) -> String {
+    if menit > 0 {
+        format!("{menit} mnt")
+    } else {
+        "-".into()
+    }
+}
+
+fn lokasi_satker(
+    nama_satker_map: &HashMap<Uuid, String>,
+    satker_id: Uuid,
+    unit: Option<&str>,
+) -> String {
+    match (nama_satker_map.get(&satker_id), unit) {
+        (Some(satker), Some(unit)) => format!("{satker} · {unit}"),
+        (Some(satker), None) => satker.clone(),
+        (None, _) => "-".into(),
+    }
+}
+
+/// Catatan ringkas kondisi absensi (offline / mock GPS / luar radius).
+fn catatan_kondisi(offline: bool, mock: bool, dalam_radius: bool) -> String {
+    let mut bagian = Vec::new();
+    if offline {
+        bagian.push("Absen offline");
+    }
+    if mock {
+        bagian.push("Terdeteksi mock GPS");
+    }
+    if !dalam_radius {
+        bagian.push("Di luar radius");
+    }
+    if bagian.is_empty() {
+        "-".into()
+    } else {
+        bagian.join(", ")
+    }
+}
+
+/// Ekspor rekap kehadiran per personel sesuai filter menjadi PDF.
+pub async fn ekspor_rekap_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<RekapEksporQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola_absensi(&user)?;
+    let (periode, scope) = periode_dan_scope(
+        &state,
+        &user,
+        query.periode_id,
+        query.satker_id,
+        "Anda tidak berhak mengekspor rekap satker tersebut",
+    )
+    .await?;
+
+    let rows = absensi::rekap(
+        &state.pool,
+        &scope,
+        periode.tanggal_mulai,
+        periode.tanggal_selesai,
+    )
+    .await?;
+
+    let nama_satker = nama_satker_terpilih(&state, query.satker_id).await?;
+    let dicetak_oleh = nama_pencetak(&state, &user).await?;
+    let dicetak_pada = waktu_cetak();
+    let nama_satker_map: HashMap<Uuid, String> = satker::list(&state.pool)
+        .await?
+        .into_iter()
+        .map(|row| (row.id, row.nama))
+        .collect();
+
+    let mut baris = String::new();
+    for (indeks, row) in rows.iter().enumerate() {
+        baris.push_str(&format!(
+            "<tr>\
+                <td style=\"text-align:center\">{}</td>\
+                <td><strong>{}</strong><br><span style=\"color:#64748b\">{}</span></td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+             </tr>",
+            indeks + 1,
+            laporan::esc(&row.nama),
+            laporan::esc(&row.nrp),
+            laporan::esc(&lokasi_satker(
+                &nama_satker_map,
+                row.satker_id,
+                row.unit.as_deref()
+            )),
+            row.hadir,
+            row.telat,
+            row.menit_telat,
+            row.dinas_luar,
+            row.piket,
+            row.cuti,
+            row.izin,
+            row.sakit,
+            row.libur_nasional,
+            row.tanpa_keterangan,
+            row.menunggu_verifikasi,
+        ));
+    }
+
+    if !rows.is_empty() {
+        let jumlah = |ambil: fn(&absensi::RekapRow) -> i64| rows.iter().map(ambil).sum::<i64>();
+        baris.push_str(&format!(
+            "<tr style=\"font-weight:600;background:#e2e8f0\">\
+                <td colspan=\"3\" style=\"text-align:right\">Jumlah</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+             </tr>",
+            jumlah(|row| row.hadir),
+            jumlah(|row| row.telat),
+            jumlah(|row| row.menit_telat),
+            jumlah(|row| row.dinas_luar),
+            jumlah(|row| row.piket),
+            jumlah(|row| row.cuti),
+            jumlah(|row| row.izin),
+            jumlah(|row| row.sakit),
+            jumlah(|row| row.libur_nasional),
+            jumlah(|row| row.tanpa_keterangan),
+            jumlah(|row| row.menunggu_verifikasi),
+        ));
+    }
+
+    let html = laporan::html(&laporan::Laporan {
+        judul: "Rekap Kehadiran Personel",
+        periode: &label_periode(&periode),
+        satker: &nama_satker,
+        personel: "Semua Personel",
+        status: "Semua status kehadiran",
+        dicetak_oleh: &dicetak_oleh,
+        dicetak_pada: &dicetak_pada,
+        kolom: vec![
+            laporan::Kolom {
+                judul: "No",
+                lebar: 4,
+            },
+            laporan::Kolom {
+                judul: "Personel",
+                lebar: 22,
+            },
+            laporan::Kolom {
+                judul: "Satker / Unit",
+                lebar: 16,
+            },
+            laporan::Kolom {
+                judul: "Hadir",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "Telat",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "Menit",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "DL",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "Piket",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "Cuti",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "Izin",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "Sakit",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "PH",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "TK",
+                lebar: 5,
+            },
+            laporan::Kolom {
+                judul: "Menunggu",
+                lebar: 8,
+            },
+        ],
+        baris,
+        jumlah: rows.len(),
+        total: rows.len() as i64,
+        catatan: Some(format!("Total {} personel.", rows.len())),
+    });
+    let isi_pdf = pdf::render_pdf(&html).await?;
+
+    Ok(respons_pdf(
+        isi_pdf,
+        format!(
+            "rekap-absensi-{}.pdf",
+            waktu::hari_ini_wita().format("%Y%m%d")
+        ),
+    ))
+}
+
+/// Ekspor daftar absensi yang menunggu verifikasi sesuai filter menjadi PDF.
+pub async fn ekspor_verifikasi_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<EksporQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola_absensi(&user)?;
+    let (periode, scope) = periode_dan_scope(
+        &state,
+        &user,
+        query.periode_id,
+        query.satker_id,
+        "Anda tidak berhak mengekspor absensi satker tersebut",
+    )
+    .await?;
+
+    let (rows, total) = absensi::list_harian(
+        &state.pool,
+        &ListHarianFilter {
+            satker_ids: scope,
+            personel_id: query.personel_id,
+            dari: Some(periode.tanggal_mulai),
+            sampai: Some(periode.tanggal_selesai),
+            perlu_verifikasi: Some(true),
+            limit: 5000,
+            offset: 0,
+        },
+    )
+    .await?;
+
+    let nama_satker = nama_satker_terpilih(&state, query.satker_id).await?;
+    let nama_personel = nama_personel_terpilih(&state, query.personel_id).await?;
+    let dicetak_oleh = nama_pencetak(&state, &user).await?;
+    let dicetak_pada = waktu_cetak();
+    let nama_satker_map: HashMap<Uuid, String> = satker::list(&state.pool)
+        .await?
+        .into_iter()
+        .map(|row| (row.id, row.nama))
+        .collect();
+
+    let mut baris = String::new();
+    for (indeks, row) in rows.iter().enumerate() {
+        baris.push_str(&format!(
+            "<tr>\
+                <td style=\"text-align:center\">{}</td>\
+                <td><strong>{}</strong><br><span style=\"color:#64748b\">{}</span></td>\
+                <td>{}</td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+             </tr>",
+            indeks + 1,
+            laporan::esc(&row.personel_nama),
+            laporan::esc(&row.personel_nrp),
+            laporan::esc(&lokasi_satker(
+                &nama_satker_map,
+                row.satker_id,
+                row.unit.as_deref()
+            )),
+            laporan::format_tanggal(row.tanggal),
+            label_jam(row.masuk_jam),
+            label_jam(row.pulang_jam),
+            label_status_harian(row),
+            label_menit_telat(row.menit_telat),
+            laporan::esc(&catatan_kondisi(
+                row.is_offline,
+                row.is_mock_suspect,
+                !row.luar_radius
+            )),
+        ));
+    }
+
+    let html = laporan::html(&laporan::Laporan {
+        judul: "Daftar Absensi Menunggu Verifikasi",
+        periode: &label_periode(&periode),
+        satker: &nama_satker,
+        personel: &nama_personel,
+        status: "Menunggu verifikasi",
+        dicetak_oleh: &dicetak_oleh,
+        dicetak_pada: &dicetak_pada,
+        kolom: vec![
+            laporan::Kolom {
+                judul: "No",
+                lebar: 4,
+            },
+            laporan::Kolom {
+                judul: "Personel",
+                lebar: 20,
+            },
+            laporan::Kolom {
+                judul: "Satker / Unit",
+                lebar: 15,
+            },
+            laporan::Kolom {
+                judul: "Tanggal",
+                lebar: 9,
+            },
+            laporan::Kolom {
+                judul: "Masuk",
+                lebar: 6,
+            },
+            laporan::Kolom {
+                judul: "Pulang",
+                lebar: 6,
+            },
+            laporan::Kolom {
+                judul: "Status",
+                lebar: 12,
+            },
+            laporan::Kolom {
+                judul: "Telat",
+                lebar: 6,
+            },
+            laporan::Kolom {
+                judul: "Kondisi",
+                lebar: 22,
+            },
+        ],
+        baris,
+        jumlah: rows.len(),
+        total,
+        catatan: None,
+    });
+    let isi_pdf = pdf::render_pdf(&html).await?;
+
+    Ok(respons_pdf(
+        isi_pdf,
+        format!(
+            "verifikasi-absensi-{}.pdf",
+            waktu::hari_ini_wita().format("%Y%m%d")
+        ),
+    ))
+}
+
+/// Ekspor detail absensi satu personel pada periode terpilih menjadi PDF.
+pub async fn ekspor_detail_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<EksporQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola_absensi(&user)?;
+    let (periode, scope) = periode_dan_scope(
+        &state,
+        &user,
+        query.periode_id,
+        query.satker_id,
+        "Anda tidak berhak mengekspor absensi satker tersebut",
+    )
+    .await?;
+
+    let personel_id = query.personel_id.ok_or_else(|| {
+        AppError::BadRequest("Pilih personel terlebih dahulu sebelum mengekspor detail".into())
+    })?;
+
+    let orang = personel::find_by_id(&state.pool, personel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Personel tidak ditemukan".into()))?;
+    if !scope.contains(&orang.satker_id) {
+        return Err(AppError::Forbidden(
+            "Anda tidak berhak mengekspor absensi personel tersebut".into(),
+        ));
+    }
+
+    let (rows, total) = absensi::list_harian(
+        &state.pool,
+        &ListHarianFilter {
+            satker_ids: scope,
+            personel_id: Some(personel_id),
+            dari: Some(periode.tanggal_mulai),
+            sampai: Some(periode.tanggal_selesai),
+            perlu_verifikasi: None,
+            limit: 5000,
+            offset: 0,
+        },
+    )
+    .await?;
+
+    let nama_personel = match orang.nrp.clone() {
+        Some(nrp) => format!("{} ({})", orang.nama, nrp),
+        None => orang.nama.clone(),
+    };
+    let dicetak_oleh = nama_pencetak(&state, &user).await?;
+    let dicetak_pada = waktu_cetak();
+    let nama_satker_map: HashMap<Uuid, String> = satker::list(&state.pool)
+        .await?
+        .into_iter()
+        .map(|row| (row.id, row.nama))
+        .collect();
+    let mut nama_satker = nama_satker_terpilih(&state, query.satker_id).await?;
+    if query.satker_id.is_none() {
+        nama_satker = lokasi_satker(&nama_satker_map, orang.satker_id, orang.unit.as_deref());
+    }
+
+    let mut baris = String::new();
+    for (indeks, row) in rows.iter().enumerate() {
+        let verifikasi = if row.perlu_verifikasi {
+            "Menunggu".to_string()
+        } else if let Some(waktu) = row.verified_at {
+            format!("Terverifikasi {}", ke_wita(waktu).format("%d-%m-%Y %H:%M"))
+        } else {
+            "-".to_string()
+        };
+
+        let catatan = match row.catatan_verifikator.as_deref() {
+            Some(catatan) if !catatan.trim().is_empty() => format!(
+                "{} · {}",
+                catatan_kondisi(row.is_offline, row.is_mock_suspect, !row.luar_radius),
+                catatan
+            ),
+            _ => catatan_kondisi(row.is_offline, row.is_mock_suspect, !row.luar_radius),
+        };
+
+        baris.push_str(&format!(
+            "<tr>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+                <td>{}</td>\
+             </tr>",
+            indeks + 1,
+            laporan::format_tanggal(row.tanggal),
+            label_jam(row.masuk_jam),
+            label_jam(row.pulang_jam),
+            label_status_harian(row),
+            label_menit_telat(row.menit_telat),
+            if row.luar_radius { "Tidak" } else { "Ya" },
+            laporan::esc(&verifikasi),
+            laporan::esc(&catatan),
+        ));
+    }
+
+    let html = laporan::html(&laporan::Laporan {
+        judul: "Detail Absensi Personel",
+        periode: &label_periode(&periode),
+        satker: &nama_satker,
+        personel: &nama_personel,
+        status: "Semua jenis absensi",
+        dicetak_oleh: &dicetak_oleh,
+        dicetak_pada: &dicetak_pada,
+        kolom: vec![
+            laporan::Kolom {
+                judul: "No",
+                lebar: 4,
+            },
+            laporan::Kolom {
+                judul: "Tanggal",
+                lebar: 11,
+            },
+            laporan::Kolom {
+                judul: "Masuk",
+                lebar: 7,
+            },
+            laporan::Kolom {
+                judul: "Pulang",
+                lebar: 7,
+            },
+            laporan::Kolom {
+                judul: "Status",
+                lebar: 16,
+            },
+            laporan::Kolom {
+                judul: "Telat",
+                lebar: 7,
+            },
+            laporan::Kolom {
+                judul: "Radius",
+                lebar: 8,
+            },
+            laporan::Kolom {
+                judul: "Verifikasi",
+                lebar: 14,
+            },
+            laporan::Kolom {
+                judul: "Catatan",
+                lebar: 26,
+            },
+        ],
+        baris,
+        jumlah: rows.len(),
+        total,
+        catatan: None,
+    });
+    let isi_pdf = pdf::render_pdf(&html).await?;
+
+    Ok(respons_pdf(
+        isi_pdf,
+        format!(
+            "detail-absensi-{}.pdf",
+            waktu::hari_ini_wita().format("%Y%m%d")
+        ),
+    ))
 }
 
 #[derive(Debug, Deserialize)]

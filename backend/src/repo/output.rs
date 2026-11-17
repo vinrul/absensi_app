@@ -46,10 +46,11 @@ const LIST_SQL: &str = r#"
      WHERE o.satker_id = ANY($1::uuid[])
        AND ($2::uuid IS NULL OR o.personel_id = $2)
        AND ($3::status_output IS NULL OR o.status = $3)
-       AND ($4::uuid IS NULL OR r.atasan_id = $4)
-       AND (NOT $5::bool OR o.status = 'dalam_verifikasi')
+       AND ($4::uuid IS NULL OR r.periode_id = $4)
+       AND ($5::uuid IS NULL OR r.atasan_id = $5)
+       AND (NOT $6::bool OR o.status = 'dalam_verifikasi')
      ORDER BY o.created_at DESC
-     LIMIT $6 OFFSET $7
+     LIMIT $7 OFFSET $8
 "#;
 
 const LIST_COUNT: &str = r#"
@@ -59,14 +60,16 @@ const LIST_COUNT: &str = r#"
      WHERE o.satker_id = ANY($1::uuid[])
        AND ($2::uuid IS NULL OR o.personel_id = $2)
        AND ($3::status_output IS NULL OR o.status = $3)
-       AND ($4::uuid IS NULL OR r.atasan_id = $4)
-       AND (NOT $5::bool OR o.status = 'dalam_verifikasi')
+       AND ($4::uuid IS NULL OR r.periode_id = $4)
+       AND ($5::uuid IS NULL OR r.atasan_id = $5)
+       AND (NOT $6::bool OR o.status = 'dalam_verifikasi')
 "#;
 
 pub struct ListFilter {
     pub satker_ids: Vec<Uuid>,
     pub personel_id: Option<Uuid>,
     pub status: Option<StatusOutput>,
+    pub periode_id: Option<Uuid>,
     pub atasan_id: Option<Uuid>,
     pub hanya_diajukan: bool,
     pub limit: i64,
@@ -78,6 +81,7 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<OutputRo
         .bind(&filter.satker_ids)
         .bind(filter.personel_id)
         .bind(filter.status)
+        .bind(filter.periode_id)
         .bind(filter.atasan_id)
         .bind(filter.hanya_diajukan)
         .bind(filter.limit)
@@ -89,6 +93,7 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<OutputRo
         .bind(&filter.satker_ids)
         .bind(filter.personel_id)
         .bind(filter.status)
+        .bind(filter.periode_id)
         .bind(filter.atasan_id)
         .bind(filter.hanya_diajukan)
         .fetch_one(pool)
