@@ -1,11 +1,15 @@
 use axum::Json;
 use axum::Router;
+use axum::body::Body;
 use axum::extract::{Path, Query, State};
+use axum::http::{HeaderValue, StatusCode, header};
+use axum::response::Response;
 use axum::routing::{get, patch, post};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::{Datelike, NaiveDate, NaiveTime};
+use chrono::{Datelike, Duration, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::auth::extractor::AuthUser;
@@ -15,8 +19,9 @@ use crate::repo::personel;
 use crate::repo::ph::{
     self, AbsensiPhRow, JadwalPhRow, JadwalPhSayaRow, NewAbsensiPh, StrongPointRow,
 };
+use crate::repo::satker;
 use crate::service::waktu::{hari_ini_wita, ke_wita};
-use crate::service::{akses, geofence, storage};
+use crate::service::{akses, geofence, laporan, pdf, storage};
 use crate::state::AppState;
 
 pub fn routes() -> Router<AppState> {
@@ -30,6 +35,7 @@ pub fn routes() -> Router<AppState> {
             patch(update_strong_point).delete(delete_strong_point),
         )
         .route("/jadwal", get(list_jadwal).post(create_jadwal))
+        .route("/jadwal/ekspor", get(ekspor_jadwal_pdf))
         .route("/jadwal/saya", get(jadwal_saya))
         .route(
             "/jadwal/{id}",
@@ -40,6 +46,7 @@ pub fn routes() -> Router<AppState> {
         .route("/absensi/jadwal/{id}", get(absensi_jadwal))
         .route("/absensi/{id}/verifikasi", post(verifikasi_absensi_ph))
         .route("/rekap", get(rekap_ph))
+        .route("/rekap/ekspor", get(ekspor_rekap_pdf))
 }
 
 #[derive(Debug, Serialize)]
@@ -88,6 +95,7 @@ pub struct JadwalDto {
     pub tanggal: NaiveDate,
     pub jam_mulai: String,
     pub jam_selesai: String,
+    pub regu: Option<String>,
     pub catatan: Option<String>,
     pub jumlah_personel: i64,
     pub personel: Vec<PersonelJadwalDto>,
@@ -105,6 +113,7 @@ pub struct JadwalSayaDto {
     pub tanggal: NaiveDate,
     pub jam_mulai: String,
     pub jam_selesai: String,
+    pub regu: Option<String>,
     pub catatan: Option<String>,
     pub peran: Option<String>,
 }
@@ -122,6 +131,7 @@ impl From<JadwalPhSayaRow> for JadwalSayaDto {
             tanggal: row.tanggal,
             jam_mulai: row.jam_mulai.format("%H:%M").to_string(),
             jam_selesai: row.jam_selesai.format("%H:%M").to_string(),
+            regu: row.regu,
             catatan: row.catatan,
             peran: row.peran,
         }
@@ -192,8 +202,10 @@ pub struct RekapPhDto {
     pub unit: Option<String>,
     pub jumlah_jadwal: i64,
     pub hadir: i64,
-    pub telat: i64,
+    pub hanya_check_in: i64,
     pub tidak_hadir: i64,
+    pub tanggal_tidak_hadir: Vec<NaiveDate>,
+    pub tanggal_hanya_check_in: Vec<NaiveDate>,
     pub menunggu_verifikasi: i64,
 }
 
@@ -317,6 +329,7 @@ async fn jadwal_dto(state: &AppState, row: JadwalPhRow) -> AppResult<JadwalDto> 
         tanggal: row.tanggal,
         jam_mulai: row.jam_mulai.format("%H:%M").to_string(),
         jam_selesai: row.jam_selesai.format("%H:%M").to_string(),
+        regu: row.regu,
         catatan: row.catatan,
         jumlah_personel: row.jumlah_personel,
         personel,
@@ -506,12 +519,51 @@ pub struct PersonelJadwalInput {
 #[derive(Debug, Deserialize)]
 pub struct JadwalRequest {
     pub satker_id: Uuid,
-    pub strong_point_id: Uuid,
+    /// Opsional: dashboard tidak lagi meminta strong point (belum ada titik tetap).
+    pub strong_point_id: Option<Uuid>,
     pub tanggal: NaiveDate,
-    pub jam_mulai: String,
-    pub jam_selesai: String,
+    /// Opsional: bila diisi, satu jadwal dibuat untuk setiap tanggal dalam rentang.
+    pub tanggal_selesai: Option<NaiveDate>,
+    /// Opsional: jadwal dashboard kini hanya per tanggal.
+    pub jam_mulai: Option<String>,
+    pub jam_selesai: Option<String>,
+    /// Nama regu untuk tampilan roster (mis. "Regu 1").
+    pub regu: Option<String>,
     pub catatan: Option<String>,
     pub personel: Vec<PersonelJadwalInput>,
+}
+
+const JAM_MULAI_BAWAAN: &str = "00:00";
+const JAM_SELESAI_BAWAAN: &str = "23:59";
+
+/// Strong point dipilih eksplisit bila dikirim; jika tidak, pakai strong point aktif
+/// pertama milik satker agar check-in/radius lama tetap berjalan.
+async fn strong_point_jadwal(
+    state: &AppState,
+    satker_id: Uuid,
+    diminta: Option<Uuid>,
+) -> AppResult<Uuid> {
+    if let Some(id) = diminta {
+        let titik = ph::find_strong_point(&state.pool, id)
+            .await?
+            .ok_or_else(|| AppError::Unprocessable("Strong point tidak ditemukan".into()))?;
+        if titik.satker_id != satker_id {
+            return Err(AppError::Unprocessable(
+                "Strong point bukan milik satker jadwal".into(),
+            ));
+        }
+        return Ok(id);
+    }
+
+    let rows = ph::list_strong_points(&state.pool, &[satker_id]).await?;
+    rows.into_iter()
+        .find(|row| row.is_active)
+        .map(|row| row.id)
+        .ok_or_else(|| {
+            AppError::Unprocessable(
+                "Satker belum memiliki strong point aktif. Hubungi admin satker.".into(),
+            )
+        })
 }
 
 async fn validasi_personel_jadwal(
@@ -563,16 +615,9 @@ pub async fn create_jadwal(
 ) -> AppResult<Json<JadwalDto>> {
     pastikan_admin(&user)?;
     pastikan_satker_dikelola(&state, &user, req.satker_id).await?;
-    let strong_point = ph::find_strong_point(&state.pool, req.strong_point_id)
-        .await?
-        .ok_or_else(|| AppError::Unprocessable("Strong point tidak ditemukan".into()))?;
-    if strong_point.satker_id != req.satker_id {
-        return Err(AppError::Unprocessable(
-            "Strong point bukan milik satker jadwal".into(),
-        ));
-    }
-    let jam_mulai = parse_time(&req.jam_mulai)?;
-    let jam_selesai = parse_time(&req.jam_selesai)?;
+    let strong_point_id = strong_point_jadwal(&state, req.satker_id, req.strong_point_id).await?;
+    let jam_mulai = parse_time(req.jam_mulai.as_deref().unwrap_or(JAM_MULAI_BAWAAN))?;
+    let jam_selesai = parse_time(req.jam_selesai.as_deref().unwrap_or(JAM_SELESAI_BAWAAN))?;
     if jam_mulai == jam_selesai {
         return Err(AppError::Unprocessable(
             "Jam mulai dan jam selesai tidak boleh sama".into(),
@@ -580,28 +625,56 @@ pub async fn create_jadwal(
     }
     let personel = validasi_personel_jadwal(&state, req.satker_id, &req.personel).await?;
     let ids: Vec<Uuid> = personel.iter().map(|(id, _)| *id).collect();
-    if ph::ada_bentrok(&state.pool, &ids, req.tanggal, jam_mulai, jam_selesai, None).await? {
-        return Err(AppError::Conflict(
-            "Sebagian personel sudah memiliki jadwal PH lain yang beririsan".into(),
+
+    let sampai = req.tanggal_selesai.unwrap_or(req.tanggal);
+    if sampai < req.tanggal {
+        return Err(AppError::Unprocessable(
+            "Tanggal selesai tidak boleh sebelum tanggal mulai".into(),
+        ));
+    }
+    if (sampai - req.tanggal).num_days() > 62 {
+        return Err(AppError::Unprocessable(
+            "Rentang jadwal maksimal 63 hari".into(),
         ));
     }
 
-    let id = Uuid::now_v7();
-    ph::create_jadwal(
-        &state.pool,
-        &ph::JadwalBaru {
-            id,
-            satker_id: req.satker_id,
-            strong_point_id: req.strong_point_id,
-            tanggal: req.tanggal,
-            jam_mulai,
-            jam_selesai,
-            catatan: req.catatan.as_deref(),
-            created_by: user.id(),
-            personel: &personel,
-        },
-    )
-    .await?;
+    let mut tanggal = req.tanggal;
+    while tanggal <= sampai {
+        if ph::ada_bentrok(&state.pool, &ids, tanggal, jam_mulai, jam_selesai, None).await? {
+            return Err(AppError::Conflict(format!(
+                "Sebagian personel sudah memiliki jadwal strong point pada {tanggal}"
+            )));
+        }
+        tanggal += chrono::Duration::days(1);
+    }
+
+    let mut pertama = None;
+    let mut tanggal = req.tanggal;
+    while tanggal <= sampai {
+        let id = Uuid::now_v7();
+        ph::create_jadwal(
+            &state.pool,
+            &ph::JadwalBaru {
+                id,
+                satker_id: req.satker_id,
+                strong_point_id,
+                tanggal,
+                jam_mulai,
+                jam_selesai,
+                regu: req.regu.as_deref(),
+                catatan: req.catatan.as_deref(),
+                created_by: user.id(),
+                personel: &personel,
+            },
+        )
+        .await?;
+        if pertama.is_none() {
+            pertama = Some(id);
+        }
+        tanggal += chrono::Duration::days(1);
+    }
+
+    let id = pertama.ok_or_else(|| AppError::Internal("jadwal PH gagal dibuat".into()))?;
     let row = ph::find_jadwal(&state.pool, id)
         .await?
         .ok_or_else(|| AppError::Internal("jadwal PH gagal dibuat".into()))?;
@@ -624,16 +697,18 @@ pub async fn update_jadwal(
             "Satker jadwal tidak boleh dipindah lewat pembaruan".into(),
         ));
     }
-    let strong_point = ph::find_strong_point(&state.pool, req.strong_point_id)
-        .await?
-        .ok_or_else(|| AppError::Unprocessable("Strong point tidak ditemukan".into()))?;
-    if strong_point.satker_id != existing.satker_id {
-        return Err(AppError::Unprocessable(
-            "Strong point bukan milik satker jadwal".into(),
-        ));
-    }
-    let jam_mulai = parse_time(&req.jam_mulai)?;
-    let jam_selesai = parse_time(&req.jam_selesai)?;
+    let strong_point_id = match req.strong_point_id {
+        Some(id) => strong_point_jadwal(&state, existing.satker_id, Some(id)).await?,
+        None => existing.strong_point_id,
+    };
+    let jam_mulai = match req.jam_mulai.as_deref() {
+        Some(nilai) => parse_time(nilai)?,
+        None => existing.jam_mulai,
+    };
+    let jam_selesai = match req.jam_selesai.as_deref() {
+        Some(nilai) => parse_time(nilai)?,
+        None => existing.jam_selesai,
+    };
     if jam_mulai == jam_selesai {
         return Err(AppError::Unprocessable(
             "Jam mulai dan jam selesai tidak boleh sama".into(),
@@ -658,10 +733,11 @@ pub async fn update_jadwal(
     ph::update_jadwal(
         &state.pool,
         id,
-        req.strong_point_id,
+        strong_point_id,
         req.tanggal,
         jam_mulai,
         jam_selesai,
+        req.regu.as_deref(),
         req.catatan.as_deref(),
         &personel,
     )
@@ -918,8 +994,10 @@ pub async fn rekap_ph(
             unit: row.unit,
             jumlah_jadwal: row.jumlah_jadwal,
             hadir: row.hadir,
-            telat: row.telat,
+            hanya_check_in: row.hanya_check_in,
             tidak_hadir: row.tidak_hadir,
+            tanggal_tidak_hadir: row.tanggal_tidak_hadir,
+            tanggal_hanya_check_in: row.tanggal_hanya_check_in,
             menunggu_verifikasi: row.menunggu_verifikasi,
         })
         .collect();
@@ -927,4 +1005,293 @@ pub async fn rekap_ph(
         "periode": { "dari": dari, "sampai": sampai },
         "data": data,
     })))
+}
+
+// --------------------------------------------------------------- ekspor PDF
+
+fn respons_pdf(isi: Vec<u8>, nama_berkas: String) -> Response {
+    let disposisi = HeaderValue::from_str(&format!("attachment; filename=\"{nama_berkas}\""))
+        .unwrap_or_else(|_| HeaderValue::from_static("attachment"));
+
+    let mut response = Response::new(Body::from(isi));
+    *response.status_mut() = StatusCode::OK;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/pdf"),
+    );
+    response
+        .headers_mut()
+        .insert(header::CONTENT_DISPOSITION, disposisi);
+    response
+}
+
+fn scope_ekspor(user: &AuthUser, satker_id: Option<Uuid>) -> AppResult<Vec<Uuid>> {
+    let mut scope = user.satker_akses().to_vec();
+    if let Some(id) = satker_id {
+        if !scope.contains(&id) {
+            return Err(AppError::Forbidden(
+                "Anda tidak berhak mengekspor satker tersebut".into(),
+            ));
+        }
+        scope = vec![id];
+    }
+    Ok(scope)
+}
+
+async fn nama_satker_ekspor(state: &AppState, satker_id: Option<Uuid>) -> AppResult<String> {
+    match satker_id {
+        Some(id) => Ok(satker::find(&state.pool, id)
+            .await?
+            .map(|row| row.nama)
+            .unwrap_or_else(|| "-".into())),
+        None => Ok("Semua Satker".into()),
+    }
+}
+
+async fn nama_pencetak(state: &AppState, user: &AuthUser) -> AppResult<String> {
+    Ok(personel::find_by_id(&state.pool, user.id())
+        .await?
+        .map(|row| row.nama)
+        .unwrap_or_else(|| "-".into()))
+}
+
+fn waktu_cetak() -> String {
+    (Utc::now() + Duration::hours(8))
+        .format("%d-%m-%Y %H:%M WITA")
+        .to_string()
+}
+
+fn label_periode_bulan(dari: NaiveDate, sampai: NaiveDate) -> String {
+    format!(
+        "{} s.d. {}",
+        laporan::format_tanggal(dari),
+        laporan::format_tanggal(sampai)
+    )
+}
+
+fn label_tanggal_pendek(daftar: &[NaiveDate]) -> String {
+    if daftar.is_empty() {
+        return "-".into();
+    }
+    daftar
+        .iter()
+        .map(|tanggal| tanggal.format("%d/%m").to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Sel jumlah yang dilengkapi daftar tanggal pendek di bawahnya.
+fn sel_jumlah_tanggal(jumlah: i64, tanggal: &[NaiveDate], warna: &str) -> String {
+    if jumlah == 0 {
+        return "-".into();
+    }
+    format!(
+        "<strong>{jumlah}</strong><br><span style=\"color:{warna};font-size:8px\">{}</span>",
+        laporan::esc(&label_tanggal_pendek(tanggal))
+    )
+}
+
+/// Ekspor jadwal strong point sebulan menjadi PDF.
+pub async fn ekspor_jadwal_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<BulanQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola(&user)?;
+    let (dari, sampai) = rentang_bulan(query.bulan.as_deref())?;
+    let scope = scope_ekspor(&user, query.satker_id)?;
+    let rows = ph::list_jadwal(&state.pool, &scope, dari, sampai).await?;
+
+    let nama_satker_map: HashMap<Uuid, String> = satker::list(&state.pool)
+        .await?
+        .into_iter()
+        .map(|row| (row.id, row.nama))
+        .collect();
+
+    let mut baris = String::new();
+    for (indeks, row) in rows.iter().enumerate() {
+        let anggota = ph::personel_jadwal(&state.pool, row.id)
+            .await?
+            .into_iter()
+            .map(|personel| {
+                format!(
+                    "{} ({})",
+                    laporan::esc(&personel.nama),
+                    laporan::esc(&personel.pangkat)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("<br>");
+        let satker_nama = nama_satker_map
+            .get(&row.satker_id)
+            .cloned()
+            .unwrap_or_else(|| "-".into());
+        let regu = row.regu.clone().unwrap_or_else(|| "-".into());
+        let catatan = row.catatan.clone().unwrap_or_else(|| "-".into());
+        baris.push_str(&format!(
+            "<tr>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+                <td>{}</td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+             </tr>",
+            indeks + 1,
+            laporan::format_tanggal(row.tanggal),
+            laporan::esc(&satker_nama),
+            laporan::esc(&regu),
+            anggota,
+            row.jumlah_personel,
+            laporan::esc(&catatan),
+        ));
+    }
+
+    let html = laporan::html(&laporan::Laporan {
+        judul: "Jadwal Strong Point",
+        periode: &label_periode_bulan(dari, sampai),
+        satker: &nama_satker_ekspor(&state, query.satker_id).await?,
+        personel: "Semua Personel",
+        status: "Semua regu",
+        dicetak_oleh: &nama_pencetak(&state, &user).await?,
+        dicetak_pada: &waktu_cetak(),
+        kolom: vec![
+            laporan::Kolom {
+                judul: "No",
+                lebar: 4,
+            },
+            laporan::Kolom {
+                judul: "Tanggal",
+                lebar: 10,
+            },
+            laporan::Kolom {
+                judul: "Satker",
+                lebar: 19,
+            },
+            laporan::Kolom {
+                judul: "Regu",
+                lebar: 10,
+            },
+            laporan::Kolom {
+                judul: "Anggota",
+                lebar: 36,
+            },
+            laporan::Kolom {
+                judul: "Jumlah",
+                lebar: 7,
+            },
+            laporan::Kolom {
+                judul: "Catatan",
+                lebar: 14,
+            },
+        ],
+        baris,
+        jumlah: rows.len(),
+        total: rows.len() as i64,
+        catatan: None,
+    });
+    let pdf = pdf::render_pdf(&html).await?;
+    Ok(respons_pdf(
+        pdf,
+        format!(
+            "jadwal-strong-point-{}-{}.pdf",
+            dari.format("%Y%m%d"),
+            sampai.format("%Y%m%d")
+        ),
+    ))
+}
+
+/// Ekspor rekap kehadiran strong point sebulan menjadi PDF.
+pub async fn ekspor_rekap_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<BulanQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola(&user)?;
+    let (dari, sampai) = rentang_bulan(query.bulan.as_deref())?;
+    let scope = scope_ekspor(&user, query.satker_id)?;
+    let rows = ph::rekap_ph(&state.pool, &scope, dari, sampai).await?;
+
+    let mut baris = String::new();
+    for (indeks, row) in rows.iter().enumerate() {
+        baris.push_str(&format!(
+            "<tr>\
+                <td style=\"text-align:center\">{}</td>\
+                <td><strong>{}</strong><br><span style=\"color:#64748b\">{}</span></td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+             </tr>",
+            indeks + 1,
+            laporan::esc(&row.nama),
+            laporan::esc(&row.nrp),
+            laporan::esc(row.unit.as_deref().unwrap_or("-")),
+            row.jumlah_jadwal,
+            row.hadir,
+            sel_jumlah_tanggal(row.hanya_check_in, &row.tanggal_hanya_check_in, "#b45309"),
+            sel_jumlah_tanggal(row.tidak_hadir, &row.tanggal_tidak_hadir, "#be123c"),
+            row.menunggu_verifikasi,
+        ));
+    }
+
+    let html = laporan::html(&laporan::Laporan {
+        judul: "Rekap Strong Point",
+        periode: &label_periode_bulan(dari, sampai),
+        satker: &nama_satker_ekspor(&state, query.satker_id).await?,
+        personel: "Semua Personel",
+        status: "Semua jadwal strong point",
+        dicetak_oleh: &nama_pencetak(&state, &user).await?,
+        dicetak_pada: &waktu_cetak(),
+        kolom: vec![
+            laporan::Kolom {
+                judul: "No",
+                lebar: 4,
+            },
+            laporan::Kolom {
+                judul: "Personel",
+                lebar: 24,
+            },
+            laporan::Kolom {
+                judul: "Unit",
+                lebar: 16,
+            },
+            laporan::Kolom {
+                judul: "Jadwal",
+                lebar: 7,
+            },
+            laporan::Kolom {
+                judul: "Check-in",
+                lebar: 8,
+            },
+            laporan::Kolom {
+                judul: "Hanya Check-in",
+                lebar: 15,
+            },
+            laporan::Kolom {
+                judul: "Tidak Strong Point",
+                lebar: 18,
+            },
+            laporan::Kolom {
+                judul: "Menunggu",
+                lebar: 8,
+            },
+        ],
+        baris,
+        jumlah: rows.len(),
+        total: rows.len() as i64,
+        catatan: None,
+    });
+    let pdf = pdf::render_pdf(&html).await?;
+    Ok(respons_pdf(
+        pdf,
+        format!(
+            "rekap-strong-point-{}-{}.pdf",
+            dari.format("%Y%m%d"),
+            sampai.format("%Y%m%d")
+        ),
+    ))
 }

@@ -150,6 +150,7 @@ export interface AbsensiHarian {
 	luar_radius: boolean;
 	perlu_verifikasi: boolean;
 	perlu_verifikasi_ids: string[];
+	ph_hadir: boolean;
 	verified_at: string | null;
 	catatan_verifikator: string | null;
 	menit_telat: number;
@@ -459,6 +460,7 @@ export interface JadwalPh {
 	tanggal: string;
 	jam_mulai: string;
 	jam_selesai: string;
+	regu: string | null;
 	catatan: string | null;
 	jumlah_personel: number;
 	personel: PersonelJadwalPh[];
@@ -475,6 +477,7 @@ export interface JadwalPhSaya {
 	tanggal: string;
 	jam_mulai: string;
 	jam_selesai: string;
+	regu: string | null;
 	catatan: string | null;
 	peran: string | null;
 }
@@ -512,7 +515,9 @@ export interface RekapPh {
 	unit: string | null;
 	jumlah_jadwal: number;
 	hadir: number;
-	telat: number;
+	hanya_check_in: number;
 	tidak_hadir: number;
+	tanggal_tidak_hadir: string[];
+	tanggal_hanya_check_in: string[];
 	menunggu_verifikasi: number;
 }

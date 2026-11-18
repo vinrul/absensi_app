@@ -3,7 +3,7 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 17 November 2026 (backend unit test + 48 cek API pada DB uji;
+Terakhir diverifikasi: 18 November 2026 (backend unit test + 48 cek API pada DB uji;
 dashboard `bun run check`/`build`; APK debug; `openapi.json` 83 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
@@ -28,11 +28,11 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | CRUD personel + atasan + peran/cakupan + reset password | halaman **Data Personel**; form tanpa unit/email, pangkat combobox 21 tingkat |
 | Pagination seragam di seluruh modul daftar | komponen `Pagination.svelte`; lihat CHECKLIST §3.24 |
 | CRUD akun admin + username + cakupan + reset password | halaman **Akun Admin** (`/admin`) |
-| Modul PH / Strong Point terpisah | migrasi `0006`, `/ph/*`, halaman **PH & Strong Point** |
+| Modul PH / Strong Point terpisah | migrasi `0006`, `/ph/*`, halaman **Strong Point** (tab master disembunyikan sementara) |
 | Jam server palsu development (`fake`) | `/dev/waktu` + `cargo run --bin fake --`; hanya aktif dengan `APP__ALLOW_FAKE_TIME=true` |
 | Absensi Android bertahap + peta OSM | tombol besar → validasi GPS/peta → status → kirim/offline; `PetaAbsensi.kt` |
 | Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
-| Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422 |
+| Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; rekap menandai tidak strong point / hanya check-in |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00 & 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
@@ -40,9 +40,10 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Rencana kerja + persetujuan + lampiran | e2e alur penuh + wizard Android 4 langkah (jenis → dasar → rincian kegiatan → lampiran); seed menyediakan contoh draft/diajukan/perlu revisi |
 | Hasil kerja + verifikasi | e2e API + wizard Android 3 langkah (pilih rencana → realisasi → bukti), draf, kirim, perbaikan; progres memakai slider 0–100 |
 | Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
-| Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs` + hari PH dikecualikan |
+| Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser; Rencana/Hasil/Output memiliki halaman detail + lampiran, filter periode/status/satker/personel, dan **Export PDF** lewat Chrome/Edge headless |
 | Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
+| Strong Point: roster + Export PDF | Jadwal memakai roster bulanan (anggota × tanggal, blok regu) dengan input rentang tanggal satu-per-satu; rekap menandai tidak strong point/hanya check-in beserta tanggal, tanpa kolom telat; PDF `/ph/jadwal/ekspor` & `/ph/rekap/ekspor` (uji API) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
@@ -148,9 +149,24 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
 16. **Peran ber-scope, bukan peran datar.** `personel_role.scope_satker_id` menentukan
     cakupan admin/pimpinan. `AuthUser` memuat `role_scopes` + `satker_akses` yang dihitung
     per request; jangan menggantinya dengan pengecekan `roles.contains()` saja.
-17. **PH/Strong Point terpisah dari absensi harian.** Hari yang punya jadwal PH dikeluarkan
-    dari skor absensi (`service/penilaian.rs`), tetapi tetap masuk rekap PH. Check-in dan
-    **check-out** sama-sama wajib lokasi & radius agar tidak bisa absen pulang dari rumah.
+17. **PH/Strong Point terpisah tetapi terkait absensi kantor.** Hari ber-jadwal PH tetap
+    dihitung sebagai absensi kantor; **keterlambatan kantor diabaikan hanya bila personel
+    check-in strong point** (`repo/ph.rs::tanggal_personel_hadir` +
+    `scoring::skor_harian_dengan_strong_point`). Bila jadwal tidak dijalankan, telat dihitung
+    normal; pulang cepat tetap dihitung. Rekap PH menyimpan `hanya_check_in`,
+    `tanggal_tidak_hadir`, dan `tanggal_hanya_check_in`. Check-in dan **check-out** sama-sama
+    wajib lokasi & radius agar tidak bisa absen pulang dari rumah. Tab master strong point
+    disembunyikan sementara karena strong point belum punya titik tetap. Form jadwal dashboard
+    hanya meminta satker/tanggal/catatan/personel; `JadwalRequest.strong_point_id` dan jam
+    bersifat opsional — backend memakai strong point aktif pertama satker dan waktu bawaan
+    `00:00–23:59`, sedangkan edit tanpa jam mempertahankan nilai lama. Jadwal juga menyimpan
+    `regu`; `tanggal_selesai` membuat satu baris jadwal per tanggal dalam rentang (divalidasi
+    bentrok untuk seluruh tanggal sebelum disimpan). Tab **Jadwal Strong Point** menampilkan
+    roster bulanan ala spreadsheet: anggota × tanggal 1–akhir bulan, blok biru berlabel regu untuk
+    rentang tanggal yang dijadwalkan. Jadwal dan rekap dapat diekspor PDF lewat Chrome/Edge
+    headless (`/ph/jadwal/ekspor`, `/ph/rekap/ekspor`); rekap tidak lagi menampilkan telat karena
+    jadwal dashboard tidak memakai jam mulai/selesai. Seed memberi Ditreskrimsus jadwal penuh
+    tanggal 1–akhir bulan berjalan sebagai contoh roster.
 18. **Pengingat jadwal tanpa FCM.** Android memakai WorkManager + notifikasi lokal
     (H-1 19:00 dan 60 menit sebelum). Tidak ada ketergantungan layanan push eksternal.
 19. **Database uji terpisah (`kinerja_test`).** Seed demo ada di `kinerja_db`; skrip e2e
@@ -209,8 +225,16 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
 - `lib/components/Modal.svelte` mengunci tinggi maksimal pada viewport, membuat header/tombol tutup
   tetap terlihat, dan menggulir isi saja. Tombol aksi diletakkan pada snippet `footer`
   (contoh modal **Buat Rencana Kerja**) agar selalu tampil tanpa perlu menggulir.
-- Item sidebar **Absensi Saya** dan **Persetujuan** sementara disembunyikan (baris dikomentari di
-  `(app)/+layout.svelte`); halaman dan API-nya tetap aktif bila diakses langsung.
+- Item sidebar **Absensi Saya** dan **Persetujuan** tidak dimasukkan ke struktur menu baru; halaman
+  dan API-nya tetap aktif bila diakses langsung.
+- **Sidebar bergrup** dengan submenu yang dapat dilipat (`(app)/+layout.svelte`):
+  **Dashboard**; **Master Data** (Satker & Jam Kerja, Titik Dinas, Hari Libur, Data Personel);
+  **Absensi** (Rekap Kehadiran, Detail Rekap, Verifikasi Offline); **Strong Point**
+  (Jadwal Strong Point, Rekap Strong Point); **Kinerja** (Rencana Kerja, Hasil Kerja, Output);
+  **Laporan** (Penilaian, Print Laporan); **Pengaturan** (Akun Admin, Kesiapan Periode, Periode).
+  Grup otomatis terbuka saat salah satu submenunya aktif; submenu Absensi memakai
+  `/absensi/rekap?tab=rekap|detail|verifikasi` dan Strong Point memakai
+  `/ph?tab=jadwal|rekap` sehingga sidebar dan tab di halaman tetap sinkron.
 - **Ekspor PDF** dashboard: halaman Rencana Kerja, Hasil Kerja, Output, dan **Rekap Absensi** mengirim filter ke
   `GET /{modul}/ekspor` (absensi: `rekap/ekspor`, `verifikasi/ekspor`, `detail/ekspor`) dengan bearer token
   lewat `apiBlob` (`#lib/api/client`), lalu mengunduh blob.
@@ -357,7 +381,7 @@ GET    /docs              # di luar /api/v1
 `personel.nrp` hanya wajib untuk `jenis_akun='personel'`; `personel.username` hanya wajib
 untuk `jenis_akun='admin'` (constraint `personel_identitas_check`).
 
-Migrasi: `backend/migrations/0001_init.sql` … `0013_rencana_tahapan_rincian.sql`. Status absensi
+Migrasi: `backend/migrations/0001_init.sql` … `0015_jadwal_ph_regu.sql` (regu roster strong point). Status absensi
 `libur_nasional` menggantikan nama lama `ph` (nama `ph` sekarang khusus modul PH).
 Tambah migrasi baru = file `000N_nama.sql` lalu `sqlx migrate run` + `cargo sqlx prepare` bila
 memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).

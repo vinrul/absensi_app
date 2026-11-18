@@ -26,9 +26,12 @@ personel yang dinilai.
 - **Sabtu setengah hari**: bila Sabtu termasuk hari kerja dan `satker.jam_pulang_sabtu` terisi,
   jam pulang standar hari Sabtu memakai nilai tersebut (mis. 10:00/12:00). Hari lain memakai
   `satker.jam_pulang`.
-- **Hari yang memiliki jadwal PH untuk personel tersebut dikeluarkan dari perhitungan absensi
-  harian** (netral), karena kehadirannya dinilai pada rekap PH terpisah. Detail perhitungan
-  menyimpan jumlah hari tersebut pada `detail.hari_ph`.
+- **Hari dengan jadwal strong point tetap dihitung sebagai absensi kantor.** Bila personel
+  melakukan **check-in strong point** pada hari itu, penalti **keterlambatan** absensi kantor
+  diabaikan (pulang cepat tetap dihitung). Bila jadwal strong point tidak dijalankan sama sekali,
+  absensi kantor dihitung normal termasuk keterlambatan. Detail perhitungan menyimpan
+  `detail.hari_ph` (jumlah hari ber-jadwal) dan `detail.hari_ph_dilakukan` (jumlah hari dengan
+  check-in strong point).
 - Hari kerja tanpa catatan absensi dihitung **0** (dianggap tanpa keterangan).
 - Periode berjalan hanya menghitung hari sampai kemarin agar personel tidak
   dihukum untuk hari yang belum terjadi.

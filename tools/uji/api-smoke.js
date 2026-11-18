@@ -11,7 +11,13 @@ const BIN_API = `./target/debug/kinerja-api${AKHIRAN}`;
 console.log("Menyiapkan database uji (seed --reset)...");
 const seed = Bun.spawnSync([BIN_SEED, "--reset"], {
 	cwd: "backend",
-	env: { ...process.env, APP__DATABASE_URL: DATABASE_URL, APP__UPLOAD_DIR: "./data-test/uploads" },
+	env: {
+		...process.env,
+		APP__DATABASE_URL: DATABASE_URL,
+		APP__UPLOAD_DIR: "./data-test/uploads",
+		// Database uji memakai contoh jadwal 3–5 agar skenario jadwal hari ini tidak bentrok.
+		APP__SEED_FULL_ROSTER: "false"
+	},
 	stdout: "inherit",
 	stderr: "inherit"
 });

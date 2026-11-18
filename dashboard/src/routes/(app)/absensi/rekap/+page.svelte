@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { api, apiBlob, apiBlobUrl, ApiError } from '#lib/api/client';
 	import type {
 		AbsensiHarian,
@@ -220,8 +222,26 @@
 	function pilihTab(id: TabId) {
 		tab = id;
 		error = null;
+		if (page.url.searchParams.get('tab') !== id) {
+			goto(`/absensi/rekap?tab=${id}`, { replace: true, reset: false });
+		}
 		muatTab(id);
 	}
+
+	let tabUrlTerakhir = '';
+
+	// Sidebar dapat berpindah submenu pada route yang sama; ikuti nilai `?tab=`.
+	$effect(() => {
+		const nilai = page.url.searchParams.get('tab') ?? 'rekap';
+		if (nilai === tabUrlTerakhir) return;
+		tabUrlTerakhir = nilai;
+		if (nilai === 'rekap' || nilai === 'verifikasi' || nilai === 'detail') {
+			if (nilai !== tab) {
+				tab = nilai;
+				if (periodeList.length) muatTab(nilai);
+			}
+		}
+	});
 
 	function ubahSatker(id: TabId) {
 		const aktif = filter[id];
@@ -328,7 +348,10 @@
 		filter.verifikasi.periode_id = periodeAwal;
 		filter.detail.periode_id = periodeAwal;
 
-		await muatRekap();
+		const tabAwal = page.url.searchParams.get('tab');
+		if (tabAwal === 'verifikasi' || tabAwal === 'detail') tab = tabAwal;
+
+		await muatTab(tab);
 	});
 </script>
 
@@ -721,7 +744,12 @@
 							{#each detail?.data ?? [] as row (row.personel_id + row.tanggal)}
 								{@const status = statusHarian(row)}
 								<tr class="hover:bg-slate-50/70">
-									<td class="td text-slate-600">{tanggalSingkat(row.tanggal)}</td>
+									<td class="td text-slate-600">
+										{tanggalSingkat(row.tanggal)}
+										{#if row.ph_hadir}
+											<Badge tone="blue">Strong point</Badge>
+										{/if}
+									</td>
 									<td class="td text-center font-medium text-slate-800">
 										{row.masuk_jam ?? '—'}
 									</td>
@@ -739,6 +767,7 @@
 										class="td text-center {row.menit_telat > 0
 											? 'font-medium text-amber-700'
 											: 'text-slate-400'}"
+										title={row.ph_hadir ? 'Telat kantor diabaikan karena check-in strong point' : undefined}
 									>
 										{telatHarian(row)}
 									</td>

@@ -80,10 +80,12 @@
         "type": "object",
         "properties": {
           "satker_id": { "type": "string", "format": "uuid" },
-          "strong_point_id": { "type": "string", "format": "uuid" },
+          "strong_point_id": { "type": "string", "format": "uuid", "nullable": true, "description": "Opsional; jika kosong dipakai strong point aktif pertama milik satker" },
           "tanggal": { "type": "string", "format": "date" },
-          "jam_mulai": { "type": "string", "example": "20:00" },
-          "jam_selesai": { "type": "string", "example": "23:00" },
+          "tanggal_selesai": { "type": "string", "format": "date", "nullable": true, "description": "Opsional; satu jadwal dibuat per tanggal dalam rentang" },
+          "jam_mulai": { "type": "string", "nullable": true, "example": "20:00", "description": "Opsional; default 00:00" },
+          "jam_selesai": { "type": "string", "nullable": true, "example": "23:00", "description": "Opsional; default 23:59" },
+          "regu": { "type": "string", "nullable": true, "description": "Nama regu untuk roster, mis. Regu 1" },
           "catatan": { "type": "string", "nullable": true },
           "personel": {
             "type": "array",
@@ -98,7 +100,7 @@
             }
           }
         },
-        "required": ["satker_id", "strong_point_id", "tanggal", "jam_mulai", "jam_selesai", "personel"]
+        "required": ["satker_id", "tanggal", "personel"]
       },
       "Error": {
         "type": "object",
@@ -709,9 +711,20 @@
       "post": {
         "tags": ["ph"],
         "summary": "Susun jadwal PH (admin satker)",
-        "description": "Menolak (422) bila personel sudah punya jadwal PH pada jam yang beririsan di tanggal yang sama.",
+        "description": "Menerima rentang tanggal (tanggal s/d tanggal_selesai) dan membuat satu jadwal per tanggal. Menolak (409) bila personel sudah punya jadwal pada salah satu tanggal.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JadwalPhRequest" } } } },
         "responses": { "200": { "description": "Jadwal dibuat" }, "403": { "description": "Di luar cakupan admin" }, "422": { "description": "Jadwal bentrok / personel tidak valid" } }
+      }
+    },
+    "/ph/jadwal/ekspor": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Ekspor jadwal strong point ke PDF",
+        "parameters": [
+          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" } }
       }
     },
     "/ph/jadwal/saya": {
@@ -798,6 +811,17 @@
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Rekap PH" }, "403": { "description": "Di luar cakupan" } }
+      }
+    },
+    "/ph/rekap/ekspor": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Ekspor rekap strong point ke PDF",
+        "parameters": [
+          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" } }
       }
     },
     "/absensi": {

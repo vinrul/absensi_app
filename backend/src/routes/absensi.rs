@@ -520,6 +520,7 @@ pub struct AbsensiHarianDto {
     pub luar_radius: bool,
     pub perlu_verifikasi: bool,
     pub perlu_verifikasi_ids: Vec<Uuid>,
+    pub ph_hadir: bool,
     pub verified_at: Option<DateTime<Utc>>,
     pub catatan_verifikator: Option<String>,
     pub menit_telat: i64,
@@ -545,6 +546,7 @@ impl From<AbsensiHarianRow> for AbsensiHarianDto {
             luar_radius: row.luar_radius,
             perlu_verifikasi: row.perlu_verifikasi,
             perlu_verifikasi_ids: row.perlu_verifikasi_ids,
+            ph_hadir: row.ph_hadir,
             verified_at: row.verified_at,
             catatan_verifikator: row.catatan_verifikator,
             menit_telat: row.menit_telat,
@@ -989,7 +991,10 @@ pub async fn ekspor_rekap_pdf(
         baris,
         jumlah: rows.len(),
         total: rows.len() as i64,
-        catatan: Some(format!("Total {} personel.", rows.len())),
+        catatan: Some(format!(
+            "Menit telat hanya menghitung hari tanpa check-in strong point. Total {} personel.",
+            rows.len()
+        )),
     });
     let isi_pdf = pdf::render_pdf(&html).await?;
 
@@ -1215,6 +1220,15 @@ pub async fn ekspor_detail_pdf(
                 catatan
             ),
             _ => catatan_kondisi(row.is_offline, row.is_mock_suspect, !row.luar_radius),
+        };
+        let catatan = if row.ph_hadir {
+            if catatan == "-" {
+                "Strong point".to_string()
+            } else {
+                format!("Strong point · {catatan}")
+            }
+        } else {
+            catatan
         };
 
         baris.push_str(&format!(

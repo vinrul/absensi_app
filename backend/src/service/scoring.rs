@@ -34,7 +34,7 @@ fn menit_terlambat(aktual: NaiveTime, standar: NaiveTime) -> i64 {
 
 /// Skor satu hari absensi.
 ///
-/// `None` berarti hari tersebut netral (PH/cuti/izin/sakit) sehingga
+/// `None` berarti hari tersebut netral (cuti/izin/sakit/libur) sehingga
 /// dikeluarkan dari penyebut rata-rata.
 pub fn skor_harian(
     status: StatusKehadiran,
@@ -42,6 +42,42 @@ pub fn skor_harian(
     jam_pulang: Option<NaiveTime>,
     standar_masuk: NaiveTime,
     standar_pulang: NaiveTime,
+) -> Option<f64> {
+    skor_harian_internal(
+        status,
+        jam_masuk,
+        jam_pulang,
+        standar_masuk,
+        standar_pulang,
+        false,
+    )
+}
+
+/// Skor hari yang juga memiliki strong point: keterlambatan absensi kantor diabaikan.
+pub fn skor_harian_dengan_strong_point(
+    status: StatusKehadiran,
+    jam_masuk: Option<NaiveTime>,
+    jam_pulang: Option<NaiveTime>,
+    standar_masuk: NaiveTime,
+    standar_pulang: NaiveTime,
+) -> Option<f64> {
+    skor_harian_internal(
+        status,
+        jam_masuk,
+        jam_pulang,
+        standar_masuk,
+        standar_pulang,
+        true,
+    )
+}
+
+fn skor_harian_internal(
+    status: StatusKehadiran,
+    jam_masuk: Option<NaiveTime>,
+    jam_pulang: Option<NaiveTime>,
+    standar_masuk: NaiveTime,
+    standar_pulang: NaiveTime,
+    abaikan_telat: bool,
 ) -> Option<f64> {
     if status == StatusKehadiran::TanpaKeterangan {
         return Some(0.0);
@@ -57,7 +93,11 @@ pub fn skor_harian(
         return Some(0.0);
     };
 
-    let telat = menit_terlambat(masuk, standar_masuk);
+    let telat = if abaikan_telat {
+        0
+    } else {
+        menit_terlambat(masuk, standar_masuk)
+    };
     let penalti_telat = ((telat as f64) / 10.0).floor().min(20.0);
 
     let (dasar, penalti_pulang) = match jam_pulang {
@@ -193,6 +233,30 @@ mod tests {
             t(16, 0),
         );
         assert_eq!(skor, Some(100.0));
+    }
+
+    #[test]
+    fn strong_point_menetralkan_telat_kantor() {
+        let skor = skor_harian_dengan_strong_point(
+            StatusKehadiran::DinasKantor,
+            Some(t(9, 30)),
+            Some(t(16, 5)),
+            t(8, 0),
+            t(16, 0),
+        );
+        assert_eq!(skor, Some(100.0));
+    }
+
+    #[test]
+    fn strong_point_tetap_hitung_pulang_cepat() {
+        let skor = skor_harian_dengan_strong_point(
+            StatusKehadiran::DinasKantor,
+            Some(t(9, 30)),
+            Some(t(15, 45)),
+            t(8, 0),
+            t(16, 0),
+        );
+        assert_eq!(skor, Some(99.0));
     }
 
     #[test]

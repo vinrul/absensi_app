@@ -95,28 +95,36 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.44 | Tab Rekap Absensi: kehadiran, verifikasi, detail per orang | ✅ | `absensi/rekap/+page.svelte`; tiap tab punya filter sendiri; filter subdit/bagian dihapus dari rekap; kolom **Menit** menampilkan total menit telat Dinas Kantor |
 | 3.45 | Export PDF rekap, verifikasi, dan detail absensi | ✅ | `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (Chrome/Edge headless); rekap memuat baris jumlah + menit telat |
 | 3.46 | Gabung absen masuk & pulang per tanggal | ✅ | `GET /absensi/harian` (dipakai tab Verifikasi & Detail + PDF); menit telat dihitung untuk status Dinas Kantor yang melewati jam masuk satker |
+| 3.47 | Sidebar dashboard bergrup dengan submenu | ✅ | Dashboard; Master Data; Absensi (Rekap Kehadiran/Detail Rekap/Verifikasi Offline via `?tab=`); Strong Point (Jadwal/Rekap via `?tab=`); Kinerja; Laporan (Penilaian/Print Laporan); Pengaturan (Akun Admin/Kesiapan Periode/Periode); grup aktif terbuka otomatis |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
 | 4.1 | Tabel `strong_point`, `jadwal_ph`, `jadwal_ph_personel`, `absensi_ph` | ✅ | migrasi `0006_ph.sql` |
-| 4.2 | CRUD strong point per satker (titik + radius) | ✅ | dashboard tab **Strong Point** |
-| 4.3 | Jadwal PH per satker per bulan | ✅ | filter `?bulan=YYYY-MM&satker_id=` |
+| 4.2 | CRUD strong point per satker (titik + radius) | ✅ | API + modal tetap ada; tab master **disembunyikan sementara** karena strong point belum punya titik tetap |
+| 4.3 | Jadwal PH per satker per bulan | ✅ | filter `?bulan=YYYY-MM&satker_id=`; form dashboard hanya satker, tanggal, catatan, personel (tanpa strong point & jam) |
 | 4.4 | Satu jadwal berisi banyak personel + peran | ✅ | mis. ketua/anggota |
 | 4.5 | Deteksi bentrok jadwal personel | ✅ | `repo/ph.rs::ada_bentrok` (jam beririsan) |
-| 4.6 | Tiap personel dapat jadwal berbeda tiap bulan | ✅ | 63 jadwal contoh pada seed |
+| 4.6 | Tiap personel dapat jadwal berbeda tiap bulan | ✅ | seed: 90 jadwal contoh (Ditreskrimsus Polda Bali setiap tanggal 1–30) |
 | 4.7 | Check-in PH **wajib lokasi** | ✅ | HTTP 422 bila GPS kosong |
 | 4.8 | Check-out PH **wajib lokasi** | ✅ | lokasi diambil ulang saat check-out |
 | 4.9 | Validasi radius strong point sisi server | ✅ | jarak dihitung Haversine |
 | 4.10 | Idempotensi `client_uuid` | ✅ | kirim ulang tidak menggandakan |
 | 4.11 | Rekap PH terpisah (check-in/out per orang) | ✅ | `GET /ph/rekap` + tab **Rekap PH** |
-| 4.12 | Hari ber-jadwal PH dikeluarkan dari skor absensi harian | ✅ | `service/penilaian.rs` + detail `hari_ph` |
+| 4.12 | Hari strong point tetap dinilai absensi kantor | ✅ | Telat kantor diabaikan bila check-in strong point; bila tidak strong point, telat dihitung; pulang cepat tetap dihitung (`skor_harian_dengan_strong_point`) |
 | 4.13 | Absensi PH tidak mengubah bobot 20/20/30/30 | ✅ | hanya rekap PH terpisah |
 | 4.14 | Verifikasi absensi PH oleh atasan/admin | ✅ | `POST /ph/absensi/{id}/verifikasi` |
 | 4.15 | Tab **PH** di aplikasi Android | 🟡 | disembunyikan sementara dari bottom nav (permintaan pengguna); kode `PhScreen` tetap ada |
 | 4.16 | Antrean offline untuk absensi PH | ⬜ | absensi PH saat ini butuh koneksi |
 | 4.17 | Ekspor CSV rekap PH | ⬜ | baru JSON + tampilan dashboard |
+| 4.18 | Rekap menandai tidak strong point & hanya check-in | ✅ | `hanya_check_in`, `tanggal_tidak_hadir`, `tanggal_hanya_check_in`; badge + tanggal di tab **Rekap Strong Point** |
+| 4.19 | Sesi strong point pagi & sore | ⬜ | menyusul di laporan dan Android |
+| 4.20 | Form jadwal tanpa strong point & jam | ✅ | Combo strong point dan jam mulai/selesai dihapus dari modal tambah/edit; backend memakai default (titik aktif pertama satker, 00:00–23:59) agar API lama tetap kompatibel |
+| 4.21 | Roster bulanan strong point ala spreadsheet | ✅ | Tab **Jadwal Strong Point**: kolom Anggota/Pangkat × tanggal 1–akhir bulan, blok biru berlabel regu, akhir pekan merah; daftar kelola jadwal tetap tersedia |
+| 4.22 | Input rentang tanggal jadwal | ✅ | `tanggal_selesai` membuat satu jadwal per tanggal (bukan satu baris rentang); semua tanggal divalidasi bentrok sebelum disimpan |
+| 4.23 | Ekspor PDF jadwal & rekap strong point | ✅ | `/ph/jadwal/ekspor` dan `/ph/rekap/ekspor` (Chrome/Edge headless); rekap tanpa kolom telat; tombol Export PDF di tab Jadwal/Rekap |
+| 4.24 | Seed roster sebulan Ditreskrimsus | ✅ | Tanggal 1–30 November (mengikuti bulan berjalan), Regu 1, 6 anggota tetap; satker lain tetap contoh tanggal 3–5 |
 
 ## 5. Pengingat jadwal tanpa FCM
 

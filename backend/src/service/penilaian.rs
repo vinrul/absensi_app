@@ -110,8 +110,18 @@ pub async fn hitung_periode(
         )
         .await?;
 
-        // Hari dengan jadwal PH terpisah tidak dihitung sebagai absensi harian.
-        let ph_dates: HashSet<chrono::NaiveDate> = crate::repo::ph::tanggal_personel(
+        // Hari ber-jadwal strong point tetap dihitung sebagai absensi kantor. Keterlambatan
+        // kantor hanya diabaikan bila personel benar-benar check-in strong point pada hari itu.
+        let ph_jadwal: HashSet<chrono::NaiveDate> = crate::repo::ph::tanggal_personel(
+            &state.pool,
+            p.id,
+            periode_row.tanggal_mulai,
+            periode_row.tanggal_selesai,
+        )
+        .await?
+        .into_iter()
+        .collect();
+        let ph_dilakukan: HashSet<chrono::NaiveDate> = crate::repo::ph::tanggal_personel_hadir(
             &state.pool,
             p.id,
             periode_row.tanggal_mulai,
@@ -155,10 +165,6 @@ pub async fn hitung_periode(
 
         let mut tanggal = periode_row.tanggal_mulai;
         while tanggal <= batas {
-            if ph_dates.contains(&tanggal) {
-                tanggal += chrono::Duration::days(1);
-                continue;
-            }
             let iso = chrono::Datelike::weekday(&tanggal).num_days_from_monday() as i16 + 1;
             let hari_kerja_ini = hari_kerja.contains(&iso);
 
@@ -180,13 +186,24 @@ pub async fn hitung_periode(
                         } else {
                             jam_pulang
                         };
-                        if let Some(nilai) = scoring::skor_harian(
-                            *status,
-                            *masuk,
-                            *pulang,
-                            jam_masuk,
-                            standar_pulang_hari,
-                        ) {
+                        let nilai = if ph_dilakukan.contains(&tanggal) {
+                            scoring::skor_harian_dengan_strong_point(
+                                *status,
+                                *masuk,
+                                *pulang,
+                                jam_masuk,
+                                standar_pulang_hari,
+                            )
+                        } else {
+                            scoring::skor_harian(
+                                *status,
+                                *masuk,
+                                *pulang,
+                                jam_masuk,
+                                standar_pulang_hari,
+                            )
+                        };
+                        if let Some(nilai) = nilai {
                             skor_harian.push(nilai);
                         }
                     }
@@ -319,7 +336,8 @@ pub async fn hitung_periode(
             serde_json::json!({
                 "hari_tercatat": hari_tercatat,
                 "hari_dihitung": skor_harian.len(),
-                "hari_ph": ph_dates.len(),
+                "hari_ph": ph_jadwal.len(),
+                "hari_ph_dilakukan": ph_dilakukan.len(),
                 "hari_libur": hari_libur,
                 "standar_masuk": jam_masuk.format("%H:%M").to_string(),
                 "standar_pulang": jam_pulang.format("%H:%M").to_string(),

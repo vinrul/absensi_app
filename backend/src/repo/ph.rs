@@ -31,6 +31,7 @@ pub struct JadwalPhRow {
     pub tanggal: NaiveDate,
     pub jam_mulai: NaiveTime,
     pub jam_selesai: NaiveTime,
+    pub regu: Option<String>,
     pub catatan: Option<String>,
     pub jumlah_personel: i64,
 }
@@ -47,6 +48,7 @@ pub struct JadwalPhSayaRow {
     pub tanggal: NaiveDate,
     pub jam_mulai: NaiveTime,
     pub jam_selesai: NaiveTime,
+    pub regu: Option<String>,
     pub catatan: Option<String>,
     pub peran: Option<String>,
 }
@@ -97,8 +99,13 @@ pub struct RekapPhRow {
     pub unit: Option<String>,
     pub jumlah_jadwal: i64,
     pub hadir: i64,
-    pub telat: i64,
+    /// Jadwal yang check-in tetapi tidak check-out.
+    pub hanya_check_in: i64,
     pub tidak_hadir: i64,
+    /// Tanggal jadwal yang tidak memiliki check-in sama sekali.
+    pub tanggal_tidak_hadir: Vec<NaiveDate>,
+    /// Tanggal jadwal yang hanya memiliki check-in.
+    pub tanggal_hanya_check_in: Vec<NaiveDate>,
     pub menunggu_verifikasi: i64,
 }
 
@@ -242,13 +249,13 @@ pub async fn list_jadwal(
 ) -> AppResult<Vec<JadwalPhRow>> {
     const SQL: &str = r#"
         SELECT j.id, j.satker_id, j.strong_point_id, sp.nama AS strong_point_nama,
-               j.tanggal, j.jam_mulai, j.jam_selesai, j.catatan,
+               j.tanggal, j.jam_mulai, j.jam_selesai, j.regu, j.catatan,
                (SELECT count(*) FROM jadwal_ph_personel x WHERE x.jadwal_ph_id = j.id)
                    AS jumlah_personel
           FROM jadwal_ph j
           JOIN strong_point sp ON sp.id = j.strong_point_id
          WHERE j.satker_id = ANY($1::uuid[]) AND j.tanggal BETWEEN $2 AND $3
-         ORDER BY j.tanggal, j.jam_mulai
+         ORDER BY j.tanggal, j.regu, j.jam_mulai
     "#;
     Ok(sqlx::query_as::<_, JadwalPhRow>(SQL)
         .bind(satker_ids)
@@ -261,7 +268,7 @@ pub async fn list_jadwal(
 pub async fn find_jadwal(pool: &PgPool, id: Uuid) -> AppResult<Option<JadwalPhRow>> {
     const SQL: &str = r#"
         SELECT j.id, j.satker_id, j.strong_point_id, sp.nama AS strong_point_nama,
-               j.tanggal, j.jam_mulai, j.jam_selesai, j.catatan,
+               j.tanggal, j.jam_mulai, j.jam_selesai, j.regu, j.catatan,
                (SELECT count(*) FROM jadwal_ph_personel x WHERE x.jadwal_ph_id = j.id)
                    AS jumlah_personel
           FROM jadwal_ph j
@@ -283,7 +290,7 @@ pub async fn jadwal_saya(
     const SQL: &str = r#"
         SELECT j.id, j.satker_id, j.strong_point_id, sp.nama AS strong_point_nama,
                sp.latitude::float8 AS latitude, sp.longitude::float8 AS longitude,
-               sp.radius_m, j.tanggal, j.jam_mulai, j.jam_selesai, j.catatan, jp.peran
+               sp.radius_m, j.tanggal, j.jam_mulai, j.jam_selesai, j.regu, j.catatan, jp.peran
           FROM jadwal_ph j
           JOIN jadwal_ph_personel jp ON jp.jadwal_ph_id = j.id
           JOIN strong_point sp ON sp.id = j.strong_point_id
@@ -319,6 +326,7 @@ pub struct JadwalBaru<'a> {
     pub tanggal: NaiveDate,
     pub jam_mulai: NaiveTime,
     pub jam_selesai: NaiveTime,
+    pub regu: Option<&'a str>,
     pub catatan: Option<&'a str>,
     pub created_by: Uuid,
     pub personel: &'a [(Uuid, Option<String>)],
@@ -328,8 +336,8 @@ pub async fn create_jadwal(pool: &PgPool, data: &JadwalBaru<'_>) -> AppResult<()
     let mut tx = pool.begin().await?;
     sqlx::query(
         "INSERT INTO jadwal_ph (id, satker_id, strong_point_id, tanggal, jam_mulai,
-                                jam_selesai, catatan, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                                jam_selesai, regu, catatan, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
     .bind(data.id)
     .bind(data.satker_id)
@@ -337,6 +345,7 @@ pub async fn create_jadwal(pool: &PgPool, data: &JadwalBaru<'_>) -> AppResult<()
     .bind(data.tanggal)
     .bind(data.jam_mulai)
     .bind(data.jam_selesai)
+    .bind(data.regu)
     .bind(data.catatan)
     .bind(data.created_by)
     .execute(&mut *tx)
@@ -365,6 +374,7 @@ pub async fn update_jadwal(
     tanggal: NaiveDate,
     jam_mulai: NaiveTime,
     jam_selesai: NaiveTime,
+    regu: Option<&str>,
     catatan: Option<&str>,
     personel: &[(Uuid, Option<String>)],
 ) -> AppResult<()> {
@@ -372,7 +382,7 @@ pub async fn update_jadwal(
     let result = sqlx::query(
         "UPDATE jadwal_ph
             SET strong_point_id = $2, tanggal = $3, jam_mulai = $4,
-                jam_selesai = $5, catatan = $6
+                jam_selesai = $5, regu = $6, catatan = $7
           WHERE id = $1",
     )
     .bind(id)
@@ -380,6 +390,7 @@ pub async fn update_jadwal(
     .bind(tanggal)
     .bind(jam_mulai)
     .bind(jam_selesai)
+    .bind(regu)
     .bind(catatan)
     .execute(&mut *tx)
     .await?;
@@ -429,6 +440,30 @@ pub async fn tanggal_personel(
           FROM jadwal_ph j
           JOIN jadwal_ph_personel jp ON jp.jadwal_ph_id = j.id
          WHERE jp.personel_id = $1 AND j.tanggal BETWEEN $2 AND $3
+    "#;
+    Ok(sqlx::query_scalar::<_, NaiveDate>(SQL)
+        .bind(personel_id)
+        .bind(dari)
+        .bind(sampai)
+        .fetch_all(pool)
+        .await?)
+}
+
+/// Tanggal dengan check-in strong point; dipakai untuk menetralkan telat absensi kantor.
+pub async fn tanggal_personel_hadir(
+    pool: &PgPool,
+    personel_id: Uuid,
+    dari: NaiveDate,
+    sampai: NaiveDate,
+) -> AppResult<Vec<NaiveDate>> {
+    const SQL: &str = r#"
+        SELECT DISTINCT j.tanggal
+          FROM absensi_ph ap
+          JOIN jadwal_ph j ON j.id = ap.jadwal_ph_id
+         WHERE ap.personel_id = $1
+           AND ap.jenis = 'masuk'
+           AND j.tanggal BETWEEN $2 AND $3
+         ORDER BY j.tanggal
     "#;
     Ok(sqlx::query_scalar::<_, NaiveDate>(SQL)
         .bind(personel_id)
@@ -652,12 +687,51 @@ pub async fn rekap_ph(
         SELECT p.id AS personel_id, p.nama, p.nrp, p.pangkat, p.unit,
                count(DISTINCT jp.jadwal_ph_id) AS jumlah_jadwal,
                count(DISTINCT ap.jadwal_ph_id) FILTER (WHERE ap.jenis = 'masuk') AS hadir,
-               count(DISTINCT ap.jadwal_ph_id) FILTER (
-                   WHERE ap.jenis = 'masuk' AND ap.jam > j.jam_mulai
-               ) AS telat,
+               count(DISTINCT jp.jadwal_ph_id) FILTER (
+                   WHERE EXISTS (
+                       SELECT 1 FROM absensi_ph ap2
+                        WHERE ap2.jadwal_ph_id = jp.jadwal_ph_id
+                          AND ap2.personel_id = p.id
+                          AND ap2.jenis = 'masuk'
+                   )
+                   AND NOT EXISTS (
+                       SELECT 1 FROM absensi_ph ap3
+                        WHERE ap3.jadwal_ph_id = jp.jadwal_ph_id
+                          AND ap3.personel_id = p.id
+                          AND ap3.jenis = 'pulang'
+                   )
+               ) AS hanya_check_in,
                count(DISTINCT jp.jadwal_ph_id)
                    - count(DISTINCT ap.jadwal_ph_id) FILTER (WHERE ap.jenis = 'masuk')
                    AS tidak_hadir,
+               coalesce(
+                   array_agg(DISTINCT j.tanggal) FILTER (
+                       WHERE NOT EXISTS (
+                           SELECT 1 FROM absensi_ph ap2
+                            WHERE ap2.jadwal_ph_id = jp.jadwal_ph_id
+                              AND ap2.personel_id = p.id
+                              AND ap2.jenis = 'masuk'
+                       )
+                   ),
+                   '{}'::date[]
+               ) AS tanggal_tidak_hadir,
+               coalesce(
+                   array_agg(DISTINCT j.tanggal) FILTER (
+                       WHERE EXISTS (
+                           SELECT 1 FROM absensi_ph ap2
+                            WHERE ap2.jadwal_ph_id = jp.jadwal_ph_id
+                              AND ap2.personel_id = p.id
+                              AND ap2.jenis = 'masuk'
+                       )
+                       AND NOT EXISTS (
+                           SELECT 1 FROM absensi_ph ap3
+                            WHERE ap3.jadwal_ph_id = jp.jadwal_ph_id
+                              AND ap3.personel_id = p.id
+                              AND ap3.jenis = 'pulang'
+                       )
+                   ),
+                   '{}'::date[]
+               ) AS tanggal_hanya_check_in,
                count(DISTINCT ap.id) FILTER (
                    WHERE ap.perlu_verifikasi AND ap.verified_at IS NULL
                ) AS menunggu_verifikasi

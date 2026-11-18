@@ -293,6 +293,8 @@ pub struct AbsensiHarianRow {
     pub perlu_verifikasi: bool,
     /// ID absensi (masuk/pulang) yang masih perlu diverifikasi.
     pub perlu_verifikasi_ids: Vec<Uuid>,
+    /// Ada check-in strong point pada tanggal ini (telat kantor diabaikan).
+    pub ph_hadir: bool,
     pub verified_at: Option<DateTime<Utc>>,
     pub catatan_verifikator: Option<String>,
     pub menit_telat: i64,
@@ -332,6 +334,7 @@ const HARIAN_SELECT: &str = r#"
                array_agg(a.id) FILTER (WHERE a.perlu_verifikasi),
                '{}'::uuid[]
            ) AS perlu_verifikasi_ids,
+           bool_or(phd.tanggal IS NOT NULL) AS ph_hadir,
            max(a.verified_at) AS verified_at,
            max(a.catatan_verifikator) AS catatan_verifikator,
            coalesce(max(
@@ -339,6 +342,7 @@ const HARIAN_SELECT: &str = r#"
                    WHEN a.jenis = 'masuk'
                         AND a.status_kehadiran = 'dinas_kantor'
                         AND a.jam > s.jam_masuk
+                        AND phd.tanggal IS NULL
                        THEN floor(extract(epoch FROM (a.jam - s.jam_masuk)) / 60)::bigint
                    ELSE 0
                END
@@ -349,6 +353,13 @@ const HARIAN_SELECT: &str = r#"
       FROM absensi a
       JOIN personel p ON p.id = a.personel_id
       JOIN satker s ON s.id = a.satker_id
+      LEFT JOIN (
+          SELECT DISTINCT aph.personel_id, jph.tanggal
+            FROM absensi_ph aph
+            JOIN jadwal_ph jph ON jph.id = aph.jadwal_ph_id
+           WHERE aph.jenis = 'masuk'
+             AND jph.tanggal BETWEEN $3 AND $4
+      ) phd ON phd.personel_id = a.personel_id AND phd.tanggal = a.tanggal
      WHERE a.satker_id = ANY($1::uuid[])
        AND ($2::uuid IS NULL OR a.personel_id = $2)
        AND ($3::date IS NULL OR a.tanggal >= $3)
@@ -435,9 +446,11 @@ const REKAP_SQL: &str = r#"
            count(a.id) FILTER (WHERE a.status_kehadiran = 'piket') AS piket,
            count(a.id) FILTER (
                WHERE a.status_kehadiran IN ('dinas_kantor', 'piket') AND a.jam > s.jam_masuk
+                 AND phd.tanggal IS NULL
            ) AS telat,
            coalesce(sum(
                CASE WHEN a.status_kehadiran = 'dinas_kantor' AND a.jam > s.jam_masuk
+                         AND phd.tanggal IS NULL
                     THEN floor(extract(epoch FROM (a.jam - s.jam_masuk)) / 60)::bigint
                     ELSE 0 END
            ), 0)::bigint AS menit_telat,
@@ -454,6 +467,13 @@ const REKAP_SQL: &str = r#"
              ON a.personel_id = p.id
             AND a.jenis = 'masuk'
             AND a.tanggal BETWEEN $2 AND $3
+      LEFT JOIN (
+          SELECT DISTINCT aph.personel_id, jph.tanggal
+            FROM absensi_ph aph
+            JOIN jadwal_ph jph ON jph.id = aph.jadwal_ph_id
+           WHERE aph.jenis = 'masuk'
+             AND jph.tanggal BETWEEN $2 AND $3
+      ) phd ON phd.personel_id = p.id AND phd.tanggal = a.tanggal
      WHERE p.deleted_at IS NULL
        AND p.jenis_akun = 'personel'
        AND p.satker_id = ANY($1::uuid[])

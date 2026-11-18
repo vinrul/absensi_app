@@ -182,6 +182,11 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Periode tertutup menolak perubahan data baru.
 
 ### FR-07 Dashboard & laporan
+- Sidebar dashboard memakai menu bergrup yang dapat dilipat: **Dashboard**; **Master Data**
+  (Satker & Jam Kerja, Titik Dinas, Hari Libur, Data Personel); **Absensi** (Rekap Kehadiran,
+  Detail Rekap, Verifikasi Offline); **Strong Point** (Jadwal Strong Point, Rekap Strong Point);
+  **Kinerja** (Rencana Kerja, Hasil Kerja, Output); **Laporan** (Penilaian, Print Laporan);
+  **Pengaturan** (Akun Admin, Kesiapan Periode, Periode).
 - Filter periode dan satker.
 - KPI: total personel, hadir hari ini, rencana, hasil, output, rata-rata nilai.
 - Grafik: capaian per indikator, tren antar periode, sebaran kategori.
@@ -208,17 +213,35 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Backup harian database + berkas unggahan dengan retensi 30 hari (`deploy/backup.sh`).
 
 ### FR-09 PH / Strong Point
-- Admin satker mengelola strong point (nama, alamat, koordinat, radius).
+- Admin satker mengelola strong point (nama, alamat, koordinat, radius). Tab master strong point di
+dashboard **disembunyikan sementara** karena strong point belum memiliki titik tetap; API-nya tetap
+aktif dan dapat diaktifkan kembali.
 - Admin satker menyusun jadwal PH per bulan; satu jadwal berisi satu atau lebih personel
-  beserta peran (mis. ketua/anggota).
+  beserta peran (mis. ketua/anggota). Sesi pagi/sore belum dipisah (menyusul di laporan & Android).
+- Form tambah/edit jadwal di dashboard hanya meminta **satker, regu, tanggal, catatan, dan
+  personel**; combo strong point serta jam mulai/selesai tidak ditampilkan. Backend memakai strong
+  point aktif pertama milik satker (kompatibilitas radius lama) dan waktu bawaan `00:00–23:59`.
+- Input tanggal mendukung **rentang** (`tanggal` s.d. `tanggal_selesai`); backend membuat satu
+  jadwal per tanggal dalam satu kali simpan, setelah memvalidasi bentrok pada seluruh tanggal.
+- Tab **Jadwal Strong Point** menampilkan **roster bulanan** seperti spreadsheet: kolom No,
+  Anggota, Pangkat, dan tanggal 1–akhir bulan; tanggal yang dijadwalkan regu ditandai blok biru
+  berlabel regu (di-merge vertikal/horizontal bila seluruh anggota regu bertugas).
 - Server menolak jadwal yang jamnya beririsan untuk personel yang sama (HTTP 422).
 - Personel hanya dapat check-in/check-out pada jadwal miliknya dan pada tanggal jadwal.
 - Check-in **dan check-out wajib menyertakan koordinat**; server memvalidasi radius strong point.
   Check-out tidak boleh dilakukan dari lokasi lain (mis. rumah).
 - Absensi PH memiliki `client_uuid` untuk idempotensi dan dapat diverifikasi atasan/admin.
-- Rekap PH per bulan menampilkan jumlah jadwal, check-in, check-out, dan status.
-- Hari yang memiliki jadwal PH **dikeluarkan dari skor absensi harian** dan tidak mengubah
-  bobot 20/20/30/30; PH dilaporkan pada rekap terpisah.
+- Rekap PH per bulan menampilkan jumlah jadwal, check-in, **hanya check-in**, dan
+  **tidak strong point** beserta tanggalnya, sehingga personel yang hanya check-in atau tidak
+  menjalankan jadwal langsung terlihat (kolom telat tidak ditampilkan karena jadwal strong point
+  tidak lagi memakai jam mulai/selesai).
+- Jadwal dan rekap strong point dapat diekspor ke **PDF** (A4 landscape) sesuai bulan dan filter
+  satker, memakai kop laporan dan kolom yang sama dengan tampilan dashboard.
+- Strong point dan absensi kantor tetap terpisah namun saling terkait: hari ber-jadwal strong point
+  **tetap wajib absensi kantor**. Keterlambatan absensi kantor **tidak dihitung** bila personel
+  check-in strong point pada hari itu; bila jadwal strong point tidak dijalankan, keterlambatan
+  kantor dihitung normal. Pulang cepat tetap dihitung. Detail penilaian menyimpan `hari_ph`
+  (jadwal) dan `hari_ph_dilakukan` (check-in).
 
 ### FR-10 Pengingat jadwal (tanpa FCM)
 - Aplikasi Android menjadwalkan notifikasi lokal melalui WorkManager: H-1 pukul 19:00 dan

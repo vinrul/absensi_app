@@ -245,7 +245,14 @@ Catatan penting:
   keduanya ditampilkan dan data dapat disimpan offline.
 - **Wizard izin**: penjelasan lokasi, kamera, notifikasi, WorkManager, dan penyimpanan sebelum login. 
 - **PH / Strong Point terpisah**: strong point per satker, jadwal bulanan per personel,
-  check-in **dan check-out wajib lokasi**, verifikasi, serta rekap PH sendiri.
+  check-in **dan check-out wajib lokasi**, verifikasi, serta rekap PH sendiri. Jadwal memakai
+  **roster bulanan** (anggota × tanggal 1–akhir bulan) dengan blok regu, dan input tanggal
+  mendukung rentang (disimpan satu jadwal per tanggal). Rekap menandai personel yang
+  **tidak strong point** dan yang **hanya check-in** beserta tanggalnya; absensi kantor tetap
+  wajib pada hari strong point, dan telat kantor tidak dihitung bila sudah check-in strong point.
+  Jadwal dan rekap strong point dapat diekspor PDF; rekap tidak menampilkan kolom telat karena
+  jadwal tidak memakai jam mulai/selesai. Tab master strong point disembunyikan sementara karena
+  titiknya belum tetap.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
   60 menit sebelum jadwal.
 - **Rencana kerja**: wizard 4 langkah di Android (jenis → dasar SP/TOR → rincian kegiatan →
@@ -278,7 +285,9 @@ Catatan penting:
 - **Kalender hari libur**: libur nasional/cuti bersama dan libur khusus satker; tanggal libur
   otomatis dikeluarkan dari perhitungan absensi harian.
 - **Dashboard pimpinan**: KPI, capaian per indikator, tren, sebaran kategori, rekap
-  berpaginasi, catatan & keputusan, cetak A4, ekspor CSV.
+  berpaginasi, catatan & keputusan, cetak A4, ekspor CSV. Sidebar memakai menu bergrup
+  (Master Data, Absensi, Strong Point, Kinerja, Laporan, Pengaturan) dengan submenu yang dapat
+  dilipat dan otomatis terbuka saat halamannya aktif.
 - **Branding**: logo Polda Bali di login (terpusat), sidebar, kop laporan, aplikasi Android, dan ikon launcher. Password pada login Android dapat ditampilkan/disembunyikan lewat ikon mata.
 - **Jam server palsu (development)**: `cargo run --bin fake -- DD-MM-YYYY HH:MM` mengubah jam yang dipakai backend untuk absensi; endpoint hanya aktif bila `APP__ALLOW_FAKE_TIME=true`.
 - **Operasional**: audit log setiap mutasi, rate limit login 5/menit/IP, RBAC ber-scope,
@@ -288,7 +297,7 @@ Catatan penting:
 
 | Indikator | Bobot | Komponen |
 |---|---|---|
-| Absensi | 20% | Rata-rata skor harian; telat/pulang cepat −1 per 10 menit (maks 20); tanpa keterangan 0; libur nasional/cuti/izin/sakit dan hari ber-jadwal PH netral |
+| Absensi | 20% | Rata-rata skor harian; telat/pulang cepat −1 per 10 menit (maks 20); tanpa keterangan 0; libur nasional/cuti/izin/sakit netral; pada hari strong point telat kantor diabaikan bila check-in strong point |
 | Rencana Kerja | 20% | Ketepatan 40% + kelengkapan 30% + kualitas 30% |
 | Hasil Kerja | 30% | Kuantitas 40% + kualitas 30% + waktu 30% |
 | Output | 30% | Kelengkapan 40% + kesesuaian 30% + keabsahan 30% |

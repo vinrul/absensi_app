@@ -770,6 +770,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let libur_tetap_len = libur_tetap.len();
 
     // -------------------------------------------------------- jadwal PH demo
+    // Roster penuh sebulan untuk Ditreskrimsus dapat dimatikan lewat env agar
+    // database uji memakai jadwal contoh yang tidak menabrak skenario e2e.
+    let roster_penuh = std::env::var("APP__SEED_FULL_ROSTER")
+        .map(|nilai| {
+            !matches!(
+                nilai.trim().to_ascii_lowercase().as_str(),
+                "0" | "false" | "off"
+            )
+        })
+        .unwrap_or(true);
     let mut ph_dates: HashMap<Uuid, HashSet<NaiveDate>> = HashMap::new();
     let mut jadwal_ph_rows: Vec<(Uuid, Uuid, Uuid, NaiveDate, NaiveTime, NaiveTime)> = Vec::new();
 
@@ -783,19 +793,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if orang.is_empty() {
             continue;
         }
-        for (slot, hari) in [5u32, 15, 25].into_iter().enumerate() {
-            if hari > akhir_bulan.day() {
-                continue;
-            }
+        // Ditreskrimsus memakai roster penuh sebulan (1–akhir bulan) sebagai contoh
+        // tampilan spreadsheet; satker lain cukup contoh tanggal 3–5.
+        let hari_jadwal: Vec<u32> = if node.kode == "DITRESKRIMSUS" && roster_penuh {
+            (1..=akhir_bulan.day()).collect()
+        } else {
+            [3u32, 4, 5]
+                .into_iter()
+                .filter(|hari| *hari <= akhir_bulan.day())
+                .collect()
+        };
+        let jumlah_anggota = if node.kode == "DITRESKRIMSUS" && roster_penuh {
+            6.min(orang.len())
+        } else {
+            4.min(orang.len())
+        };
+        let anggota_regu: Vec<Uuid> = (0..jumlah_anggota)
+            .map(|offset| orang[(satker_index + offset) % orang.len()])
+            .collect();
+        let jam_mulai = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        let jam_selesai = NaiveTime::from_hms_opt(16, 0, 0).unwrap();
+        for hari in hari_jadwal {
             let tanggal = NaiveDate::from_ymd_opt(awal_bulan.year(), awal_bulan.month(), hari)
                 .expect("tanggal PH valid");
             let id = uid(&format!("jadwal-ph-{satker_id}-{hari}"));
-            let jam_mulai = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
-            let jam_selesai = NaiveTime::from_hms_opt(16, 0, 0).unwrap();
             sqlx::query(
                 "INSERT INTO jadwal_ph (id, satker_id, strong_point_id, tanggal, jam_mulai,
-                                        jam_selesai, catatan, created_by)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+                                        jam_selesai, regu, catatan, created_by)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
             )
             .bind(id)
             .bind(satker_id)
@@ -803,23 +828,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .bind(tanggal)
             .bind(jam_mulai)
             .bind(jam_selesai)
-            .bind(format!("Jadwal PH {}", node.nama))
+            .bind("Regu 1")
+            .bind(format!("Jadwal Strong Point {}", node.nama))
             .bind(uid("admin-polda"))
             .execute(&pool)
             .await?;
 
-            for offset in 0..2 {
-                let personel_id = orang[(satker_index + slot + offset) % orang.len()];
+            for personel_id in &anggota_regu {
                 sqlx::query(
                     "INSERT INTO jadwal_ph_personel (jadwal_ph_id, personel_id, peran)
                      VALUES ($1, $2, $3)",
                 )
                 .bind(id)
                 .bind(personel_id)
-                .bind(if offset == 0 { "Komandan" } else { "Anggota" })
+                .bind("Anggota")
                 .execute(&pool)
                 .await?;
-                ph_dates.entry(personel_id).or_default().insert(tanggal);
+                ph_dates.entry(*personel_id).or_default().insert(tanggal);
             }
             jadwal_ph_rows.push((
                 id,
@@ -838,14 +863,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let iso_weekday = tanggal.weekday().num_days_from_monday() + 1;
         if iso_weekday <= 5 {
             for (index, (personel_id, satker_id, _nrp)) in personel_ids.iter().enumerate() {
-                if ph_dates
+                let ph_hari_ini = ph_dates
                     .get(personel_id)
-                    .is_some_and(|set| set.contains(&tanggal))
-                {
-                    continue;
-                }
+                    .is_some_and(|set| set.contains(&tanggal));
                 let pola = (index * 13 + tanggal.day() as usize * 7) % 100;
-                let (status, jam_masuk) = if pola < 80 {
+                let (status, jam_masuk) = if ph_hari_ini {
+                    // Pada hari strong point personel tetap wajib absensi kantor;
+                    // sengaja dibuat terlambat untuk menguji pengecualian telat.
+                    (
+                        StatusKehadiran::DinasKantor,
+                        NaiveTime::from_hms_opt(8, 30, 0).unwrap(),
+                    )
+                } else if pola < 80 {
                     (
                         StatusKehadiran::DinasKantor,
                         NaiveTime::from_hms_opt(7, 20, 0).unwrap(),
@@ -930,10 +959,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if (index + tanggal.day() as usize).is_multiple_of(5) {
                 continue;
             }
+            // Sebagian hanya check-in tanpa check-out agar rekap menampilkan kasus tersebut.
+            let hanya_masuk = (index + tanggal.day() as usize).is_multiple_of(4);
             for (jenis, jam) in [
                 ("masuk", *jam_mulai + Delta::minutes(5)),
                 ("pulang", *jam_selesai + Delta::minutes(5)),
             ] {
+                if jenis == "pulang" && hanya_masuk {
+                    continue;
+                }
                 let jam = NaiveTime::from_num_seconds_from_midnight_opt(
                     jam.num_seconds_from_midnight(),
                     0,
