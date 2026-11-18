@@ -253,8 +253,9 @@ Catatan penting:
   Jadwal dan rekap strong point dapat diekspor PDF; PDF jadwal berbentuk roster (anggota × tanggal)
   dan rekap tidak menampilkan kolom telat serta hanya menghitung sampai hari ini karena jadwal
   tidak memakai jam mulai/selesai. Tab master strong point disembunyikan sementara karena
-  titiknya belum tetap. Aplikasi Android memiliki tab **Strong** untuk melihat jadwal bulanan,
-  jadwal hari ini, serta check-in/check-out ber-lokasi.
+  titiknya belum tetap. Aplikasi Android memiliki tab **Strong** dengan tombol besar menuju wizard
+  check-in/check-out: peta lokasi (marker hijau) tanpa titik dinas, koordinat, akurasi GPS, alamat
+  reverse-geocode, dokumentasi foto saat check-in, dan antrean offline untuk kondisi tanpa sinyal.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
   60 menit sebelum jadwal.
 - **Rencana kerja**: wizard 4 langkah di Android (jenis → dasar SP/TOR → rincian kegiatan →

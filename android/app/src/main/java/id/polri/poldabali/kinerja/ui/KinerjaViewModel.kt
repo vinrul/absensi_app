@@ -76,6 +76,9 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     var antrean by mutableStateOf<List<AbsensiAntrean>>(emptyList())
         private set
 
+    var antreanPh by mutableStateOf<List<AbsensiPhRequest>>(emptyList())
+        private set
+
     var periode by mutableStateOf<Periode?>(null)
         private set
 
@@ -229,6 +232,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         jadwalPh = emptyList()
         absensiPh = emptyList()
         antrean = emptyList()
+        antreanPh = emptyList()
     }
 
     fun segarkanProfil() {
@@ -316,6 +320,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     private suspend fun muatSemuaLangsung() {
         periode = repo.periodeAktif()
         antrean = repo.daftarAntrean()
+        antreanPh = repo.daftarAntreanPh()
         riwayat = repo.riwayatAbsensiBulanIni()
         runCatching { absensiHariIni = repo.absensiHariIni() }
             .onSuccess { absensiHariIniOffline = false }
@@ -401,11 +406,15 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     fun sinkronkanSekarang() {
         jalankan {
             val jumlah = repo.sinkronkanAntrean()
+            val jumlahPh = repo.sinkronkanAntreanPh()
             antrean = repo.daftarAntrean()
+            antreanPh = repo.daftarAntreanPh()
             riwayat = repo.riwayatAbsensiBulanIni()
+            runCatching { muatPhLangsung() }
             runCatching { absensiHariIni = repo.absensiHariIni() }
                 .onSuccess { absensiHariIniOffline = false }
-            pesan = if (jumlah > 0) "$jumlah absensi berhasil dikirim" else "Tidak ada antrean yang dapat dikirim"
+            val total = jumlah + jumlahPh
+            pesan = if (total > 0) "$total data berhasil dikirim" else "Tidak ada antrean yang dapat dikirim"
         }
     }
 
@@ -838,6 +847,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         val bulan = awalBulan().take(7)
         jadwalPh = repo.jadwalPhSaya(bulan)
         absensiPh = repo.absensiPhSaya(bulan)
+        antreanPh = repo.daftarAntreanPh()
         Pengingat.jadwalkan(getApplication(), jadwalPh)
     }
 
@@ -846,40 +856,69 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     }
 
     fun kirimAbsensiPh(
+        clientUuid: String,
         jadwalId: String,
         jenis: String,
+        capturedAt: String,
         latitude: Double?,
         longitude: Double?,
         akurasi: Double?,
         mock: Boolean,
         fotoBase64: String?,
-        selesai: (String) -> Unit
+        offline: Boolean,
+        selesai: (Boolean, String) -> Unit
     ) {
-        jalankan {
-            val hasil = repo.kirimAbsensiPh(
-                AbsensiPhRequest(
-                    clientUuid = UUID.randomUUID().toString(),
-                    jadwalPhId = jadwalId,
-                    jenis = jenis,
-                    capturedAt = Instant.now().toString(),
-                    latitude = latitude,
-                    longitude = longitude,
-                    akurasiM = akurasi,
-                    isMockSuspect = mock,
-                    isOffline = false,
-                    fotoBase64 = fotoBase64
-                )
+        viewModelScope.launch {
+            sedangMemproses = true
+            pesan = null
+            galat = null
+            val request = AbsensiPhRequest(
+                clientUuid = clientUuid,
+                jadwalPhId = jadwalId,
+                jenis = jenis,
+                capturedAt = capturedAt,
+                latitude = latitude,
+                longitude = longitude,
+                akurasiM = akurasi,
+                isMockSuspect = mock,
+                isOffline = offline,
+                fotoBase64 = fotoBase64
             )
-            muatPhLangsung()
-            val jarak = hasil.jarakM
-            selesai(
-                buildString {
-                    append("Absensi strong point ${hasil.jenis} tercatat pukul ${hasil.jam}")
-                    if (jarak != null) {
-                        append(String.format(java.util.Locale.US, " (%.0f m dari strong point)", jarak))
-                    }
+            try {
+                if (offline) {
+                    repo.antreAbsensiPh(request)
+                    antreanPh = repo.daftarAntreanPh()
+                    Sinkronisasi.segera(getApplication())
+                    selesai(true, "Strong point disimpan di perangkat dan akan dikirim otomatis")
+                } else {
+                    val hasil = repo.kirimAbsensiPh(request)
+                    runCatching { muatPhLangsung() }
+                    val jarak = hasil.jarakM
+                    selesai(
+                        true,
+                        buildString {
+                            append("Strong point ${hasil.jenis} tercatat pukul ${hasil.jam}")
+                            if (jarak != null) {
+                                append(String.format(java.util.Locale.US, " (%.0f m dari strong point)", jarak))
+                            }
+                        }
+                    )
                 }
-            )
+            } catch (error: ApiException) {
+                if (error.status == 401 && pengguna != null) {
+                    pengguna = null
+                    galat = "Sesi berakhir, silakan login kembali"
+                } else {
+                    galat = error.message
+                }
+                selesai(false, error.message ?: "Gagal mengirim strong point")
+            } catch (error: Exception) {
+                val teks = error.message ?: "Gagal mengirim strong point"
+                galat = teks
+                selesai(false, teks)
+            } finally {
+                sedangMemproses = false
+            }
         }
     }
 }

@@ -98,8 +98,12 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C6 | Nyalakan data → kirim antrean | Terkirim sekali (tidak duplikat), antrean kosong | ⬜ | |
 | C7 | Lihat daftar absensi satker | Hanya data sendiri | ✅ | API |
 | C8 | Buka dashboard pimpinan | 403 (tidak berhak) | ✅ | API |
-| C9 | Buka tab **Strong** | Tab Strong Point (ke-6) menampilkan jadwal bulan ini dengan jadwal hari ini di paling atas; regu, radius, status Belum/Check-in/Selesai, dan riwayat tampil | ✅ | emulator |
-| C9a | Check-in & check-out strong point di lokasi | Lokasi emulator diatur ke koordinat strong point; check-in memberi pesan “0 m dari strong point”, lalu tombol berubah menjadi Check-out dan status Selesai | ✅ | emulator + API |
+| C9 | Buka tab **Strong** | Tombol besar **Strong Point** dan **Riwayat Strong Point**; status sesi hari ini dan antrean offline tampil | ✅ | emulator |
+| C9a | Wizard lokasi strong point | Peta OSM tanpa titik dinas, marker hijau lokasi, koordinat, akurasi GPS, dan alamat hasil geocode `geocode.vinrul.my.id` tampil | ✅ | emulator |
+| C9b | Check-in → dokumentasi → kirim | Progress "Langkah 2 dari 3", foto/documentasi (dapat dilewati bila kamera tidak tersedia), lalu kirim; status berubah menjadi Check-in pukul HH:mm | ✅ | emulator |
+| C9c | Check-out | Langsung ke "Langkah 2 dari 2" tanpa dokumentasi; status menjadi Sudah check-out pukul HH:mm | ✅ | emulator |
+| C9d | Offline (mode pesawat) | Dua tombol CHECK-IN/CHECK-OUT (Offline) muncul; kirim menampilkan “Kirim Strong Point (Offline)”, antrean tersimpan, lalu terkirim otomatis saat jaringan kembali | ✅ | emulator + API |
+| C9e | Check-in lagi setelah check-out | Tombol berubah menjadi CHECK-IN untuk sesi sore/berikutnya | ✅ | emulator |
 | C10 | Check-in PH tanpa GPS | 422 "Lokasi GPS wajib diambil untuk absensi PH" | ✅ | API |
 | C11 | Check-in PH di luar radius strong point | 422 dengan jarak aktual | ✅ | API |
 | C12 | Check-out PH dari lokasi berbeda (mis. rumah) | Ditolak 422 (wajib lokasi & radius) | ✅ | API |

@@ -1,259 +1,271 @@
 package id.polri.poldabali.kinerja.ui
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import id.polri.poldabali.kinerja.data.AbsensiPh
-import id.polri.poldabali.kinerja.data.JadwalPhSaya
-import id.polri.poldabali.kinerja.lokasi.Lokasi
 import id.polri.poldabali.kinerja.ui.theme.Warna
-import kotlinx.coroutines.launch
+import java.time.Instant
+
+private const val HALAMAN_BERANDA = 0
+private const val HALAMAN_WIZARD = 1
+private const val HALAMAN_RIWAYAT = 2
 
 @Composable
 fun PhScreen(vm: KinerjaViewModel) {
-    val konteks = LocalContext.current
-    val skop = rememberCoroutineScope()
-    var menunggu by remember { mutableStateOf<Pair<JadwalPhSaya, String>?>(null) }
-    var mengambil by remember { mutableStateOf(false) }
+    var halaman by rememberSaveable { mutableIntStateOf(HALAMAN_BERANDA) }
 
     LaunchedEffect(Unit) { vm.muatPh() }
 
-    val hariIni = tanggalHariIni()
-    val daftarJadwal = vm.jadwalPh.sortedWith(
-        compareByDescending<JadwalPhSaya> { it.tanggal == hariIni }.thenBy { it.tanggal }
-    )
+    when (halaman) {
+        HALAMAN_WIZARD -> WizardStrongPoint(vm) {
+            halaman = HALAMAN_BERANDA
+        }
 
-    fun punyaLokasi(): Boolean =
-        ContextCompat.checkSelfPermission(konteks, Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
+        HALAMAN_RIWAYAT -> Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            vm.galat?.let { KotakPesan(it, JenisPesan.Galat) }
+            vm.pesan?.let { KotakPesan(it, JenisPesan.Sukses) }
+            HalamanRiwayat(vm) {
+                vm.bersihkanPesan()
+                halaman = HALAMAN_BERANDA
+            }
+        }
 
-    fun kirimDenganLokasi(item: JadwalPhSaya, jenis: String) {
-        skop.launch {
-            mengambil = true
-            runCatching { Lokasi.ambil(konteks) }
-                .onSuccess { lokasi ->
-                    vm.kirimAbsensiPh(
-                        jadwalId = item.id,
-                        jenis = jenis,
-                        latitude = lokasi.latitude,
-                        longitude = lokasi.longitude,
-                        akurasi = lokasi.accuracy.toDouble(),
-                        mock = Lokasi.adalahMock(lokasi),
-                        fotoBase64 = null
-                    ) { info -> vm.pesanSukses(info) }
+        else -> Column(
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            vm.galat?.let { KotakPesan(it, JenisPesan.Galat) }
+            vm.pesan?.let { KotakPesan(it, JenisPesan.Sukses) }
+            HalamanBeranda(vm) {
+                vm.bersihkanPesan()
+                halaman = HALAMAN_WIZARD
+            }
+            TombolKedua(
+                teks = "Riwayat Strong Point",
+                onClick = {
+                    vm.bersihkanPesan()
+                    halaman = HALAMAN_RIWAYAT
                 }
-                .onFailure { vm.pesanGalat(it.message ?: "Gagal mengambil lokasi") }
-            mengambil = false
+            )
         }
     }
+}
 
-    val mintaLokasi = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { hasil ->
-        val item = menunggu
-        menunggu = null
-        if (hasil.values.any { it } && item != null) {
-            kirimDenganLokasi(item.first, item.second)
-        } else if (item != null) {
-            vm.pesanGalat("Izin lokasi diperlukan untuk absensi strong point")
-        }
-    }
+@Composable
+private fun HalamanBeranda(vm: KinerjaViewModel, onMulai: () -> Unit) {
+    val hariIni = tanggalHariIni()
+    val jadwal = vm.jadwalPh.firstOrNull { it.tanggal == hariIni }
+    val status = statusStrongPoint(jadwal?.id, vm.absensiPh, vm.antreanPh)
 
-    fun proses(item: JadwalPhSaya, jenis: String) {
-        if (punyaLokasi()) {
-            kirimDenganLokasi(item, jenis)
-        } else {
-            menunggu = item to jenis
-            mintaLokasi.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(124.dp)
+            .clickable(onClick = onMulai),
+        shape = RoundedCornerShape(18.dp),
+        color = Warna.Navy,
+        shadowElevation = 3.dp
+    ) {
+        Column(
+            Modifier.fillMaxSize().padding(20.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                Icons.Filled.DateRange,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(38.dp)
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Strong Point",
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White
+            )
+            Text(
+                "Check-in / check-out dengan validasi lokasi",
+                style = MaterialTheme.typography.bodySmall,
+                color = Warna.NavySoft
             )
         }
     }
 
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text(
-            "Jadwal Strong Point",
-            style = MaterialTheme.typography.titleLarge,
-            color = Warna.Teks
-        )
-        Text(
-            "Jadwal penjagaan bulan ini. Check-in dan check-out wajib dilakukan di lokasi strong point.",
-            style = MaterialTheme.typography.bodySmall,
-            color = Warna.TeksLembut
-        )
+    Kartu {
+        val keterangan = when {
+            jadwal == null -> "Tidak ada jadwal strong point hari ini"
+            status.sesi.isEmpty() -> "Belum check-in hari ini"
+            status.terbuka ->
+                "Check-in pukul ${status.masukTerakhir?.jam.orEmpty()}" +
+                    if (status.perluCheckInBaru) " (lebih dari 2 jam, belum check-out)" else ""
+            else -> "Sudah check-out pukul ${status.pulangTerakhir?.jam.orEmpty()}"
+        }
+        JudulBagian("Status Hari Ini", keterangan)
+        if (jadwal != null) {
+            Spacer(Modifier.height(8.dp))
+            BarisInfo("Jadwal", keteranganJadwal(jadwal.regu, jadwal.strongPointNama))
+            BarisInfo("Sesi hari ini", "${status.sesi.size} catatan")
+        }
+        if (status.sesi.any { it.menungguKirim }) {
+            Spacer(Modifier.height(8.dp))
+            KotakPesan(
+                "Sebagian sesi strong point masih menunggu dikirim. Data tersimpan di perangkat.",
+                JenisPesan.Info
+            )
+        }
+    }
 
-        vm.galat?.let { KotakPesan(it, JenisPesan.Galat) }
-        vm.pesan?.let { KotakPesan(it, JenisPesan.Sukses) }
+    if (vm.antreanPh.isNotEmpty()) {
+        Kartu {
+            JudulBagian(
+                "Antrean Strong Point",
+                "${vm.antreanPh.size} data menunggu dikirim ke server"
+            )
+            Spacer(Modifier.height(8.dp))
+            TombolKedua(
+                teks = "Kirim Antrean Sekarang",
+                aktif = !vm.sedangMemproses,
+                onClick = { vm.sinkronkanSekarang() }
+            )
+        }
+    }
+}
 
-        if (vm.jadwalPh.isEmpty()) {
-            Kartu {
-                JudulBagian("Jadwal Strong Point", "Belum ada jadwal bulan ini")
-                Spacer(Modifier.height(8.dp))
+@Composable
+private fun HalamanRiwayat(vm: KinerjaViewModel, onKembali: () -> Unit) {
+    BarisKembaliStrong("Riwayat Strong Point", onKembali)
+
+    if (vm.antreanPh.isNotEmpty()) {
+        Kartu {
+            JudulBagian("Menunggu Dikirim", "${vm.antreanPh.size} catatan offline")
+            Spacer(Modifier.height(8.dp))
+            vm.antreanPh.takeLast(10).reversed().forEach { item ->
+                val waktu = runCatching { Instant.parse(item.capturedAt) }.getOrNull()
+                BarisInfo(
+                    label = "${tanggalIndo(item.capturedAt.take(10))} · ${labelJenis(item.jenis)}",
+                    nilai = "${waktu?.let(::jamWita) ?: "-"} · offline",
+                    warnaNilai = Warna.Kuning
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            TombolKedua(
+                teks = "Kirim Semua Antrean",
+                aktif = !vm.sedangMemproses,
+                onClick = { vm.sinkronkanSekarang() }
+            )
+        }
+    }
+
+    Kartu {
+        JudulBagian("Riwayat Strong Point", "${vm.absensiPh.size} catatan bulan ini")
+        Spacer(Modifier.height(8.dp))
+        if (vm.absensiPh.isEmpty()) {
+            LayarKosong("Belum ada absensi strong point pada bulan ini.")
+        } else {
+            vm.absensiPh.sortedByDescending { it.capturedAt }.forEach { item ->
+                BarisInfo(
+                    label = "${tanggalIndo(item.capturedAt.take(10))} · ${labelJenis(item.jenis)}",
+                    nilai = "${item.jam} · ${jarakTeks(item)}",
+                    warnaNilai = when {
+                        !item.dalamRadius -> Warna.Merah
+                        item.perluVerifikasi && item.verifiedAt == null -> Warna.Kuning
+                        else -> Warna.Hijau
+                    }
+                )
                 Text(
-                    "Admin satker belum menyusun jadwal strong point untuk Anda pada bulan ini.",
+                    item.strongPointNama,
                     style = MaterialTheme.typography.bodySmall,
                     color = Warna.TeksLembut
                 )
-            }
-        } else {
-            daftarJadwal.forEach { item ->
-                val masuk = vm.absensiPh.firstOrNull {
-                    it.jadwalPhId == item.id && it.jenis == "masuk"
-                }
-                val pulang = vm.absensiPh.firstOrNull {
-                    it.jadwalPhId == item.id && it.jenis == "pulang"
-                }
-                val jadwalHariIni = item.tanggal == hariIni
-                val waktu = if (item.jamMulai == "00:00" && item.jamSelesai == "23:59") {
-                    "Sepanjang hari"
-                } else {
-                    "${item.jamMulai}–${item.jamSelesai}"
-                }
-                val keterangan = listOfNotNull(
-                    item.strongPointNama,
-                    item.regu?.takeIf { it.isNotBlank() },
-                    waktu
-                ).joinToString(" · ")
-                Kartu {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                tanggalIndo(item.tanggal),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = Warna.Teks
-                            )
-                            if (jadwalHariIni) {
-                                Text(
-                                    "Hari ini",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Warna.Biru
-                                )
-                            }
-                            Text(
-                                keterangan,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Warna.TeksLembut
-                            )
-                            if (!item.peran.isNullOrBlank()) {
-                                Text(
-                                    "Peran: ${item.peran}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Warna.Gold
-                                )
-                            }
-                            if (!item.catatan.isNullOrBlank()) {
-                                Text(
-                                    item.catatan,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Warna.TeksLembut
-                                )
-                            }
-                        }
-                        val selesai = masuk != null && pulang != null
-                        Lencana(
-                            when {
-                                selesai -> "Selesai"
-                                masuk != null -> "Check-in"
-                                else -> "Belum"
-                            },
-                            when {
-                                selesai -> Warna.Hijau
-                                masuk != null -> Warna.Biru
-                                else -> Warna.Kuning
-                            }
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    BarisInfo("Radius", "${item.radiusM} m")
-                    if (masuk != null) {
-                        BarisInfo("Check-in", "${masuk.jam} · ${jarakTeks(masuk)}", Warna.Hijau)
-                    }
-                    if (pulang != null) {
-                        BarisInfo("Check-out", "${pulang.jam} · ${jarakTeks(pulang)}", Warna.Hijau)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    if (!jadwalHariIni) {
-                        Text(
-                            if (item.tanggal < hariIni) "Jadwal strong point sudah lewat." else "Check-in dapat dilakukan pada tanggal jadwal.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Warna.TeksLembut
-                        )
-                    } else if (masuk == null) {
-                        TombolUtama(
-                            teks = if (mengambil) "Mengambil lokasi…" else "Check-in Strong Point",
-                            aktif = !mengambil,
-                            onClick = { proses(item, "masuk") }
-                        )
-                    } else if (pulang == null) {
-                        TombolUtama(
-                            teks = if (mengambil) "Mengambil lokasi…" else "Check-out Strong Point",
-                            aktif = !mengambil,
-                            onClick = { proses(item, "pulang") }
-                        )
-                    } else {
-                        Text(
-                            "Absensi strong point untuk jadwal ini sudah lengkap.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Warna.Hijau
-                        )
-                    }
-                }
-            }
-        }
-
-        if (vm.absensiPh.isNotEmpty()) {
-            Kartu {
-                JudulBagian("Riwayat Strong Point Bulan Ini", "${vm.absensiPh.size} catatan")
-                Spacer(Modifier.height(8.dp))
-                vm.absensiPh.takeLast(10).reversed().forEach { item ->
-                    BarisInfo(
-                        label = "${item.spKodeTanggal()} · ${item.jenis}",
-                        nilai = "${item.jam} · ${jarakTeks(item)}",
-                        warnaNilai = if (item.dalamRadius) Warna.Hijau else Warna.Merah
+                if (item.perluVerifikasi && item.verifiedAt == null) {
+                    Text(
+                        "Menunggu verifikasi atasan",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Warna.Kuning
                     )
                 }
+                Spacer(Modifier.height(6.dp))
+            }
+        }
+    }
+
+    Kartu {
+        JudulBagian("Jadwal Bulan Ini", "${vm.jadwalPh.size} jadwal")
+        Spacer(Modifier.height(8.dp))
+        if (vm.jadwalPh.isEmpty()) {
+            LayarKosong("Belum ada jadwal strong point pada bulan ini.")
+        } else {
+            vm.jadwalPh.forEach { item ->
+                BarisInfo(
+                    label = tanggalIndo(item.tanggal),
+                    nilai = keteranganJadwal(item.regu, item.strongPointNama)
+                )
             }
         }
     }
 }
 
-private fun jarakTeks(item: AbsensiPh): String =
-    item.jarakM?.let { String.format(java.util.Locale.US, "%.0f m", it) } ?: "-"
+@Composable
+private fun BarisKembaliStrong(judul: String, onKembali: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        TextButton(onClick = onKembali) {
+            Text("‹ Kembali", color = Warna.Navy)
+        }
+        Text(
+            judul,
+            style = MaterialTheme.typography.titleMedium,
+            color = Warna.Teks,
+            fontWeight = FontWeight.SemiBold
+        )
+    }
+}
 
-private fun AbsensiPh.spKodeTanggal(): String =
-    "${tanggalIndo(capturedAt.take(10))} · $strongPointNama"
+internal fun keteranganJadwal(regu: String?, strongPoint: String): String =
+    listOfNotNull(strongPoint, regu?.takeIf { it.isNotBlank() }).joinToString(" · ")
+
+internal fun labelJenis(jenis: String): String =
+    if (jenis == "masuk") "Check-in" else "Check-out"
+
+internal fun jarakTeks(item: AbsensiPh): String =
+    item.jarakM?.let { String.format(java.util.Locale.US, "%.0f m", it) } ?: "-"

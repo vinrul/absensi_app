@@ -17,6 +17,7 @@ class SyncWorker(context: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         return try {
             Graf.repositori.sinkronkanAntrean()
+            Graf.repositori.sinkronkanAntreanPh()
             Result.success()
         } catch (error: Exception) {
             if (runAttemptCount < 5) Result.retry() else Result.failure()

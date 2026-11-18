@@ -749,8 +749,8 @@
     "/ph/absensi": {
       "post": {
         "tags": ["ph"],
-        "summary": "Check-in / check-out PH (wajib lokasi)",
-        "description": "Lokasi wajib diisi untuk check-in maupun check-out dan harus berada dalam radius strong point. Idempoten terhadap client_uuid.",
+        "summary": "Check-in / check-out Strong Point (wajib lokasi)",
+        "description": "Lokasi wajib diisi dan harus berada dalam radius strong point. Idempoten terhadap client_uuid. Satu jadwal dapat memiliki beberapa sesi check-in; check-in baru ditolak (409) bila sesi sebelumnya masih terbuka dan belum berumur 2 jam. Check-out dipasangkan ke check-in terakhir yang terbuka.",
         "requestBody": {
           "required": true,
           "content": {
@@ -774,7 +774,7 @@
             }
           }
         },
-        "responses": { "200": { "description": "Tercatat" }, "403": { "description": "Bukan peserta jadwal" }, "409": { "description": "Sudah absen untuk jenis ini" }, "422": { "description": "Di luar radius / GPS tidak ada / di luar jam jadwal" } }
+        "responses": { "200": { "description": "Tercatat" }, "403": { "description": "Bukan peserta jadwal" }, "409": { "description": "Sesi check-in masih berlangsung (< 2 jam)" }, "422": { "description": "Di luar radius / GPS tidak ada / check-out tanpa check-in" } }
       }
     },
     "/ph/absensi/saya": {

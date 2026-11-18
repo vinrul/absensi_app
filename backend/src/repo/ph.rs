@@ -91,6 +91,12 @@ pub struct AbsensiPhRow {
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+pub struct SesiPhRow {
+    pub masuk_terakhir: Option<DateTime<Utc>>,
+    pub pulang_terakhir: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct RekapPhRow {
     pub personel_id: Uuid,
     pub nama: String,
@@ -586,6 +592,28 @@ pub async fn exists_absensi_ph(
     .bind(jenis)
     .fetch_one(pool)
     .await?)
+}
+
+/// Waktu check-in dan check-out terakhir untuk menentukan sesi yang masih terbuka.
+pub async fn sesi_ph_terakhir(
+    pool: &PgPool,
+    jadwal_id: Uuid,
+    personel_id: Uuid,
+) -> AppResult<SesiPhRow> {
+    const SQL: &str = r#"
+        SELECT
+            (SELECT max(captured_at) FROM absensi_ph
+              WHERE jadwal_ph_id = $1 AND personel_id = $2 AND jenis = 'masuk')
+                AS masuk_terakhir,
+            (SELECT max(captured_at) FROM absensi_ph
+              WHERE jadwal_ph_id = $1 AND personel_id = $2 AND jenis = 'pulang')
+                AS pulang_terakhir
+    "#;
+    Ok(sqlx::query_as::<_, SesiPhRow>(SQL)
+        .bind(jadwal_id)
+        .bind(personel_id)
+        .fetch_one(pool)
+        .await?)
 }
 
 pub async fn insert_absensi_ph(pool: &PgPool, data: &NewAbsensiPh) -> AppResult<i64> {

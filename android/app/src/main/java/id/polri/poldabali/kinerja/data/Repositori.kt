@@ -12,6 +12,7 @@ import kotlinx.serialization.builtins.ListSerializer
 class Repositori(
     private val sesi: PenyimpananSesi,
     private val antrean: AntreanAbsensi,
+    private val antreanPh: AntreanPh,
     private val api: Api
 ) {
     private val json = api.json
@@ -341,5 +342,29 @@ class Repositori(
         val body = json.encodeToString(AbsensiPhRequest.serializer(), request)
         val teks = api.panggil("POST", "ph/absensi", body)
         return json.decodeFromString(AbsensiPh.serializer(), teks)
+    }
+
+    suspend fun antreAbsensiPh(request: AbsensiPhRequest) {
+        antreanPh.tambah(request)
+    }
+
+    suspend fun daftarAntreanPh(): List<AbsensiPhRequest> = antreanPh.daftar()
+
+    /** Mengirim antrean strong point berurutan; kegagalan permanen (4xx) dibuang. */
+    suspend fun sinkronkanAntreanPh(): Int {
+        var berhasil = 0
+        for (item in antreanPh.daftar()) {
+            val hasil = runCatching { kirimAbsensiPh(item.copy(isOffline = true)) }
+            if (hasil.isSuccess) {
+                antreanPh.hapus(item.clientUuid)
+                berhasil++
+            } else {
+                val error = hasil.exceptionOrNull()
+                if (error is ApiException && error.status in 400..499 && error.status != 401) {
+                    antreanPh.hapus(item.clientUuid)
+                }
+            }
+        }
+        return berhasil
     }
 }

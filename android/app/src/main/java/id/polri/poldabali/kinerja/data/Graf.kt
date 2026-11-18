@@ -13,6 +13,9 @@ object Graf {
     lateinit var antrean: AntreanAbsensi
         private set
 
+    lateinit var antreanPh: AntreanPh
+        private set
+
     lateinit var api: Api
         private set
 
@@ -24,7 +27,8 @@ object Graf {
         appContext = context.applicationContext
         sesi = PenyimpananSesi(appContext)
         antrean = AntreanAbsensi(appContext)
+        antreanPh = AntreanPh(appContext)
         api = Api(sesi)
-        repositori = Repositori(sesi, antrean, api)
+        repositori = Repositori(sesi, antrean, antreanPh, api)
     }
 }

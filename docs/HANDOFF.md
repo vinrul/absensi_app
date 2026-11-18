@@ -33,7 +33,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Absensi Android bertahap + peta OSM | tombol besar → validasi GPS/peta → status → kirim/offline; `PetaAbsensi.kt` |
 | Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
 | Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; rekap menandai tidak strong point / hanya check-in |
-| Tab **Strong Point** di Android | bottom nav 6 tab; jadwal hari ini di atas, regu, check-in/out ber-lokasi (uji emulator), riwayat bulan ini |
+| Tab **Strong Point** di Android | bottom nav 6 tab; tombol besar + riwayat, wizard 3 langkah (lokasi → dokumentasi → kirim), peta tanpa titik dinas + marker hijau, koordinat/akurasi/geocode, check-in/out offline ber-antrean |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
@@ -170,8 +170,17 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
     PDF jadwal berbentuk roster seperti dashboard (No, Anggota, Pangkat, tanggal 1–akhir bulan,
     blok biru regu). Seed memberi Ditreskrimsus dua regu penuh sebulan (Regu 1 tanggal 1–15,
     Regu 2 tanggal 16–akhir bulan) sebagai contoh roster.
+    **Sesi strong point:** satu jadwal dapat memiliki beberapa check-in (pagi/sore). Check-in
+    baru ditolak 409 bila sesi terakhir masih terbuka dan belum berumur 2 jam (dihitung dari
+    `captured_at`, sehingga aman untuk antrean offline). Check-out dipasangkan ke check-in
+    terakhir yang terbuka; migrasi `0016_absensi_ph_sesi.sql` menghapus unique
+    `(jadwal_ph_id, personel_id, jenis)`. Aplikasi Android memakai wizard 3 langkah, peta OSM
+    tanpa titik dinas dengan marker hijau, alamat dari Nominatim mandiri
+    (`https://geocode.vinrul.my.id`), serta antrean `AntreanPh` untuk check-in/out offline.
+    Dokumentasi foto diminta saat check-in (dapat dilewati bila kamera tidak tersedia).
 18. **Pengingat jadwal tanpa FCM.** Android memakai WorkManager + notifikasi lokal
-    (H-1 19:00 dan 60 menit sebelum). Tidak ada ketergantungan layanan push eksternal.
+    (H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum).
+    Tidak ada ketergantungan layanan push eksternal.
 19. **Database uji terpisah (`kinerja_test`).** Seed demo ada di `kinerja_db`; skrip e2e
     men-spawn API sendiri di port 8091 dengan `APP__DATABASE_URL` ke `kinerja_test`.
 20. **Satu tabel identitas, dua jenis akun.** `personel.jenis_akun` membedakan `admin` dan
@@ -384,7 +393,7 @@ GET    /docs              # di luar /api/v1
 `personel.nrp` hanya wajib untuk `jenis_akun='personel'`; `personel.username` hanya wajib
 untuk `jenis_akun='admin'` (constraint `personel_identitas_check`).
 
-Migrasi: `backend/migrations/0001_init.sql` … `0015_jadwal_ph_regu.sql` (regu roster strong point). Status absensi
+Migrasi: `backend/migrations/0001_init.sql` … `0016_absensi_ph_sesi.sql` (sesi check-in strong point berulang). Status absensi
 `libur_nasional` menggantikan nama lama `ph` (nama `ph` sekarang khusus modul PH).
 Tambah migrasi baru = file `000N_nama.sql` lalu `sqlx migrate run` + `cargo sqlx prepare` bila
 memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).

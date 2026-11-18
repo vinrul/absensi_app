@@ -75,7 +75,8 @@ fun PetaAbsensi(
     longitude: Double?,
     akurasiM: Double?,
     titik: TitikDinas?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    warnaMarkerLokasi: Int = 0xFF1565C0.toInt()
 ) {
     val petaRef = remember { mutableStateOf<MapView?>(null) }
     var kunciTerakhir by remember { mutableStateOf("") }
@@ -133,8 +134,13 @@ modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(12.dp)
                                 peta = peta,
                                 pusat = posisi,
                                 radiusMeter = akurasiM,
-                                warnaGaris = android.graphics.Color.parseColor("#1565C0"),
-                                warnaIsi = android.graphics.Color.argb(35, 21, 101, 192)
+                                warnaGaris = warnaMarkerLokasi,
+                                warnaIsi = android.graphics.Color.argb(
+                                    35,
+                                    android.graphics.Color.red(warnaMarkerLokasi),
+                                    android.graphics.Color.green(warnaMarkerLokasi),
+                                    android.graphics.Color.blue(warnaMarkerLokasi)
+                                )
                             )
                         )
                     }
@@ -142,7 +148,7 @@ modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(12.dp)
                         Marker(peta).apply {
                             position = posisi
                             setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                            icon = ikonBulat(peta.context, android.graphics.Color.parseColor("#1565C0"), 18)
+                            icon = ikonBulat(peta.context, warnaMarkerLokasi, 18)
                             title = "Lokasi Anda"
                         }
                     )
@@ -150,7 +156,7 @@ modifier = Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(12.dp)
 
                 peta.invalidate()
 
-                val kunci = "$latitude,$longitude,${titik?.id}"
+                val kunci = "$latitude,$longitude,${titik?.id},$warnaMarkerLokasi"
                 if (kunci != kunciTerakhir) {
                     kunciTerakhir = kunci
                     peta.post {

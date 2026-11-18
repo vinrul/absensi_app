@@ -115,7 +115,11 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.12 | Hari strong point tetap dinilai absensi kantor | ✅ | Telat kantor diabaikan bila check-in strong point; bila tidak strong point, telat dihitung; pulang cepat tetap dihitung (`skor_harian_dengan_strong_point`) |
 | 4.13 | Absensi PH tidak mengubah bobot 20/20/30/30 | ✅ | hanya rekap PH terpisah |
 | 4.14 | Verifikasi absensi PH oleh atasan/admin | ✅ | `POST /ph/absensi/{id}/verifikasi` |
-| 4.15 | Tab **Strong Point** di aplikasi Android | ✅ | Tab ke-6 di bottom nav (`PhScreen`): jadwal hari ini di atas, regu, radius, check-in/check-out ber-lokasi, riwayat bulan ini; pengingat disesuaikan untuk jadwal tanpa jam |
+| 4.15 | Tab **Strong Point** di aplikasi Android | ✅ | Tab ke-6 (`PhScreen`): tombol besar **Strong Point** + tombol **Riwayat Strong Point**; status sesi hari ini dan antrean offline |
+| 4.25 | Wizard strong point 3 langkah | ✅ | Lokasi → Dokumentasi (khusus check-in) → Kirim; progress bar seperti wizard rencana/hasil/output; check-out melewati dokumentasi |
+| 4.26 | Peta lokasi & geocode strong point | ✅ | Peta OSM tanpa titik dinas, marker hijau lokasi saat ini, koordinat, akurasi GPS, alamat dari `https://geocode.vinrul.my.id` |
+| 4.27 | Sesi check-in berulang & aturan 2 jam | ✅ | Satu jadwal dapat beberapa sesi (pagi/sore); check-in baru ditolak 409 bila sesi terbuka < 2 jam; check-out dipasangkan ke check-in terakhir |
+| 4.28 | Check-in/out offline + dokumentasi | ✅ | Dua tombol check-in/check-out saat offline (seperti absensi), antrean `AntreanPh` dikirim WorkManager; dokumentasi hanya untuk check-in |
 | 4.16 | Antrean offline untuk absensi PH | ⬜ | absensi PH saat ini butuh koneksi |
 | 4.17 | Ekspor CSV rekap PH | ⬜ | baru JSON + tampilan dashboard |
 | 4.18 | Rekap menandai tidak strong point & hanya check-in | ✅ | `hanya_check_in`, `tanggal_tidak_hadir`, `tanggal_hanya_check_in`; badge + tanggal di tab **Rekap Strong Point** |

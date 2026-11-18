@@ -469,7 +469,7 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "masuk",
-			captured_at: new Date().toISOString(),
+			captured_at: `${hariIni}T00:05:00Z`,
 			latitude: sp.latitude + 0.1,
 			longitude: sp.longitude,
 			akurasi_m: 5
@@ -483,7 +483,7 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "masuk",
-			captured_at: new Date().toISOString(),
+			captured_at: `${hariIni}T00:05:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
 			akurasi_m: 5
@@ -496,7 +496,7 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "masuk",
-			captured_at: new Date().toISOString(),
+			captured_at: `${hariIni}T00:10:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
 			akurasi_m: 5
@@ -504,13 +504,27 @@ try {
 	});
 	cek("check-in PH ganda ditolak", ulang.status === 409, `status ${ulang.status}`);
 
+	const masukKedua = await panggil(personel.access_token, "/ph/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jadwal_ph_id: jadwalBaru.data.id,
+			jenis: "masuk",
+			captured_at: `${hariIni}T02:15:00Z`,
+			latitude: sp.latitude,
+			longitude: sp.longitude,
+			akurasi_m: 5
+		}
+	});
+	cek("check-in sesi baru setelah 2 jam berhasil", masukKedua.status === 200, JSON.stringify(masukKedua.data));
+
 	const pulangLuar = await panggil(personel.access_token, "/ph/absensi", {
 		method: "POST",
 		body: {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "pulang",
-			captured_at: new Date().toISOString(),
+			captured_at: `${hariIni}T02:20:00Z`,
 			latitude: sp.latitude + 0.1,
 			longitude: sp.longitude,
 			akurasi_m: 5
@@ -524,13 +538,26 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "pulang",
-			captured_at: new Date().toISOString(),
+			captured_at: `${hariIni}T02:25:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
 			akurasi_m: 5
 		}
 	});
 	cek("check-out PH di dalam radius berhasil", pulang.status === 200, JSON.stringify(pulang.data));
+	const pulangUlang = await panggil(personel.access_token, "/ph/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jadwal_ph_id: jadwalBaru.data.id,
+			jenis: "pulang",
+			captured_at: `${hariIni}T02:30:00Z`,
+			latitude: sp.latitude,
+			longitude: sp.longitude,
+			akurasi_m: 5
+		}
+	});
+	cek("check-out tanpa sesi terbuka ditolak", pulangUlang.status === 422, `status ${pulangUlang.status}`);
 	const rekapPh = await panggil(adminToken, "/ph/rekap?bulan=2026-11");
 	cek("rekap PH memuat personel uji", rekapPh.status === 200 && rekapPh.data.data.some((r) => r.personel_id === personel.user.id));
 

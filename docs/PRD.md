@@ -244,6 +244,14 @@ aktif dan dapat diaktifkan kembali.
   check-in strong point pada hari itu; bila jadwal strong point tidak dijalankan, keterlambatan
   kantor dihitung normal. Pulang cepat tetap dihitung. Detail penilaian menyimpan `hari_ph`
   (jadwal) dan `hari_ph_dilakukan` (check-in).
+- Satu jadwal dapat memiliki **beberapa sesi check-in** (mis. pagi dan sore). Check-in baru ditolak
+  bila sesi sebelumnya masih terbuka dan belum berumur **2 jam**; check-out dipasangkan ke check-in
+  terakhir yang terbuka.
+- Di aplikasi Android, tab **Strong** menyediakan tombol besar menuju wizard: peta lokasi tanpa
+  titik dinas (marker hijau), koordinat, akurasi GPS, alamat reverse-geocode, lalu check-in/check-out.
+  Check-in dilanjutkan ke dokumentasi foto dan halaman kirim; check-out langsung ke halaman kirim.
+  Bila tidak ada sinyal, kedua tombol check-in/check-out (offline) tersedia dan data masuk antrean
+  untuk dikirim otomatis.
 
 ### FR-10 Pengingat jadwal (tanpa FCM)
 - Aplikasi Android menjadwalkan notifikasi lokal melalui WorkManager: H-1 pukul 19:00 dan

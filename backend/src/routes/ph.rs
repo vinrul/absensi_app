@@ -811,16 +811,41 @@ pub async fn create_absensi_ph(
         ));
     }
 
-    if ph::exists_absensi_ph(&state.pool, jadwal.id, user.id(), req.jenis).await? {
-        return Err(AppError::Conflict(match req.jenis {
-            AbsensiJenis::Masuk => "Check-in PH sudah tercatat".into(),
-            AbsensiJenis::Pulang => "Check-out PH sudah tercatat".to_string(),
-        }));
-    }
-    if req.jenis == AbsensiJenis::Pulang
-        && !ph::exists_absensi_ph(&state.pool, jadwal.id, user.id(), AbsensiJenis::Masuk).await?
-    {
-        return Err(AppError::Unprocessable("Check-in PH belum tercatat".into()));
+    // Satu jadwal dapat memiliki beberapa sesi check-in (mis. pagi dan sore).
+    // Sesi dianggap terbuka bila check-in terakhir lebih baru dari check-out terakhir.
+    let sesi = ph::sesi_ph_terakhir(&state.pool, jadwal.id, user.id()).await?;
+    let terbuka = match (sesi.masuk_terakhir, sesi.pulang_terakhir) {
+        (Some(masuk), Some(pulang)) => masuk > pulang,
+        (Some(_), None) => true,
+        _ => false,
+    };
+    match req.jenis {
+        AbsensiJenis::Masuk => {
+            if terbuka {
+                let masuk = sesi.masuk_terakhir.expect("sesi terbuka memiliki check-in");
+                let selisih = req.captured_at.signed_duration_since(masuk);
+                if selisih < Duration::hours(2) {
+                    return Err(AppError::Conflict(format!(
+                        "Check-in strong point pukul {} masih berlangsung. Lakukan check-out atau tunggu 2 jam untuk check-in baru.",
+                        ke_wita(masuk).format("%H:%M")
+                    )));
+                }
+            }
+        }
+        AbsensiJenis::Pulang => {
+            if !terbuka {
+                return Err(AppError::Unprocessable(
+                    "Check-in strong point belum tercatat".into(),
+                ));
+            }
+            if let Some(masuk) = sesi.masuk_terakhir
+                && req.captured_at < masuk
+            {
+                return Err(AppError::Unprocessable(
+                    "Waktu check-out tidak valid".into(),
+                ));
+            }
+        }
     }
 
     let (lat, lng) = match (req.latitude, req.longitude) {
