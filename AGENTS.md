@@ -24,7 +24,8 @@ di sana ada status, keputusan teknis, jebakan, dan backlog berprioritas.
 9. **Fake GPS** diputuskan server lewat `APP__MOCK_LOCATION_POLICY` (`flag` untuk development,
    `reject` untuk produksi). Klien hanya mengirim `is_mock_suspect` dan peringatan Developer
    Options; jangan hardcode penolakan di aplikasi. Panduan: `docs/fake-gps.md`.
-10. **Rahasia**: jangan commit `backend/.env`, `deploy/.env`, atau `deploy/data/`.
+10. **Rahasia**: jangan commit `backend/.env`, `deploy/.env`, `deploy/data/`, atau
+    `android/keystore.properties` (beserta `*.jks`/`*.keystore`).
 
 ## Perintah verifikasi cepat
 
@@ -33,6 +34,8 @@ cd backend;  cargo fmt --check; cargo clippy --all-targets -- -D warnings; cargo
 cd dashboard; bun run check; bun run build
 cd personel;  bun run check; bun run build
 cd android;  .\gradlew.bat :app:assembleDebug
+# release bertanda tangan (butuh android\keystore.properties):
+cd android;  .\build-release.bat
 ```
 
 ## Deploy VPS

@@ -528,7 +528,8 @@ seed `--reset` pada database produksi.
   build debug, atau ubah `ALAMAT_BAWAAN` di `android/app/src/main/java/id/polri/poldabali/kinerja/data/Api.kt`
   untuk build rilis).
 - Untuk build rilis, ubah `network_security_config.xml` menjadi
-  `cleartextTrafficPermitted="false"` karena server sudah HTTPS.
+  `cleartextTrafficPermitted="false"` karena server sudah HTTPS, lalu buat APK/AAB dengan
+  `android\build-release.bat` (signing dari `android/keystore.properties`).
 - Android terhubung ke Cloudflare, bukan langsung ke origin; mTLS origin tidak mengganggu
   aplikasi selama DNS diproksikan Cloudflare.
 

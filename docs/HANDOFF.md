@@ -102,6 +102,9 @@ bun run check; bun run build                # build statis ke personel/build
 cd android; .\gradlew.bat :app:assembleDebug
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 
+# Android release bertanda tangan (APK + AAB; butuh android/keystore.properties)
+cd android; .\build-release.bat
+
 # Test backend
 cd backend; cargo test; cargo clippy --all-targets -- -D warnings
 ```
@@ -510,6 +513,9 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
 - Emulator GPS: `adb emu geo fix <longitude> <latitude>` (urutan longitude dulu), lalu
   `pm grant ... ACCESS_FINE_LOCATION`.
 - `emulator` butuh `-gpu swiftshader_indirect` di mesin ini agar tidak crash.
+- Signing Android dibaca dari `android/keystore.properties` (gitignored). Jangan menaruh
+  password keystore di `build.gradle.kts` atau berkas yang di-commit; `storeFile` harus ada
+  saat `assembleRelease`/`bundleRelease`, sedangkan build debug tetap berjalan tanpa berkas itu.
 - Seed `--vps` hanya membuat Polda Bali + Ditreskrimsus dan **tidak** membuat akun Polres
   (`admin_polres`, `000022`, `000023`); jangan mencampurnya dengan database yang sudah berisi
   data development. `--reset` tetap menghapus seluruh data.

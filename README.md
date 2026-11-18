@@ -146,6 +146,36 @@ adb install -r app\build\outputs\apk\debug\app-debug.apk
 Alamat server default `http://10.0.2.2:8080/api/v1/` (emulator). Untuk perangkat
 nyata, ubah lewat menu **Profil → Server** menjadi `http://<ip-server>:8080/api/v1/`.
 
+#### Build release (APK + AAB)
+
+Signing release dibaca dari `android/keystore.properties` yang **tidak di-commit**.
+Salin contohnya lalu isi nilainya:
+
+```powershell
+cd F:\absensi_polda_bali\android
+copy keystore.properties.example keystore.properties
+notepad keystore.properties
+```
+
+```properties
+storeFile=E:/new_disposisi/siopa.jks
+storePassword=...
+keyAlias=siopa
+keyPassword=...
+```
+
+Build keduanya sekaligus:
+
+```powershell
+.\build-release.bat
+# APK  : app\build\outputs\apk\release\app-release.apk
+# AAB  : app\build\outputs\bundle\release\app-release.aab
+```
+
+APK release memakai `applicationId` `id.polri.poldabali.kinerja` (tanpa `.debug`), sehingga
+dapat terpasang berdampingan dengan build debug. Untuk produksi, pastikan server memakai
+HTTPS dan `network_security_config.xml` tidak mengizinkan cleartext.
+
 #### Menjalankan emulator & memasang APK lewat command line
 
 Pastikan backend sudah berjalan di `http://127.0.0.1:8080` (emulator mengaksesnya lewat

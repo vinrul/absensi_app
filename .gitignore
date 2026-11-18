@@ -31,6 +31,9 @@
 /android/.idea/
 /android/.kotlin/
 /android/captures/
+/android/keystore.properties
+/android/*.jks
+/android/*.keystore
 *.hprof
 
 # Deploy data
