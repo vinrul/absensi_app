@@ -75,6 +75,9 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A61 | Sidebar pimpinan murni | Grup **Master Data** tidak tampil; akses langsung `/satker`, `/personel`, `/libur`, `/absensi/titik-dinas` dialihkan ke dashboard | ✅ | UI build |
 | A62 | Aksi Kinerja pimpinan murni | Tombol **Buat Rencana**, **Tambah Hasil**, **Tambah Output**, dan **Ajukan** rencana tidak tampil; admin tetap melihat | ✅ | UI build |
 | A63 | Tab **Verifikasi Offline** pimpinan murni | Submenu **Verifikasi Offline** dan tab **Verifikasi** disembunyikan; akses `?tab=verifikasi` dialihkan ke Rekap Kehadiran | ✅ | UI build |
+| A64 | Buka **Profil Saya** lewat avatar/nama di sidebar atau header | Halaman `/profil` menampilkan nama, pangkat, jabatan, NRP/username, satker, dan badge peran; judul header menjadi **Profil Saya** | ✅ | build + API |
+| A65 | Profil → unggah foto JPG/PNG ≤ 5 MB | Pratinjau tampil, unggahan berhasil, avatar berubah di profil, sidebar, dan header; berkas PDF atau > 5 MB ditolak dengan pesan | ✅ | build + endpoint (Android) |
+| A66 | Profil → **Ganti Password** dengan ikon mata | Ketiga kolom dapat ditampilkan/disembunyikan; validasi minimal 8 karakter, huruf + angka, dan konfirmasi sama; setelah sukses semua sesi dicabut dan pengguna diarahkan ke `/login` | ✅ | build + endpoint (Android) |
 
 ## B. Admin ber-scope
 

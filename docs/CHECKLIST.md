@@ -98,6 +98,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.47 | Sidebar dashboard bergrup dengan submenu | ✅ | Dashboard; Master Data; Absensi (Rekap Kehadiran/Detail Rekap/Verifikasi Offline via `?tab=`); Strong Point (Jadwal/Rekap via `?tab=`); Kinerja; Laporan (Penilaian/Print Laporan); Pengaturan (Akun Admin/Kesiapan Periode/Periode); grup aktif terbuka otomatis |
 | 3.48 | Galeri dokumentasi foto absensi | ✅ | Tombol **Lihat** di rekap membuka galeri foto per personel; detail per orang menampilkan tombol **Masuk/Pulang**; berkas disajikan `/api/v1/files/...` dengan cek kepemilikan/cakupan |
 | 3.49 | Pembatasan peran dashboard | ✅ | Login web hanya role admin/pimpinan; atasan/personel ditolak 403. Pimpinan murni tidak melihat Master Data, **Verifikasi Offline**, dan tombol Buat Rencana/Tambah Hasil/Tambah Output/Ajukan; akun multi-role tetap masuk lewat role pimpinan/admin |
+| 3.50 | Profil Saya di dashboard | ✅ | `/profil`: unggah foto (JPG/PNG maks. 5 MB, avatar di sidebar/header) dan ganti password dengan tombol mata; ganti password mencabut semua sesi lalu diarahkan ke login |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 

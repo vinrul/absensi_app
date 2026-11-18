@@ -111,7 +111,9 @@ export async function apiBlobUrl(path: string): Promise<string> {
 	const url =
 		path.startsWith('/api/v1/') || path.startsWith('/files/')
 			? path
-			: `/api/v1/lampiran/raw/${path}`;
+			: path.startsWith('auth/foto/')
+				? `/api/v1/${path}`
+				: `/api/v1/lampiran/raw/${path}`;
 
 	const ambil = async () => {
 		const headers = new Headers();

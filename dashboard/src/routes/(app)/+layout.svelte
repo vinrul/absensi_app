@@ -5,6 +5,7 @@
 	import { page } from '$app/state';
 	import { logout, pulihkanSesi, session, bolehMasukDashboard } from '#lib/stores/session.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import Avatar from '#lib/components/Avatar.svelte';
 
 	let { children }: { children?: Snippet } = $props();
 
@@ -169,10 +170,11 @@
 
 	const judulHalaman = $derived.by(() => {
 		const semua = [...menuTampil, ...grupTampil.flatMap((grup) => grup.items)];
-		return (
-			semua.find((item) => aktif(item.href))?.label ??
-			(page.url.pathname.startsWith('/ph') ? 'Strong Point' : 'Penilaian Kinerja')
-		);
+		const cocok = semua.find((item) => aktif(item.href))?.label;
+		if (cocok) return cocok;
+		if (page.url.pathname.startsWith('/profil')) return 'Profil Saya';
+		if (page.url.pathname.startsWith('/ph')) return 'Strong Point';
+		return 'Penilaian Kinerja';
 	});
 
 	onMount(async () => {
@@ -292,7 +294,25 @@
 				{/each}
 			</nav>
 
-			<div class="shrink-0 border-t border-white/10 p-3">
+			<div class="shrink-0 space-y-1 border-t border-white/10 p-3">
+				<a
+					href="/profil"
+					title="Profil Saya"
+					class="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors {page.url
+						.pathname === '/profil'
+						? 'bg-white/10'
+						: 'hover:bg-white/10'}"
+					onclick={() => (menuTerbuka = false)}
+				>
+					<Avatar pengguna={session.user} size={32} class="ring-2 ring-white/20" />
+					<span class="min-w-0 flex-1">
+						<span class="block truncate text-sm font-medium text-white">
+							{session.user?.nama ?? '-'}
+						</span>
+						<span class="block truncate text-[11px] text-navy-300">Profil Saya</span>
+					</span>
+					<Icon name="right" size={14} class="shrink-0 text-navy-300" />
+				</a>
 				<button
 					class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-navy-100 hover:bg-white/10"
 					onclick={keluar}
@@ -333,19 +353,17 @@
 				</div>
 
 				<div class="flex items-center gap-3">
-					<div class="hidden text-right sm:block">
+					<a href="/profil" class="hidden text-right hover:underline sm:block">
 						<p class="text-sm font-medium text-slate-800">{session.user?.nama}</p>
 						<p class="text-[11px] text-slate-500">
 							{session.user?.pangkat} · {session.user?.jenis_akun === 'admin'
 								? `@${session.user?.username ?? '-'}`
 								: `NRP ${session.user?.nrp ?? '-'}`}
 						</p>
-					</div>
-					<div
-						class="flex size-9 items-center justify-center rounded-full bg-navy-100 text-sm font-semibold text-navy-800"
-					>
-						{(session.user?.nama ?? '?').slice(0, 1)}
-					</div>
+					</a>
+					<a href="/profil" title="Profil Saya" class="rounded-full hover:opacity-90">
+						<Avatar pengguna={session.user} size={36} class="ring-2 ring-slate-200" />
+					</a>
 				</div>
 			</header>
 

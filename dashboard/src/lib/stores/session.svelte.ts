@@ -18,6 +18,9 @@ export interface Pengguna {
 	role_scopes: RoleScope[];
 	must_change_password: boolean;
 	atasan_id: string | null;
+	email?: string | null;
+	phone?: string | null;
+	foto_url?: string | null;
 }
 
 export const session = $state<{ user: Pengguna | null; siap: boolean }>({

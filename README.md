@@ -283,6 +283,10 @@ Catatan penting:
   tautan, serta layar verifikasi untuk atasan langsung.
 - **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 21 tingkat
   Polri)/jabatan/telepon/email, ganti password, pengaturan alamat server, dan antrean offline.
+- **Profil Saya di dashboard**: halaman `/profil` untuk admin & pimpinan dengan unggah foto profil
+  (JPG/PNG maks. 5 MB) dan ganti password; setiap kolom password punya ikon mata
+  tampil/sembunyikan. Avatar tampil di sidebar dan header, dan ganti password mencabut seluruh
+  sesi sehingga pengguna kembali ke halaman login.
 - **Penilaian**: periode bulanan dibuat otomatis (penutupan manual), bobot per periode
   (default 20/20/30/30), snapshot komponen untuk audit, hari ber-jadwal PH dikeluarkan dari
   skor absensi harian.

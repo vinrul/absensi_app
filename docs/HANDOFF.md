@@ -45,6 +45,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser; Rencana/Hasil/Output memiliki halaman detail + lampiran, filter periode/status/satker/personel, dan **Export PDF** lewat Chrome/Edge headless |
 | Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
+| Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
 | Strong Point: roster + Export PDF | Jadwal memakai roster bulanan (anggota × tanggal, blok regu) dengan input rentang tanggal satu-per-satu; rekap menandai tidak strong point/hanya check-in beserta tanggal, tanpa kolom telat, dan hanya menghitung sampai hari ini; PDF `/ph/jadwal/ekspor` (roster) & `/ph/rekap/ekspor` (uji API + Chrome headless) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
@@ -340,6 +341,12 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
   `bersihkanDataSesi()` sehingga aplikasi kembali ke layar login.
 - **Avatar di Beranda** memakai komponen bersama `FotoProfil` dan hanya digambar bila foto berhasil
   diunggah/dimuat (`tampilkanInisial = false`); tanpa foto, salam langsung dimulai dari teks.
+- **Profil dashboard** (`(app)/profil/+page.svelte`): avatar memakai komponen bersama
+  `Avatar.svelte` (menerima `pengguna` + `versi` untuk memuat ulang setelah unggah), unggah foto
+  lewat `POST /auth/foto` (FormData field `file`), ganti password lewat
+  `POST /auth/change-password`. `apiBlobUrl('auth/foto/{id}')` dipetakan ke
+  `/api/v1/auth/foto/{id}`. Ganti password mencabut seluruh sesi → panggil `logout()` lalu
+  `goto('/login?ubah=password')`; jangan hanya menampilkan pesan sukses.
 - Semua tanggal memakai `FieldTanggal` + `DatePickerDialog` Material 3 (tidak ada input tanggal manual).
 - Satu pengajuan wizard = satu baris `rencana_kerja`; rincian kegiatan disimpan sebagai
   `rencana_tahapan` dengan kolom tambahan (migrasi `0013`) agar tetap satu alur persetujuan.

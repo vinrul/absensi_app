@@ -107,6 +107,10 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Halaman **Profil & Pengaturan** Android menyediakan ganti foto, edit profil, dan ganti password.
   Kolom password memiliki ikon mata untuk menampilkan/menyembunyikan isian. Ganti password
   mencabut seluruh sesi sehingga pengguna harus login kembali.
+- Halaman **Profil Saya** di dashboard (`/profil`, untuk admin & pimpinan) menyediakan unggah
+  foto profil (JPG/PNG maks. 5 MB) dan ganti password dengan tombol mata pada tiap kolom.
+  Avatar tampil di sidebar dan header; setelah ganti password seluruh sesi dicabut dan pengguna
+  diarahkan ke halaman login.
 - Foto profil yang sudah diunggah ditampilkan sebagai avatar di Beranda; bila belum ada, Beranda
   tidak menampilkan avatar maupun placeholder.
 
