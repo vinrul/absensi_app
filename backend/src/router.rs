@@ -31,6 +31,7 @@ pub fn build(state: AppState) -> Router {
         .nest("/hasil-kerja", routes::hasil::routes())
         .nest("/output", routes::output::routes())
         .nest("/lampiran", routes::lampiran::routes())
+        .nest("/files", routes::files::routes())
         .nest("/periode", routes::periode::routes())
         .nest("/libur", routes::libur::routes())
         .nest("/penilaian", routes::penilaian::routes())

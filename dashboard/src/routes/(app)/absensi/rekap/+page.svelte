@@ -5,6 +5,7 @@
 	import { api, apiBlob, apiBlobUrl, ApiError } from '#lib/api/client';
 	import type {
 		AbsensiHarian,
+		FotoAbsensi,
 		ListResponse,
 		Periode,
 		Personel,
@@ -67,6 +68,10 @@
 	let pilihVerifikasi = $state<AbsensiHarian | null>(null);
 	let catatan = $state('');
 	let fotoVerifikasi = $state<string | null>(null);
+
+	type ItemGaleri = { url: string; caption: string };
+	let galeri = $state<{ nama: string; memuat: boolean; item: ItemGaleri[] } | null>(null);
+	let fotoDetail = $state<ItemGaleri | null>(null);
 
 	const perPage = 10;
 	const totalHalamanRekap = $derived(Math.max(1, Math.ceil(rekap.length / perPage)));
@@ -310,6 +315,48 @@
 		fotoVerifikasi = null;
 	}
 
+	function tutupGaleri() {
+		galeri?.item.forEach((item) => URL.revokeObjectURL(item.url));
+		galeri = null;
+	}
+
+	async function bukaGaleri(row: RekapAbsensi) {
+		tutupGaleri();
+		galeri = { nama: row.nama, memuat: true, item: [] };
+		try {
+			const params = new URLSearchParams({ personel_id: row.personel_id });
+			if (filter.rekap.periode_id) params.set('periode_id', filter.rekap.periode_id);
+			if (filter.rekap.satker_id) params.set('satker_id', filter.rekap.satker_id);
+
+			const hasil = await api<{ data: FotoAbsensi[] }>(`/absensi/foto?${params}`);
+			const item = await Promise.all(
+				hasil.data.map(async (foto) => ({
+					url: await apiBlobUrl(foto.foto_url),
+					caption: `${tanggalSingkat(foto.tanggal)} · ${foto.jenis === 'masuk' ? 'Masuk' : 'Pulang'} ${foto.jam} · ${LABEL_STATUS_KEHADIRAN[foto.status_kehadiran]}`
+				}))
+			);
+			if (galeri) galeri = { ...galeri, memuat: false, item };
+		} catch (err) {
+			error = err instanceof ApiError ? err.message : 'Gagal memuat dokumentasi absensi';
+			if (galeri) galeri = { ...galeri, memuat: false };
+		}
+	}
+
+	async function bukaFotoDetail(url: string, caption: string) {
+		if (fotoDetail) URL.revokeObjectURL(fotoDetail.url);
+		fotoDetail = null;
+		try {
+			fotoDetail = { url: await apiBlobUrl(url), caption };
+		} catch (err) {
+			error = err instanceof ApiError ? err.message : 'Gagal memuat foto';
+		}
+	}
+
+	function tutupFotoDetail() {
+		if (fotoDetail) URL.revokeObjectURL(fotoDetail.url);
+		fotoDetail = null;
+	}
+
 	async function verifikasi() {
 		if (!pilihVerifikasi) return;
 		const ids = pilihVerifikasi.perlu_verifikasi_ids;
@@ -526,6 +573,7 @@
 							<th class="th text-center">PH</th>
 							<th class="th text-center">TK</th>
 							<th class="th text-center">Menunggu</th>
+							<th class="th text-center">Dokumentasi</th>
 						</tr>
 					</thead>
 					<tbody class="divide-y divide-slate-100">
@@ -569,10 +617,18 @@
 										<span class="text-slate-300">-</span>
 									{/if}
 								</td>
+								<td class="td text-center">
+									<button
+										class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs"
+										onclick={() => bukaGaleri(row)}
+									>
+										<Icon name="image" size={14} /> Lihat
+									</button>
+								</td>
 							</tr>
 						{:else}
 							<tr>
-								<td class="td text-center text-slate-500" colspan="13">
+								<td class="td text-center text-slate-500" colspan="14">
 									{memuat ? 'Memuat…' : 'Belum ada data.'}
 								</td>
 							</tr>
@@ -737,6 +793,7 @@
 								<th class="th text-center">Radius</th>
 								<th class="th">Kondisi</th>
 								<th class="th">Verifikasi</th>
+								<th class="th text-center">Dokumentasi</th>
 								<th class="th">Catatan</th>
 							</tr>
 						</thead>
@@ -799,13 +856,44 @@
 											<span class="text-xs text-slate-400">-</span>
 										{/if}
 									</td>
+									<td class="td">
+										<div class="flex flex-wrap gap-1">
+											{#if row.foto_masuk_url}
+												<button
+													class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs"
+													onclick={() =>
+														bukaFotoDetail(
+															row.foto_masuk_url ?? '',
+															`${tanggalSingkat(row.tanggal)} · Masuk ${row.masuk_jam ?? ''}`
+														)}
+												>
+													<Icon name="image" size={14} /> Masuk
+												</button>
+											{/if}
+											{#if row.foto_pulang_url}
+												<button
+													class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs"
+													onclick={() =>
+														bukaFotoDetail(
+															row.foto_pulang_url ?? '',
+															`${tanggalSingkat(row.tanggal)} · Pulang ${row.pulang_jam ?? ''}`
+														)}
+												>
+													<Icon name="image" size={14} /> Pulang
+												</button>
+											{/if}
+											{#if !row.foto_masuk_url && !row.foto_pulang_url}
+												<span class="text-xs text-slate-400">-</span>
+											{/if}
+										</div>
+									</td>
 									<td class="td text-xs text-slate-600">
 										{row.catatan_verifikator ?? '-'}
 									</td>
 								</tr>
 							{:else}
 								<tr>
-									<td class="td text-center text-slate-500" colspan="9">
+									<td class="td text-center text-slate-500" colspan="10">
 										{memuat
 											? 'Memuat…'
 											: 'Belum ada absensi untuk personel ini pada periode terpilih.'}
@@ -895,6 +983,56 @@
 					bind:value={catatan}
 				></textarea>
 			</div>
+		</div>
+	{/if}
+</Modal>
+
+<Modal
+	open={!!galeri}
+	title={galeri ? `Dokumentasi Absensi — ${galeri.nama}` : 'Dokumentasi Absensi'}
+	lebar="max-w-4xl"
+	onclose={tutupGaleri}
+>
+	{#if galeri}
+		{#if galeri.memuat}
+			<p class="py-8 text-center text-sm text-slate-500">Memuat dokumentasi…</p>
+		{:else if galeri.item.length === 0}
+			<p class="py-8 text-center text-sm text-slate-500">
+				Belum ada foto dokumentasi absensi pada periode ini.
+			</p>
+		{:else}
+			<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+				{#each galeri.item as foto}
+					<figure class="overflow-hidden rounded-lg ring-1 ring-slate-200">
+						<img
+							src={foto.url}
+							alt={foto.caption}
+							class="h-40 w-full object-cover"
+						/>
+						<figcaption class="bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+							{foto.caption}
+						</figcaption>
+					</figure>
+				{/each}
+			</div>
+		{/if}
+	{/if}
+</Modal>
+
+<Modal
+	open={!!fotoDetail}
+	title="Dokumentasi Absensi"
+	lebar="max-w-3xl"
+	onclose={tutupFotoDetail}
+>
+	{#if fotoDetail}
+		<div class="space-y-2">
+			<img
+				src={fotoDetail.url}
+				alt={fotoDetail.caption}
+				class="max-h-[70vh] w-full rounded-lg object-contain ring-1 ring-slate-200"
+			/>
+			<p class="text-xs text-slate-500">{fotoDetail.caption}</p>
 		</div>
 	{/if}
 </Modal>

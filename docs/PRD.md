@@ -120,6 +120,9 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   tanpa keterangan.
 - `client_uuid` menjamin idempotensi pengiriman ulang antrean offline.
 - Satu absen masuk dan satu absen pulang per personel per hari.
+- Foto bukti absensi yang diunggah dari Android dapat dilihat di dashboard: galeri pada rekap
+  absensi dan tombol Masuk/Pulang pada detail per orang. Berkas hanya dapat diakses pemilik atau
+  pengelola dalam cakupan satker.
 
 ### FR-03 Rencana kerja
 - Wajib: program, kegiatan, uraian, tanggal mulai/selesai, periode.
@@ -252,6 +255,8 @@ aktif dan dapat diaktifkan kembali.
   Check-in dilanjutkan ke dokumentasi foto dan halaman kirim; check-out langsung ke halaman kirim.
   Bila tidak ada sinyal, kedua tombol check-in/check-out (offline) tersedia dan data masuk antrean
   untuk dikirim otomatis.
+- Foto dokumentasi check-in dapat dilihat pada rekap strong point dashboard melalui tombol
+  **Lihat** (galeri per personel).
 
 ### FR-10 Pengingat jadwal (tanpa FCM)
 - Aplikasi Android menjadwalkan notifikasi lokal melalui WorkManager: H-1 pukul 19:00 dan

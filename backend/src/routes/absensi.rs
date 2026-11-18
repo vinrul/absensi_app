@@ -37,6 +37,7 @@ pub fn routes() -> Router<AppState> {
         .route("/harian", get(list_harian))
         .route("/rekap", get(rekap_absensi))
         .route("/rekap/ekspor", get(ekspor_rekap_pdf))
+        .route("/foto", get(list_foto))
         .route("/verifikasi/ekspor", get(ekspor_verifikasi_pdf))
         .route("/detail/ekspor", get(ekspor_detail_pdf))
         .route("/titik-terdekat", get(titik_terdekat))
@@ -89,7 +90,7 @@ impl From<AbsensiRow> for AbsensiDto {
             perlu_verifikasi: row.perlu_verifikasi,
             verified_at: row.verified_at,
             catatan_verifikator: row.catatan_verifikator,
-            foto_url: row.foto_path.map(|key| format!("/files/{key}")),
+            foto_url: row.foto_path.map(|key| format!("/api/v1/files/{key}")),
         }
     }
 }
@@ -483,7 +484,7 @@ pub async fn list_absensi(
             perlu_verifikasi: row.perlu_verifikasi,
             verified_at: row.verified_at,
             catatan_verifikator: row.catatan_verifikator,
-            foto_url: row.foto_path.map(|key| format!("/files/{key}")),
+            foto_url: row.foto_path.map(|key| format!("/api/v1/files/{key}")),
         })
         .collect();
 
@@ -525,6 +526,8 @@ pub struct AbsensiHarianDto {
     pub catatan_verifikator: Option<String>,
     pub menit_telat: i64,
     pub foto_url: Option<String>,
+    pub foto_masuk_url: Option<String>,
+    pub foto_pulang_url: Option<String>,
 }
 
 impl From<AbsensiHarianRow> for AbsensiHarianDto {
@@ -550,7 +553,13 @@ impl From<AbsensiHarianRow> for AbsensiHarianDto {
             verified_at: row.verified_at,
             catatan_verifikator: row.catatan_verifikator,
             menit_telat: row.menit_telat,
-            foto_url: row.foto_path.map(|key| format!("/files/{key}")),
+            foto_url: row.foto_path.map(|key| format!("/api/v1/files/{key}")),
+            foto_masuk_url: row
+                .foto_masuk_path
+                .map(|key| format!("/api/v1/files/{key}")),
+            foto_pulang_url: row
+                .foto_pulang_path
+                .map(|key| format!("/api/v1/files/{key}")),
         }
     }
 }
@@ -595,6 +604,62 @@ pub async fn list_harian(
 
     let data = rows.into_iter().map(AbsensiHarianDto::from).collect();
     Ok(Json(ListResponse::new(data, page, per_page, total)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FotoQuery {
+    pub periode_id: Option<Uuid>,
+    pub satker_id: Option<Uuid>,
+    pub personel_id: Option<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FotoAbsensiDto {
+    pub id: Uuid,
+    pub tanggal: NaiveDate,
+    pub jenis: AbsensiJenis,
+    pub jam: String,
+    pub status_kehadiran: StatusKehadiran,
+    pub foto_url: String,
+}
+
+/// Daftar foto dokumentasi absensi untuk galeri rekap/detail per orang.
+pub async fn list_foto(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<FotoQuery>,
+) -> AppResult<Json<Vec<FotoAbsensiDto>>> {
+    pastikan_pengelola_absensi(&user)?;
+    let (periode, scope) = periode_dan_scope(
+        &state,
+        &user,
+        query.periode_id,
+        query.satker_id,
+        "Anda tidak berhak melihat foto absensi satker tersebut",
+    )
+    .await?;
+
+    let rows = absensi::list_foto(
+        &state.pool,
+        &scope,
+        query.personel_id,
+        periode.tanggal_mulai,
+        periode.tanggal_selesai,
+    )
+    .await?;
+
+    Ok(Json(
+        rows.into_iter()
+            .map(|row| FotoAbsensiDto {
+                id: row.id,
+                tanggal: row.tanggal,
+                jenis: row.jenis,
+                jam: row.jam.format("%H:%M").to_string(),
+                status_kehadiran: row.status_kehadiran,
+                foto_url: format!("/api/v1/files/{}", row.foto_path),
+            })
+            .collect(),
+    ))
 }
 
 #[derive(Debug, Deserialize)]

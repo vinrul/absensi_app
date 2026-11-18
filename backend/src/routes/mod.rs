@@ -4,6 +4,7 @@ pub mod audit;
 pub mod auth;
 pub mod dashboard;
 pub mod dev;
+pub mod files;
 pub mod hasil;
 pub mod health;
 pub mod lampiran;

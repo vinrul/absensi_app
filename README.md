@@ -256,6 +256,8 @@ Catatan penting:
   titiknya belum tetap. Aplikasi Android memiliki tab **Strong** dengan tombol besar menuju wizard
   check-in/check-out: peta lokasi (marker hijau) tanpa titik dinas, koordinat, akurasi GPS, alamat
   reverse-geocode, dokumentasi foto saat check-in, dan antrean offline untuk kondisi tanpa sinyal.
+  Foto dokumentasi absensi dan strong point dapat dibuka kembali dari dashboard (galeri rekap dan
+  detail per orang) dengan kontrol akses pemilik/cakupan satker.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
   60 menit sebelum jadwal.
 - **Rencana kerja**: wizard 4 langkah di Android (jenis → dasar SP/TOR → rincian kegiatan →

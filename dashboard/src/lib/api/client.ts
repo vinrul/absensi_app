@@ -108,7 +108,10 @@ export async function api<T>(path: string, opsi: Opsi = {}): Promise<T> {
 
 /** Ambil berkas (foto/bukti) dengan header Authorization lalu jadikan object URL. */
 export async function apiBlobUrl(path: string): Promise<string> {
-	const url = path.startsWith('/files/') ? path : `/api/v1/lampiran/raw/${path}`;
+	const url =
+		path.startsWith('/api/v1/') || path.startsWith('/files/')
+			? path
+			: `/api/v1/lampiran/raw/${path}`;
 
 	const ambil = async () => {
 		const headers = new Headers();

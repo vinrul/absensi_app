@@ -34,6 +34,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
 | Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; rekap menandai tidak strong point / hanya check-in |
 | Tab **Strong Point** di Android | bottom nav 6 tab; tombol besar + riwayat, wizard 3 langkah (lokasi → dokumentasi → kirim), peta tanpa titik dinas + marker hijau, koordinat/akurasi/geocode, check-in/out offline ber-antrean |
+| Dokumentasi foto absensi & strong point | Unggahan base64 Android disimpan sebagai `foto_path`; galeri dashboard lewat `/absensi/foto` dan `/ph/foto`; berkas `/api/v1/files/{key}` dengan cek pemilik/cakupan satker |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
@@ -178,6 +179,10 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
     tanpa titik dinas dengan marker hijau, alamat dari Nominatim mandiri
     (`https://geocode.vinrul.my.id`), serta antrean `AntreanPh` untuk check-in/out offline.
     Dokumentasi foto diminta saat check-in (dapat dilewati bila kamera tidak tersedia).
+    **Penyajian foto:** `foto_url` memakai `/api/v1/files/{key}`; endpoint `/files/{*key}`
+    memeriksa pemilik atau cakupan satker. Galeri rekap memakai `/absensi/foto` (satu personel
+    per periode) dan `/ph/foto`; detail per orang memakai `foto_masuk_url`/`foto_pulang_url`
+    dari `GET /absensi/harian`.
 18. **Pengingat jadwal tanpa FCM.** Android memakai WorkManager + notifikasi lokal
     (H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum).
     Tidak ada ketergantungan layanan push eksternal.

@@ -813,6 +813,18 @@
         "responses": { "200": { "description": "Rekap PH" }, "403": { "description": "Di luar cakupan" } }
       }
     },
+    "/ph/foto": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Daftar foto dokumentasi strong point (galeri rekap)",
+        "parameters": [
+          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Daftar foto" }, "403": { "description": "Di luar cakupan" } }
+      }
+    },
     "/ph/rekap/ekspor": {
       "get": {
         "tags": ["ph"],
@@ -895,6 +907,26 @@
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Rekap" } }
+      }
+    },
+    "/absensi/foto": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Daftar foto dokumentasi absensi (galeri rekap/detail)",
+        "parameters": [
+          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Daftar foto" }, "403": { "description": "Di luar cakupan" } }
+      }
+    },
+    "/files/{key}": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Ambil berkas foto absensi atau strong point",
+        "parameters": [{ "name": "key", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Berkas gambar" }, "403": { "description": "Di luar cakupan" }, "404": { "description": "Tidak ditemukan" } }
       }
     },
     "/absensi/rekap/ekspor": {

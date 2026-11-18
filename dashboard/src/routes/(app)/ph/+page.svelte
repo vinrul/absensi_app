@@ -2,10 +2,11 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { api, apiBlob, ApiError } from '#lib/api/client';
+	import { api, apiBlob, apiBlobUrl, ApiError } from '#lib/api/client';
 	import { adalahAdmin } from '#lib/stores/session.svelte';
 	import type {
 		AbsensiPh,
+		FotoPh,
 		JadwalPh,
 		ListResponse,
 		Personel,
@@ -82,6 +83,8 @@
 	let mengekspor = $state(false);
 	let error = $state<string | null>(null);
 	let info = $state<string | null>(null);
+	type ItemGaleri = { url: string; caption: string };
+	let galeri = $state<{ nama: string; memuat: boolean; item: ItemGaleri[] } | null>(null);
 	let halamanJadwal = $state(1);
 	let halamanStrong = $state(1);
 	let halamanRekap = $state(1);
@@ -275,6 +278,31 @@
 		if (satkerId) params.set('satker_id', satkerId);
 		const hasil = await api<{ data: RekapPh[] }>(`/ph/rekap?${params}`);
 		rekap = hasil.data;
+	}
+
+	function tutupGaleri() {
+		galeri?.item.forEach((item) => URL.revokeObjectURL(item.url));
+		galeri = null;
+	}
+
+	async function bukaGaleri(row: RekapPh) {
+		tutupGaleri();
+		galeri = { nama: row.nama, memuat: true, item: [] };
+		try {
+			const params = new URLSearchParams({ bulan, personel_id: row.personel_id });
+			if (satkerId) params.set('satker_id', satkerId);
+			const hasil = await api<{ data: FotoPh[] }>(`/ph/foto?${params}`);
+			const item = await Promise.all(
+				hasil.data.map(async (foto) => ({
+					url: await apiBlobUrl(foto.foto_url),
+					caption: `${tanggalPanjang(foto.tanggal)} · ${foto.jenis === 'masuk' ? 'Check-in' : 'Check-out'} ${foto.jam}`
+				}))
+			);
+			if (galeri) galeri = { ...galeri, memuat: false, item };
+		} catch (err) {
+			error = err instanceof ApiError ? err.message : 'Gagal memuat dokumentasi strong point';
+			if (galeri) galeri = { ...galeri, memuat: false };
+		}
 	}
 
 	async function eksporPdf() {
@@ -678,6 +706,7 @@
 								<th class="th text-center">Hanya Check-in</th>
 								<th class="th text-center">Tidak Strong Point</th>
 								<th class="th text-center">Menunggu</th>
+								<th class="th text-center">Dokumentasi</th>
 							</tr>
 						</thead>
 						<tbody class="divide-y divide-slate-100">
@@ -724,9 +753,17 @@
 									<td class="td text-center">
 										{#if row.menunggu_verifikasi > 0}<Badge tone="amber">{row.menunggu_verifikasi}</Badge>{:else}<span class="text-slate-300">-</span>{/if}
 									</td>
+									<td class="td text-center">
+										<button
+											class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs"
+											onclick={() => bukaGaleri(row)}
+										>
+											<Icon name="image" size={14} /> Lihat
+										</button>
+									</td>
 								</tr>
 							{:else}
-								<tr><td class="td text-center text-slate-500" colspan="7">{memuat ? 'Memuat…' : 'Belum ada rekap PH.'}</td></tr>
+								<tr><td class="td text-center text-slate-500" colspan="8">{memuat ? 'Memuat…' : 'Belum ada rekap PH.'}</td></tr>
 							{/each}
 					</tbody>
 				</table>
@@ -829,8 +866,40 @@
 							</tr>
 						{/each}
 					</tbody>
-				</table>
+					</table>
+				</div>
 			</div>
-		</div>
-	{/if}
-</Modal>
+		{/if}
+	</Modal>
+
+	<Modal
+		open={!!galeri}
+		title={galeri ? `Dokumentasi Strong Point — ${galeri.nama}` : 'Dokumentasi Strong Point'}
+		lebar="max-w-4xl"
+		onclose={tutupGaleri}
+	>
+		{#if galeri}
+			{#if galeri.memuat}
+				<p class="py-8 text-center text-sm text-slate-500">Memuat dokumentasi…</p>
+			{:else if galeri.item.length === 0}
+				<p class="py-8 text-center text-sm text-slate-500">
+					Belum ada foto dokumentasi strong point pada bulan ini.
+				</p>
+			{:else}
+				<div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+					{#each galeri.item as foto}
+						<figure class="overflow-hidden rounded-lg ring-1 ring-slate-200">
+							<img
+								src={foto.url}
+								alt={foto.caption}
+								class="h-40 w-full object-cover"
+							/>
+							<figcaption class="bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+								{foto.caption}
+							</figcaption>
+						</figure>
+					{/each}
+				</div>
+			{/if}
+		{/if}
+	</Modal>

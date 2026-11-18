@@ -67,6 +67,9 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A53 | Buka tab Jadwal Strong Point | Roster bulanan: kolom tanggal 1–akhir bulan, anggota × pangkat, dan blok biru berlabel regu pada tanggal yang dijadwalkan; daftar kelola jadwal dapat dibuka | ✅ | UI (Chrome headless) |
 | A54 | **Export PDF** pada tab Jadwal Strong Point | `jadwal-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh sesuai bulan & satker; berbentuk **roster** seperti dashboard: No, Anggota, Pangkat, dan kolom tanggal 1–akhir bulan dengan blok biru berlabel regu | ✅ | API + Chrome headless |
 | A55 | **Export PDF** pada tab Rekap Strong Point | `rekap-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh; perhitungan dibatasi sampai hari ini (tanggal setelahnya tidak dianggap tidak strong point); memuat Check-in, Hanya Check-in + tanggal, Tidak Strong Point + tanggal, Menunggu (tanpa telat) | ✅ | API |
+| A56 | Tombol **Lihat** dokumentasi di Rekap Absensi | Galeri foto absensi per personel tampil (tanggal, masuk/pulang, jam, status); hanya pengelola sesuai cakupan yang dapat membuka | ✅ | API + build |
+| A57 | Dokumentasi di **Detail per Orang** | Tombol **Masuk** dan **Pulang** tampil pada tanggal yang memiliki foto; modal menampilkan gambar penuh | ✅ | API + build |
+| A58 | Tombol **Lihat** dokumentasi di Rekap Strong Point | Galeri foto check-in strong point per personel tampil; foto tanpa token ditolak 401, di luar cakupan 403 | ✅ | API |
 
 ## B. Admin ber-scope
 

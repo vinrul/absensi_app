@@ -802,3 +802,51 @@ pub async fn verifikasi_absensi_ph(
     }
     Ok(())
 }
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FotoPhRow {
+    pub id: Uuid,
+    pub tanggal: NaiveDate,
+    pub jenis: AbsensiJenis,
+    pub jam: NaiveTime,
+    pub strong_point_nama: String,
+    pub foto_path: String,
+}
+
+/// Foto dokumentasi strong point pada rentang tanggal dan cakupan satker.
+pub async fn list_foto_ph(
+    pool: &PgPool,
+    satker_ids: &[Uuid],
+    personel_id: Option<Uuid>,
+    dari: NaiveDate,
+    sampai: NaiveDate,
+) -> AppResult<Vec<FotoPhRow>> {
+    const SQL: &str = r#"
+        SELECT ap.id, j.tanggal, ap.jenis, ap.jam, sp.nama AS strong_point_nama,
+               ap.foto_path
+          FROM absensi_ph ap
+          JOIN jadwal_ph j ON j.id = ap.jadwal_ph_id
+          JOIN strong_point sp ON sp.id = ap.strong_point_id
+         WHERE ap.satker_id = ANY($1::uuid[])
+           AND ($2::uuid IS NULL OR ap.personel_id = $2)
+           AND j.tanggal BETWEEN $3 AND $4
+           AND ap.foto_path IS NOT NULL
+         ORDER BY j.tanggal DESC, ap.jam DESC
+    "#;
+    Ok(sqlx::query_as::<_, FotoPhRow>(SQL)
+        .bind(satker_ids)
+        .bind(personel_id)
+        .bind(dari)
+        .bind(sampai)
+        .fetch_all(pool)
+        .await?)
+}
+
+/// Pemilik berkas foto strong point untuk pemeriksaan akses.
+pub async fn pemilik_foto_ph(pool: &PgPool, storage_key: &str) -> AppResult<Option<(Uuid, Uuid)>> {
+    const SQL: &str = "SELECT personel_id, satker_id FROM absensi_ph WHERE foto_path = $1";
+    Ok(sqlx::query_as::<_, (Uuid, Uuid)>(SQL)
+        .bind(storage_key)
+        .fetch_optional(pool)
+        .await?)
+}

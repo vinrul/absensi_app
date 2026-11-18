@@ -3,6 +3,8 @@
 const DATABASE_URL = "postgres://kinerja:kinerja_dev@127.0.0.1:5433/kinerja_test";
 const PORT = 8091;
 const BASE = `http://127.0.0.1:${PORT}/api/v1`;
+const FOTO_PNG =
+	"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 const AKHIRAN = process.platform === "win32" ? ".exe" : "";
 const BIN_SEED = `./target/debug/seed${AKHIRAN}`;
 const BIN_API = `./target/debug/kinerja-api${AKHIRAN}`;
@@ -486,7 +488,8 @@ try {
 			captured_at: `${hariIni}T00:05:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
-			akurasi_m: 5
+			akurasi_m: 5,
+			foto_base64: FOTO_PNG
 		}
 	});
 	cek("check-in PH di dalam radius berhasil", masuk.status === 200 && masuk.data.dalam_radius === true, JSON.stringify(masuk.data));
@@ -558,6 +561,22 @@ try {
 		}
 	});
 	cek("check-out tanpa sesi terbuka ditolak", pulangUlang.status === 422, `status ${pulangUlang.status}`);
+
+	const fotoPh = await panggil(adminToken, `/ph/foto?bulan=2026-11&personel_id=${personel.user.id}`);
+	cek(
+		"galeri foto strong point memuat dokumentasi",
+		fotoPh.status === 200 && fotoPh.data.length > 0,
+		`status ${fotoPh.status}`
+	);
+	const berkasPh = await fetch(`http://127.0.0.1:${PORT}${fotoPh.data[0].foto_url}`, {
+		headers: { authorization: `Bearer ${adminToken}` }
+	});
+	cek(
+		"berkas foto strong point dapat diunduh",
+		berkasPh.status === 200 && (berkasPh.headers.get("content-type") ?? "").startsWith("image/")
+	);
+	const tanpaToken = await fetch(`http://127.0.0.1:${PORT}${fotoPh.data[0].foto_url}`);
+	cek("foto tanpa token ditolak", tanpaToken.status === 401, `status ${tanpaToken.status}`);
 	const rekapPh = await panggil(adminToken, "/ph/rekap?bulan=2026-11");
 	cek("rekap PH memuat personel uji", rekapPh.status === 200 && rekapPh.data.data.some((r) => r.personel_id === personel.user.id));
 

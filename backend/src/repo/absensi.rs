@@ -299,6 +299,8 @@ pub struct AbsensiHarianRow {
     pub catatan_verifikator: Option<String>,
     pub menit_telat: i64,
     pub foto_path: Option<String>,
+    pub foto_masuk_path: Option<String>,
+    pub foto_pulang_path: Option<String>,
 }
 
 pub struct ListHarianFilter {
@@ -347,6 +349,10 @@ const HARIAN_SELECT: &str = r#"
                    ELSE 0
                END
            ), 0) AS menit_telat,
+           (array_agg(a.foto_path) FILTER (WHERE a.jenis = 'masuk' AND a.foto_path IS NOT NULL))[1]
+               AS foto_masuk_path,
+           (array_agg(a.foto_path) FILTER (WHERE a.jenis = 'pulang' AND a.foto_path IS NOT NULL))[1]
+               AS foto_pulang_path,
            (array_agg(a.foto_path) FILTER (
                WHERE a.perlu_verifikasi AND a.foto_path IS NOT NULL
            ))[1] AS foto_path
@@ -520,4 +526,49 @@ pub async fn verifikasi(
         return Err(AppError::NotFound("Data absensi tidak ditemukan".into()));
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct FotoAbsensiRow {
+    pub id: Uuid,
+    pub tanggal: NaiveDate,
+    pub jenis: AbsensiJenis,
+    pub jam: NaiveTime,
+    pub status_kehadiran: StatusKehadiran,
+    pub foto_path: String,
+}
+
+/// Foto dokumentasi absensi pada rentang tanggal dan cakupan satker.
+pub async fn list_foto(
+    pool: &PgPool,
+    satker_ids: &[Uuid],
+    personel_id: Option<Uuid>,
+    dari: NaiveDate,
+    sampai: NaiveDate,
+) -> AppResult<Vec<FotoAbsensiRow>> {
+    const SQL: &str = r#"
+        SELECT a.id, a.tanggal, a.jenis, a.jam, a.status_kehadiran, a.foto_path
+          FROM absensi a
+         WHERE a.satker_id = ANY($1::uuid[])
+           AND ($2::uuid IS NULL OR a.personel_id = $2)
+           AND a.tanggal BETWEEN $3 AND $4
+           AND a.foto_path IS NOT NULL
+         ORDER BY a.tanggal DESC, a.jam DESC
+    "#;
+    Ok(sqlx::query_as::<_, FotoAbsensiRow>(SQL)
+        .bind(satker_ids)
+        .bind(personel_id)
+        .bind(dari)
+        .bind(sampai)
+        .fetch_all(pool)
+        .await?)
+}
+
+/// Pemilik berkas foto absensi untuk pemeriksaan akses.
+pub async fn pemilik_foto(pool: &PgPool, storage_key: &str) -> AppResult<Option<(Uuid, Uuid)>> {
+    const SQL: &str = "SELECT personel_id, satker_id FROM absensi WHERE foto_path = $1";
+    Ok(sqlx::query_as::<_, (Uuid, Uuid)>(SQL)
+        .bind(storage_key)
+        .fetch_optional(pool)
+        .await?)
 }

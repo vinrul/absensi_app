@@ -96,6 +96,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.45 | Export PDF rekap, verifikasi, dan detail absensi | ✅ | `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (Chrome/Edge headless); rekap memuat baris jumlah + menit telat |
 | 3.46 | Gabung absen masuk & pulang per tanggal | ✅ | `GET /absensi/harian` (dipakai tab Verifikasi & Detail + PDF); menit telat dihitung untuk status Dinas Kantor yang melewati jam masuk satker |
 | 3.47 | Sidebar dashboard bergrup dengan submenu | ✅ | Dashboard; Master Data; Absensi (Rekap Kehadiran/Detail Rekap/Verifikasi Offline via `?tab=`); Strong Point (Jadwal/Rekap via `?tab=`); Kinerja; Laporan (Penilaian/Print Laporan); Pengaturan (Akun Admin/Kesiapan Periode/Periode); grup aktif terbuka otomatis |
+| 3.48 | Galeri dokumentasi foto absensi | ✅ | Tombol **Lihat** di rekap membuka galeri foto per personel; detail per orang menampilkan tombol **Masuk/Pulang**; berkas disajikan `/api/v1/files/...` dengan cek kepemilikan/cakupan |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 
@@ -120,6 +121,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.26 | Peta lokasi & geocode strong point | ✅ | Peta OSM tanpa titik dinas, marker hijau lokasi saat ini, koordinat, akurasi GPS, alamat dari `https://geocode.vinrul.my.id` |
 | 4.27 | Sesi check-in berulang & aturan 2 jam | ✅ | Satu jadwal dapat beberapa sesi (pagi/sore); check-in baru ditolak 409 bila sesi terbuka < 2 jam; check-out dipasangkan ke check-in terakhir |
 | 4.28 | Check-in/out offline + dokumentasi | ✅ | Dua tombol check-in/check-out saat offline (seperti absensi), antrean `AntreanPh` dikirim WorkManager; dokumentasi hanya untuk check-in |
+| 4.29 | Galeri dokumentasi strong point | ✅ | Tombol **Lihat** di rekap strong point membuka galeri foto check-in; endpoint `GET /ph/foto`; berkas `/api/v1/files/...` |
 | 4.16 | Antrean offline untuk absensi PH | ⬜ | absensi PH saat ini butuh koneksi |
 | 4.17 | Ekspor CSV rekap PH | ⬜ | baru JSON + tampilan dashboard |
 | 4.18 | Rekap menandai tidak strong point & hanya check-in | ✅ | `hanya_check_in`, `tanggal_tidak_hadir`, `tanggal_hanya_check_in`; badge + tanggal di tab **Rekap Strong Point** |

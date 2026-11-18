@@ -155,6 +155,17 @@ export interface AbsensiHarian {
 	catatan_verifikator: string | null;
 	menit_telat: number;
 	foto_url: string | null;
+	foto_masuk_url: string | null;
+	foto_pulang_url: string | null;
+}
+
+export interface FotoAbsensi {
+	id: string;
+	tanggal: string;
+	jenis: 'masuk' | 'pulang';
+	jam: string;
+	status_kehadiran: StatusKehadiran;
+	foto_url: string;
 }
 
 export interface RekapAbsensi {
@@ -520,4 +531,13 @@ export interface RekapPh {
 	tanggal_tidak_hadir: string[];
 	tanggal_hanya_check_in: string[];
 	menunggu_verifikasi: number;
+}
+
+export interface FotoPh {
+	id: string;
+	tanggal: string;
+	jenis: 'masuk' | 'pulang';
+	jam: string;
+	strong_point_nama: string;
+	foto_url: string;
 }

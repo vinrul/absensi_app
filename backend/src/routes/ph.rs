@@ -47,6 +47,7 @@ pub fn routes() -> Router<AppState> {
         .route("/absensi/{id}/verifikasi", post(verifikasi_absensi_ph))
         .route("/rekap", get(rekap_ph))
         .route("/rekap/ekspor", get(ekspor_rekap_pdf))
+        .route("/foto", get(list_foto_ph))
 }
 
 #[derive(Debug, Serialize)]
@@ -183,7 +184,7 @@ impl From<AbsensiPhRow> for AbsensiPhDto {
             akurasi_m: row.akurasi_m,
             jarak_m: row.jarak_m,
             dalam_radius: row.dalam_radius,
-            foto_url: row.foto_path.map(|key| format!("/files/{key}")),
+            foto_url: row.foto_path.map(|key| format!("/api/v1/files/{key}")),
             is_offline: row.is_offline,
             is_mock_suspect: row.is_mock_suspect,
             perlu_verifikasi: row.perlu_verifikasi,
@@ -1037,6 +1038,48 @@ pub async fn rekap_ph(
         "periode": { "dari": dari, "sampai": sampai },
         "data": data,
     })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct FotoPhQuery {
+    pub bulan: Option<String>,
+    pub satker_id: Option<Uuid>,
+    pub personel_id: Option<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FotoPhDto {
+    pub id: Uuid,
+    pub tanggal: NaiveDate,
+    pub jenis: AbsensiJenis,
+    pub jam: String,
+    pub strong_point_nama: String,
+    pub foto_url: String,
+}
+
+/// Daftar foto dokumentasi strong point untuk galeri rekap.
+pub async fn list_foto_ph(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<FotoPhQuery>,
+) -> AppResult<Json<Vec<FotoPhDto>>> {
+    pastikan_pengelola(&user)?;
+    let (dari, sampai) = rentang_bulan(query.bulan.as_deref())?;
+    let scope = scope_ekspor(&user, query.satker_id)?;
+    let rows = ph::list_foto_ph(&state.pool, &scope, query.personel_id, dari, sampai).await?;
+
+    Ok(Json(
+        rows.into_iter()
+            .map(|row| FotoPhDto {
+                id: row.id,
+                tanggal: row.tanggal,
+                jenis: row.jenis,
+                jam: row.jam.format("%H:%M").to_string(),
+                strong_point_nama: row.strong_point_nama,
+                foto_url: format!("/api/v1/files/{}", row.foto_path),
+            })
+            .collect(),
+    ))
 }
 
 // --------------------------------------------------------------- ekspor PDF
