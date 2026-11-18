@@ -16,6 +16,7 @@ Dokumen pendamping:
 | [`docs/CHECKLIST.md`](docs/CHECKLIST.md) | Checklist pekerjaan & sisa backlog |
 | [`docs/penilaian.md`](docs/penilaian.md) | Rumus perhitungan nilai per indikator |
 | [`docs/UAT.md`](docs/UAT.md) | Checklist uji terima per peran |
+| [`docs/fake-gps.md`](docs/fake-gps.md) | Deteksi lokasi tiruan, kebijakan `flag`/`reject`, dan cara menguji di development |
 | `AGENTS.md` | Aturan singkat untuk agent AI |
 
 ## Isi repositori
@@ -69,6 +70,10 @@ dapat login dashboard web maupun Android. **Atasan langsung dan personel** memak
 Aplikasi web personel memakai kanal login `personel_web`: hanya akun personel (termasuk
 atasan/pimpinan) yang diterima. Access token disimpan di memori dan refresh memakai cookie
 httpOnly (`device_id = "web-personel"`).
+
+Deteksi lokasi tiruan diatur server: `APP__MOCK_LOCATION_POLICY=flag` untuk development
+(simpan + `perlu_verifikasi`) dan `reject` untuk produksi (HTTP 422). Panduan lengkap:
+[`docs/fake-gps.md`](docs/fake-gps.md).
 
 Data demo ada di database `kinerja_db`. Untuk uji otomatis gunakan database terpisah
 `kinerja_test` (lihat `tools/uji/api-smoke.js`).
@@ -268,6 +273,10 @@ Catatan penting:
   Tombol Masuk/Pulang mengikuti absensi hari ini dari server; bila server tidak terjangkau,
   keduanya ditampilkan dan data dapat disimpan offline.
 - **Wizard izin**: penjelasan lokasi, kamera, notifikasi, WorkManager, dan penyimpanan sebelum login. 
+- **Kebijakan fake GPS**: Android mendeteksi `Location.isMock`/`isFromMockProvider`, menampilkan
+  peringatan bila Developer Options atau aplikasi mock dipilih, lalu mengirim `is_mock_suspect`.
+  Server memakai `APP__MOCK_LOCATION_POLICY=flag` (development: simpan + `perlu_verifikasi`) atau
+  `reject` (produksi: HTTP 422). Detail dan cara uji ada di [`docs/fake-gps.md`](docs/fake-gps.md).
 - **PH / Strong Point terpisah**: strong point per satker, jadwal bulanan per personel,
   check-in **dan check-out wajib lokasi**, verifikasi, serta rekap PH sendiri. Jadwal memakai
   **roster bulanan** (anggota × tanggal 1–akhir bulan) dengan blok regu, dan input tanggal
@@ -348,13 +357,13 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 
 ## Verifikasi yang sudah dilakukan
 
-- `cargo test` → **34 test lulus** (geofence, scoring, deteksi berkas, kanal login).
-- `bun tools/uji/api-smoke.js` → **59/59 cek lulus** pada database uji `kinerja_test`:
+- `cargo test` → **37 test lulus** (geofence, scoring, deteksi berkas, kanal login, policy mock GPS).
+- `bun tools/uji/api-smoke.js` → **60/60 cek lulus** pada database uji `kinerja_test`:
   RBAC ber-scope, pembatasan login dashboard (pimpinan/admin vs atasan/personel), kanal
   `personel_web` (personel & atasan 200, admin 403), CRUD satker/personel/admin, titik dinas
   (termasuk ubah jenis & koordinat), zona waktu & jam Sabtu, kanal login Android, tutup/buka
   periode, kesiapan satker, kalender libur, jadwal & absensi PH, jam server palsu, verifikasi,
-  foto dokumentasi, rekap.
+  foto dokumentasi, rekap, dan penandaan mock GPS pada policy `flag`.
 - `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (88 path).
 - `bun run check` → 0 error · `bun run build` → sukses (dashboard dan `personel/`).
 - Login `personel_web` diuji pada API: atasan & personel 200, admin 403, refresh cookie 200.

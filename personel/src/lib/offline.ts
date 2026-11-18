@@ -1,4 +1,4 @@
-import { api } from '#lib/api/client';
+import { api, ApiError } from '#lib/api/client';
 import type { AbsensiAntrean, AbsensiPhAntrean } from '#lib/types';
 
 function kunciAbsensi(userId: string) {
@@ -70,12 +70,20 @@ export function kosongkanAntrean(userId: string) {
 export interface HasilSinkron {
 	absensi: number;
 	ph: number;
+	ditolak: number;
+}
+
+function penolakanMock(error: unknown): boolean {
+	if (!(error instanceof ApiError) || error.status !== 422) return false;
+	const pesan = error.message.toLowerCase();
+	return pesan.includes('tiruan') || pesan.includes('mock');
 }
 
 /** Kirim seluruh antrean offline; kegagalan jaringan menyisakan item untuk dicoba lagi. */
 export async function sinkronkanAntrean(userId: string): Promise<HasilSinkron> {
 	let absensi = 0;
 	let ph = 0;
+	let ditolak = 0;
 
 	for (const item of bacaAntreanAbsensi(userId)) {
 		try {
@@ -85,8 +93,12 @@ export async function sinkronkanAntrean(userId: string): Promise<HasilSinkron> {
 			});
 			hapusAntreanAbsensi(userId, item.client_uuid);
 			absensi += 1;
-		} catch {
-			// Antrean absensi dipertahankan agar dapat diperiksa ulang (mis. di luar radius).
+		} catch (err) {
+			if (penolakanMock(err)) {
+				hapusAntreanAbsensi(userId, item.client_uuid);
+				ditolak += 1;
+			}
+			// Kegagalan lain dipertahankan agar dapat diperiksa ulang.
 		}
 	}
 
@@ -99,14 +111,14 @@ export async function sinkronkanAntrean(userId: string): Promise<HasilSinkron> {
 			hapusAntreanPh(userId, item.client_uuid);
 			ph += 1;
 		} catch (err) {
-			if (err instanceof Error && 'status' in err) {
-				const status = (err as { status: number }).status;
-				if (status >= 400 && status < 500 && status !== 401) {
-					hapusAntreanPh(userId, item.client_uuid);
-				}
+			if (penolakanMock(err)) {
+				hapusAntreanPh(userId, item.client_uuid);
+				ditolak += 1;
+			} else if (err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 401) {
+				hapusAntreanPh(userId, item.client_uuid);
 			}
 		}
 	}
 
-	return { absensi, ph };
+	return { absensi, ph, ditolak };
 }

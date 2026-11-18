@@ -143,8 +143,15 @@
 			antreanPh = bacaAntreanPh(user.id);
 			await muat();
 			const total = hasilSinkron.absensi + hasilSinkron.ph;
+			const ditolak = hasilSinkron.ditolak;
 			pesan =
-				total > 0 ? `${total} data berhasil dikirim.` : 'Tidak ada antrean yang dapat dikirim.';
+				total > 0 && ditolak > 0
+					? `${total} data terkirim, ${ditolak} ditolak karena lokasi tiruan (mock GPS).`
+					: ditolak > 0
+						? `${ditolak} data ditolak karena lokasi tiruan (mock GPS).`
+						: total > 0
+							? `${total} data berhasil dikirim.`
+							: 'Tidak ada antrean yang dapat dikirim.';
 		} catch (err) {
 			galat = err instanceof ApiError ? err.message : 'Gagal mengirim antrean.';
 		} finally {

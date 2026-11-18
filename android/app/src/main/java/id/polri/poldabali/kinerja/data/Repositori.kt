@@ -15,6 +15,14 @@ class Repositori(
     private val antreanPh: AntreanPh,
     private val api: Api
 ) {
+    data class HasilSinkron(val berhasil: Int, val ditolak: Int)
+
+    private fun penolakanMock(error: Throwable): Boolean {
+        if (error !is ApiException || error.status != 422) return false
+        val pesan = error.message?.lowercase().orEmpty()
+        return "tiruan" in pesan || "mock" in pesan
+    }
+
     private val json = api.json
 
     val perangkat: String = "${Build.MANUFACTURER} ${Build.MODEL}".trim()
@@ -75,37 +83,37 @@ class Repositori(
         antrean.kosongkan()
     }
 
-    	suspend fun alamatServer(): String = sesi.alamatServer() ?: Api.ALAMAT_BAWAAN
+    suspend fun alamatServer(): String = sesi.alamatServer() ?: Api.ALAMAT_BAWAAN
 
-    	suspend fun ubahAlamatServer(url: String) = sesi.setAlamatServer(url.trim())
+    suspend fun ubahAlamatServer(url: String) = sesi.setAlamatServer(url.trim())
 
-    	suspend fun wizardIzinSelesai(): Boolean = sesi.wizardIzinSelesai()
+    suspend fun wizardIzinSelesai(): Boolean = sesi.wizardIzinSelesai()
 
-    	suspend fun tandaiWizardIzinSelesai() = sesi.setWizardIzinSelesai()
+    suspend fun tandaiWizardIzinSelesai() = sesi.setWizardIzinSelesai()
 
     // ---------------------------------------------------------------- absensi
 
-    	suspend fun riwayatAbsensi(dari: String, sampai: String): List<Absensi> {
-    		val teks = api.panggil("GET", "absensi/saya?dari=$dari&sampai=$sampai")
-    		return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)
-    	}
+    suspend fun riwayatAbsensi(dari: String, sampai: String): List<Absensi> {
+        val teks = api.panggil("GET", "absensi/saya?dari=$dari&sampai=$sampai")
+        return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)
+    }
 
-    	/** Riwayat bulan berjalan menurut tanggal server (mendukung jam palsu development). */
-    	suspend fun riwayatAbsensiBulanIni(): List<Absensi> {
-    		val teks = api.panggil("GET", "absensi/saya")
-    		return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)
-    	}
+    /** Riwayat bulan berjalan menurut tanggal server (mendukung jam palsu development). */
+    suspend fun riwayatAbsensiBulanIni(): List<Absensi> {
+        val teks = api.panggil("GET", "absensi/saya")
+        return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)
+    }
 
-    	suspend fun kirimAbsensi(request: AbsensiRequest): AbsensiResponse {
-    		val body = json.encodeToString(AbsensiRequest.serializer(), request)
-    		val teks = api.panggil("POST", "absensi", body)
-    		return json.decodeFromString(AbsensiResponse.serializer(), teks)
-    	}
+    suspend fun kirimAbsensi(request: AbsensiRequest): AbsensiResponse {
+        val body = json.encodeToString(AbsensiRequest.serializer(), request)
+        val teks = api.panggil("POST", "absensi", body)
+        return json.decodeFromString(AbsensiResponse.serializer(), teks)
+    }
 
-    	suspend fun absensiHariIni(): AbsensiHariIni {
-    		val teks = api.panggil("GET", "absensi/hari-ini")
-    		return json.decodeFromString(AbsensiHariIni.serializer(), teks)
-    	}
+    suspend fun absensiHariIni(): AbsensiHariIni {
+        val teks = api.panggil("GET", "absensi/hari-ini")
+        return json.decodeFromString(AbsensiHariIni.serializer(), teks)
+    }
 
     suspend fun titikTerdekat(latitude: Double, longitude: Double, akurasi: Double): TitikTerdekatResponse {
         val teks = api.panggil(
@@ -135,9 +143,10 @@ class Repositori(
 
     suspend fun jumlahAntrean(): Int = antrean.jumlah()
 
-    /** Mengirim seluruh antrean; mengembalikan jumlah yang berhasil. */
-    suspend fun sinkronkanAntrean(): Int {
+    /** Mengirim seluruh antrean; mengembalikan jumlah berhasil dan ditolak karena lokasi tiruan. */
+    suspend fun sinkronkanAntrean(): HasilSinkron {
         var berhasil = 0
+        var ditolak = 0
         for (item in antrean.daftar()) {
             val request = AbsensiRequest(
                 clientUuid = item.clientUuid,
@@ -153,13 +162,21 @@ class Repositori(
                 fotoBase64 = item.fotoBase64
             )
 
-            val sukses = runCatching { kirimAbsensi(request) }.isSuccess
-            if (sukses) {
+            try {
+                kirimAbsensi(request)
                 antrean.hapus(item.clientUuid)
                 berhasil++
+            } catch (error: ApiException) {
+                if (penolakanMock(error)) {
+                    antrean.hapus(item.clientUuid)
+                    ditolak++
+                }
+                // Kegagalan lain dipertahankan agar dapat diperiksa ulang.
+            } catch (_: Exception) {
+                // Gangguan jaringan/IO: antrean tetap disimpan.
             }
         }
-        return berhasil
+        return HasilSinkron(berhasil, ditolak)
     }
 
     // ---------------------------------------------------------- rencana kerja
@@ -350,9 +367,10 @@ class Repositori(
 
     suspend fun daftarAntreanPh(): List<AbsensiPhRequest> = antreanPh.daftar()
 
-    /** Mengirim antrean strong point berurutan; kegagalan permanen (4xx) dibuang. */
-    suspend fun sinkronkanAntreanPh(): Int {
+    /** Mengirim antrean strong point berurutan; mock GPS dicatat sebagai ditolak. */
+    suspend fun sinkronkanAntreanPh(): HasilSinkron {
         var berhasil = 0
+        var ditolak = 0
         for (item in antreanPh.daftar()) {
             val hasil = runCatching { kirimAbsensiPh(item.copy(isOffline = true)) }
             if (hasil.isSuccess) {
@@ -360,11 +378,14 @@ class Repositori(
                 berhasil++
             } else {
                 val error = hasil.exceptionOrNull()
-                if (error is ApiException && error.status in 400..499 && error.status != 401) {
+                if (error != null && penolakanMock(error)) {
+                    antreanPh.hapus(item.clientUuid)
+                    ditolak++
+                } else if (error is ApiException && error.status in 400..499 && error.status != 401) {
                     antreanPh.hapus(item.clientUuid)
                 }
             }
         }
-        return berhasil
+        return HasilSinkron(berhasil, ditolak)
     }
 }

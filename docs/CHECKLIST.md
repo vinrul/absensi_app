@@ -104,6 +104,9 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.53 | Absensi & Strong Point web personel | ✅ | Peta OSM, radius/titik dinas, 8 status, foto via kamera/file, antrean offline browser; strong point marker hijau tanpa titik dinas, geocode, aturan 2 jam, dokumentasi hanya check-in |
 | 3.54 | Wizard & persetujuan web personel | ✅ | Rencana 4 langkah, hasil/output 3 langkah, draft/ajukan, persetujuan rencana, verifikasi hasil/output berslider; endpoint sama dengan Android |
 | 3.55 | Profil & nilai web personel | ✅ | Foto, edit nama/pangkat 21 tingkat/jabatan/telepon/email, ganti password dengan tombol mata; nilai periode tampil di Beranda |
+| 3.56 | Kebijakan lokasi tiruan server | ✅ | `APP__MOCK_LOCATION_POLICY=flag|reject`; `flag` menyimpan + `perlu_verifikasi`, `reject` HTTP 422 untuk absensi dan strong point |
+| 3.57 | Deteksi & antrean fake GPS Android | ✅ | `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/aplikasi mock; antrean menghitung item `ditolak` saat 422 mock |
+| 3.58 | Dokumentasi fake GPS | ✅ | `docs/fake-gps.md`: policy, ADB/Fake GPS, uji endpoint, antrean, batasan, matriks uji |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 
@@ -211,6 +214,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 8.5 | `docs/UAT.md` diperbarui | ✅ | skenario admin satker/personel/PH |
 | 8.6 | `README.md` diperbarui | ✅ | akun, fitur, jumlah data |
 | 8.7 | Dokumen checklist ini | ✅ | `docs/CHECKLIST.md` |
+| 8.8 | Dokumentasi fake GPS | ✅ | `docs/fake-gps.md` + tautan di README/HANDOFF/AGENTS |
 
 ## 9. Verifikasi teknis (dijalankan ulang 17 November 2026)
 
@@ -218,12 +222,12 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 |---|---|---|---|
 | 9.1 | `cargo fmt --check` | ✅ | bersih |
 | 9.2 | `cargo clippy --all-targets -- -D warnings` | ✅ | tanpa peringatan |
-| 9.3 | `cargo test` | ✅ | 30 test lulus |
+| 9.3 | `cargo test` | ✅ | 37 test lulus |
 | 9.4 | `bun run check` (dashboard) | ✅ | 0 error |
 | 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
 | 9.6 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
-| 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 48/48 cek lulus |
-| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (79 path) |
+| 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 60/60 cek lulus |
+| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (88 path) |
 | 9.9 | Pagination & form personel (combobox pangkat) | ✅ | `bun run check` 0 error, `bun run build` sukses; verifikasi visual di browser tetap disarankan |
 | 9.10 | Uji API titik dinas (tambah/ubah jenis & koordinat/hapus) | ✅ | 3 cek tambahan pada `api-smoke.js` |
 | 9.11 | Uji jam palsu development | ✅ | 6 cek tambahan: aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
@@ -245,7 +249,10 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.27 | Filter & PDF Rencana Kerja | ✅ | API: filter satker+personel menghasilkan 2 baris; PDF 200 `application/pdf` ~89 KB (~2,2 s), semua satker ~1,0 MB dengan kolom Satker; UI: `bun run check` 0 error |
 | 9.28 | Detail & PDF Hasil/Output | ✅ | API: detail rencana (2 tahapan, 1 lampiran), detail hasil & output (lampiran terbaca); PDF hasil/output 200 `application/pdf` ~100 KB; UI: `bun run check` 0 error, `bun run build` sukses |
 | 9.29 | Aplikasi web personel | ✅ | `personel/`: `bun run check` 0 error, `bun run build` sukses; Chrome headless 500 px: login, Beranda, Absensi, Strong, wizard Rencana, Persetujuan, Profil tampil |
-| 9.30 | Kanal login `personel_web` + refresh cookie | ✅ | API: atasan/personel login 200, admin 403, refresh cookie 200; `cargo test` 35 lulus |
+| 9.30 | Kanal login `personel_web` + refresh cookie | ✅ | API: atasan/personel login 200, admin 403, refresh cookie 200; `cargo test` 37 lulus |
+| 9.31 | Mock GPS policy `flag` | ✅ | API smoke: absensi `is_mock_suspect=true` → 200, `is_mock_suspect=true`, `perlu_verifikasi=true` |
+| 9.32 | Mock GPS policy `reject` | ✅ | API: instance sementara `APP__MOCK_LOCATION_POLICY=reject` → absensi mock 422 tanpa menyimpan data |
+| 9.33 | Android deteksi mock + build | ✅ | `:app:assembleDebug` sukses; peringatan Developer Options/mock app dan hitungan `ditolak` terkompilasi |
 
 ## 10. Yang belum dikerjakan (backlog)
 

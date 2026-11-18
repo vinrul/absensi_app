@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.provider.Settings
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
@@ -79,4 +80,37 @@ object Lokasi {
         } else {
             lokasi.isFromMockProvider
         }
+
+    data class KondisiLokasi(
+        val mock: Boolean,
+        val developerOptions: Boolean,
+        val aplikasiMock: String?
+    )
+
+    /**
+     * Pemeriksaan tambahan untuk development/verifikasi:
+     * Developer Options dan aplikasi mock yang sedang dipilih. Keduanya hanya
+     * menjadi peringatan; keputusan menolak tetap di server.
+     */
+    fun kondisi(context: Context, lokasi: Location): KondisiLokasi =
+        KondisiLokasi(
+            mock = adalahMock(lokasi),
+            developerOptions = developerOptionsAktif(context),
+            aplikasiMock = aplikasiMockTerpilih(context)
+        )
+
+    fun developerOptionsAktif(context: Context): Boolean =
+        runCatching {
+            Settings.Global.getInt(
+                context.contentResolver,
+                Settings.Global.DEVELOPMENT_SETTINGS_ENABLED,
+                0
+            ) == 1
+        }.getOrDefault(false)
+
+    /** Nama paket aplikasi mock yang dipilih di Developer Options, bila tersedia. */
+    fun aplikasiMockTerpilih(context: Context): String? =
+        runCatching {
+            Settings.Secure.getString(context.contentResolver, "mock_location")
+        }.getOrNull()?.takeIf { it.isNotBlank() && it != "null" }
 }

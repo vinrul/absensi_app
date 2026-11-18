@@ -153,6 +153,11 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C45 | Ganti password dengan data benar | Semua sesi dicabut, aplikasi kembali ke layar login; password lama tidak berlaku | ✅ | API |
 | C46 | Tekan ikon mata pada kolom password | Password berubah dari titik-titik menjadi teks biasa, lalu kembali tersembunyi saat ditekan lagi | ✅ | emulator |
 | C47 | Beranda personel dengan foto profil | Avatar bulat tampil di kiri salam; akun tanpa foto (mis. `000100`) tidak menampilkan avatar/placeholder | ✅ | emulator |
+| C48 | Server `APP__MOCK_LOCATION_POLICY=flag`, absen memakai Fake GPS | API 200; data tersimpan dengan `is_mock_suspect=true` dan `perlu_verifikasi=true`; aplikasi menampilkan peringatan | ✅ | API (smoke) |
+| C49 | Server `APP__MOCK_LOCATION_POLICY=reject`, absen/strong point memakai Fake GPS | API 422 dengan pesan lokasi tiruan; tidak ada baris absensi/strong point baru | ✅ | API |
+| C50 | Developer Options aktif tanpa aplikasi mock; absensi memakai GPS asli | Absensi tetap 200; hanya muncul peringatan informatif | ⬜ | emulator |
+| C51 | Aplikasi mock dipilih tetapi tidak aktif | Peringatan “aplikasi lokasi tiruan terpilih”; absensi GPS asli tetap boleh dikirim | ⬜ | emulator |
+| C52 | Antrean offline berisi absensi/strong point mock, lalu dikirim saat server `reject` | Item dihapus dari antrean, jumlah “ditolak” tampil, tidak ada data baru di server | ✅ | build (logika) |
 
 ## D. Atasan Langsung (`000100` / `Atasan#2026`)
 
@@ -199,12 +204,12 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| F1 | `cargo test` | 35 unit test lulus | ✅ | |
+| F1 | `cargo test` | 37 unit test lulus | ✅ | |
 | F2 | `cargo fmt --check` + clippy `-D warnings` | Bersih | ✅ | |
 | F3 | `bun run check` | 0 error, 0 warning (dashboard & personel) | ✅ | |
 | F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` dan `personel/build` | ✅ | |
 | F5 | `.gradlew :app:assembleDebug` | APK debug terbentuk | ✅ | |
-| F6 | `bun tools/uji/api-smoke.js` | 59/59 cek lulus (DB `kinerja_test`) | ✅ | |
+| F6 | `bun tools/uji/api-smoke.js` | 60/60 cek lulus (DB `kinerja_test`) | ✅ | |
 | F7 | `bun tools/uji/openapi-check.js` | JSON valid, semua `$ref` ada | ✅ | |
 | F8 | Restore backup di lingkungan uji | Data & berkas kembali utuh | ⬜ | |
 | F9 | Uji 1 bulan data riil | Hitung periode < 60 detik | ⬜ | |

@@ -37,6 +37,7 @@ services:
       APP__JWT_SECRET: ${JWT_SECRET:-ubah-secret-ini-di-produksi-minimal-32-karakter}
       APP__UPLOAD_DIR: /data/uploads
       APP__RUN_MIGRATIONS: "true"
+      APP__MOCK_LOCATION_POLICY: ${MOCK_LOCATION_POLICY:-reject}
       TZ: Asia/Makassar
     volumes:
       - ./data/uploads:/data/uploads

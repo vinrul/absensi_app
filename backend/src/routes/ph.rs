@@ -799,6 +799,15 @@ pub async fn create_absensi_ph(
             "Anda tidak ditugaskan pada jadwal PH ini".into(),
         ));
     }
+
+    // Kebijakan server: development menandai, produksi menolak lokasi tiruan.
+    let is_mock = req.is_mock_suspect.unwrap_or(false);
+    if state.settings.mock_location_policy.menolak(is_mock) {
+        return Err(AppError::Unprocessable(
+            "Lokasi tiruan (mock GPS) terdeteksi. Matikan aplikasi lokasi tiruan/Developer Options lalu coba lagi."
+                .into(),
+        ));
+    }
     let strong_point = ph::find_strong_point(&state.pool, jadwal.strong_point_id)
         .await?
         .ok_or_else(|| AppError::Unprocessable("Strong point jadwal tidak ditemukan".into()))?;
@@ -908,8 +917,7 @@ pub async fn create_absensi_ph(
         foto_path = Some(key);
     }
 
-    let perlu_verifikasi =
-        req.is_offline.unwrap_or(false) || req.is_mock_suspect.unwrap_or(false) || akurasi > 100.0;
+    let perlu_verifikasi = req.is_offline.unwrap_or(false) || is_mock || akurasi > 100.0;
     let id = Uuid::now_v7();
     ph::insert_absensi_ph(
         &state.pool,
@@ -930,7 +938,7 @@ pub async fn create_absensi_ph(
             dalam_radius: hasil.dalam_radius,
             foto_path: foto_path.clone(),
             is_offline: req.is_offline.unwrap_or(false),
-            is_mock_suspect: req.is_mock_suspect.unwrap_or(false),
+            is_mock_suspect: is_mock,
             perlu_verifikasi,
         },
     )

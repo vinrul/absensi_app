@@ -36,9 +36,14 @@
 			const hasil = await sinkronkanAntrean(user.id);
 			antrean = bacaAntreanAbsensi(user.id);
 			await muat();
-			pesan = hasil.absensi
-				? `${hasil.absensi} absensi berhasil dikirim.`
-				: 'Tidak ada antrean yang dapat dikirim.';
+			pesan =
+				hasil.absensi > 0 && hasil.ditolak > 0
+					? `${hasil.absensi} absensi terkirim, ${hasil.ditolak} ditolak karena lokasi tiruan.`
+					: hasil.ditolak > 0
+						? `${hasil.ditolak} absensi ditolak karena lokasi tiruan.`
+						: hasil.absensi > 0
+							? `${hasil.absensi} absensi berhasil dikirim.`
+							: 'Tidak ada antrean yang dapat dikirim.';
 		} catch (err) {
 			galat = err instanceof ApiError ? err.message : 'Gagal mengirim antrean.';
 		} finally {

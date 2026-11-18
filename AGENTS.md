@@ -21,7 +21,10 @@ di sana ada status, keputusan teknis, jebakan, dan backlog berprioritas.
    ada di HANDOFF §3.9.
 8. **Web personel** memakai kanal login `personel_web` dan cookie refresh httpOnly dengan
    `device_id = "web-personel"`. Jangan menaruh access/refresh token di `localStorage`.
-9. **Rahasia**: jangan commit `backend/.env`, `deploy/.env`, atau `deploy/data/`.
+9. **Fake GPS** diputuskan server lewat `APP__MOCK_LOCATION_POLICY` (`flag` untuk development,
+   `reject` untuk produksi). Klien hanya mengirim `is_mock_suspect` dan peringatan Developer
+   Options; jangan hardcode penolakan di aplikasi. Panduan: `docs/fake-gps.md`.
+10. **Rahasia**: jangan commit `backend/.env`, `deploy/.env`, atau `deploy/data/`.
 
 ## Perintah verifikasi cepat
 

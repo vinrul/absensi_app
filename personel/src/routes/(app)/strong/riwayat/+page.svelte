@@ -42,9 +42,14 @@
 			const hasil = await sinkronkanAntrean(user.id);
 			antrean = bacaAntreanPh(user.id);
 			await muat();
-			pesan = hasil.ph
-				? `${hasil.ph} strong point berhasil dikirim.`
-				: 'Tidak ada antrean yang dapat dikirim.';
+			pesan =
+				hasil.ph > 0 && hasil.ditolak > 0
+					? `${hasil.ph} strong point terkirim, ${hasil.ditolak} ditolak karena lokasi tiruan.`
+					: hasil.ditolak > 0
+						? `${hasil.ditolak} strong point ditolak karena lokasi tiruan.`
+						: hasil.ph > 0
+							? `${hasil.ph} strong point berhasil dikirim.`
+							: 'Tidak ada antrean yang dapat dikirim.';
 		} catch (err) {
 			galat = err instanceof ApiError ? err.message : 'Gagal mengirim antrean.';
 		} finally {

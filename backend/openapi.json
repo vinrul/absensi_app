@@ -750,7 +750,7 @@
       "post": {
         "tags": ["ph"],
         "summary": "Check-in / check-out Strong Point (wajib lokasi)",
-        "description": "Lokasi wajib diisi dan harus berada dalam radius strong point. Idempoten terhadap client_uuid. Satu jadwal dapat memiliki beberapa sesi check-in; check-in baru ditolak (409) bila sesi sebelumnya masih terbuka dan belum berumur 2 jam. Check-out dipasangkan ke check-in terakhir yang terbuka.",
+          "description": "Lokasi wajib diisi dan harus berada dalam radius strong point. Idempoten terhadap client_uuid. Satu jadwal dapat memiliki beberapa sesi check-in; check-in baru ditolak (409) bila sesi sebelumnya masih terbuka dan belum berumur 2 jam. Check-out dipasangkan ke check-in terakhir yang terbuka. Bila server memakai `APP__MOCK_LOCATION_POLICY=reject`, permintaan dengan `is_mock_suspect=true` ditolak 422.",
         "requestBody": {
           "required": true,
           "content": {
@@ -840,7 +840,7 @@
       "post": {
         "tags": ["absensi"],
         "summary": "Catat absensi masuk/pulang",
-        "description": "Idempoten terhadap client_uuid. Menolak (422) bila di luar radius titik dinas untuk status yang membutuhkan radius.",
+          "description": "Idempoten terhadap client_uuid. Menolak (422) bila di luar radius titik dinas untuk status yang membutuhkan radius. Bila server memakai `APP__MOCK_LOCATION_POLICY=reject`, permintaan dengan `is_mock_suspect=true` ditolak 422; policy `flag` menyimpan data dengan `perlu_verifikasi=true`.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AbsensiRequest" } } } },
         "responses": {
           "200": { "description": "Tercatat (termasuk pengiriman ulang antrean offline)" },

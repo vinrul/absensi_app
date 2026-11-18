@@ -198,6 +198,15 @@ pub async fn create_absensi(
         ));
     }
 
+    // Kebijakan server: development menandai, produksi menolak lokasi tiruan.
+    let is_mock = req.is_mock_suspect.unwrap_or(false);
+    if state.settings.mock_location_policy.menolak(is_mock) {
+        return Err(AppError::Unprocessable(
+            "Lokasi tiruan (mock GPS) terdeteksi. Matikan aplikasi lokasi tiruan/Developer Options lalu coba lagi."
+                .into(),
+        ));
+    }
+
     // ------------------------------------------------------------- geofence
     let titik_rows = titik_dinas::list_aktif_for_satker(&state.pool, personel.satker_id).await?;
     let titik: Vec<geofence::Titik> = titik_rows
@@ -281,7 +290,7 @@ pub async fn create_absensi(
 
     // ---------------------------------------------------------------- simpan
     let perlu_verifikasi = req.is_offline.unwrap_or(false)
-        || req.is_mock_suspect.unwrap_or(false)
+        || is_mock
         || akurasi > 100.0
         || (req.status_kehadiran.butuh_radius() && !hasil.dalam_radius)
         || req.status_kehadiran == StatusKehadiran::TanpaKeterangan;
@@ -305,7 +314,7 @@ pub async fn create_absensi(
             akurasi_m: req.akurasi_m,
             jarak_m: hasil.jarak_m,
             dalam_radius: hasil.dalam_radius,
-            is_mock_suspect: req.is_mock_suspect.unwrap_or(false),
+            is_mock_suspect: is_mock,
             is_offline: req.is_offline.unwrap_or(false),
             foto_path: foto_path.as_deref(),
             device_id: req.device_id.as_deref(),

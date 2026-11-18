@@ -709,6 +709,34 @@ try {
 	const fakeReset = await fetch(`${BASE}/dev/waktu/reset`, { method: "POST" });
 	const resetData = await fakeReset.json();
 	cek("jam server palsu dapat dikembalikan", fakeReset.status === 200 && resetData.aktif === false);
+
+	// ------------------------------------------------- kebijakan mock GPS (flag)
+	await fetch(`${BASE}/dev/waktu`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ tanggal: "2026-11-22", jam: "08:00" })
+	});
+	const absenMock = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "masuk",
+			status_kehadiran: "dinas_luar",
+			captured_at: "2026-11-22T08:00:00Z",
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5,
+			is_mock_suspect: true
+		}
+	});
+	cek(
+		"mock GPS ditandai perlu verifikasi (policy flag)",
+		absenMock.status === 200 &&
+			absenMock.data.data.is_mock_suspect === true &&
+			absenMock.data.data.perlu_verifikasi === true,
+		JSON.stringify(absenMock.data?.data)
+	);
+	await fetch(`${BASE}/dev/waktu/reset`, { method: "POST" });
 } catch (error) {
 	console.error(error);
 	hasil.push({ nama: "exception", lulus: false, detail: String(error) });

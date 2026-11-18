@@ -1,5 +1,30 @@
 use std::path::PathBuf;
 
+/// Kebijakan server terhadap absensi/strong point yang terdeteksi memakai lokasi tiruan.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MockLocationPolicy {
+    /// Simpan data dan tandai `perlu_verifikasi` (default development).
+    Flag,
+    /// Tolak dengan HTTP 422 (disarankan untuk produksi).
+    Reject,
+}
+
+impl MockLocationPolicy {
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "flag" | "tandai" => Ok(Self::Flag),
+            "reject" | "tolak" => Ok(Self::Reject),
+            other => Err(format!(
+                "APP__MOCK_LOCATION_POLICY tidak dikenal: {other} (gunakan flag|reject)"
+            )),
+        }
+    }
+
+    pub fn menolak(self, is_mock: bool) -> bool {
+        matches!(self, Self::Reject) && is_mock
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Settings {
     pub database_url: String,
@@ -14,6 +39,8 @@ pub struct Settings {
     pub cookie_secure: bool,
     /// Hanya untuk development: mengaktifkan endpoint jam server palsu.
     pub allow_fake_time: bool,
+    /// `flag` (tandai) atau `reject` (tolak) lokasi tiruan.
+    pub mock_location_policy: MockLocationPolicy,
 }
 
 fn var(key: &str) -> Option<String> {
@@ -68,6 +95,34 @@ impl Settings {
             allow_fake_time: var("ALLOW_FAKE_TIME")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),
+            mock_location_policy: MockLocationPolicy::parse(
+                &var("MOCK_LOCATION_POLICY").unwrap_or_else(|| "flag".into()),
+            )?,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MockLocationPolicy;
+
+    #[test]
+    fn policy_mock_default_dan_parsing() {
+        assert_eq!(
+            MockLocationPolicy::parse("flag"),
+            Ok(MockLocationPolicy::Flag)
+        );
+        assert_eq!(
+            MockLocationPolicy::parse("REJECT"),
+            Ok(MockLocationPolicy::Reject)
+        );
+        assert!(MockLocationPolicy::parse("lain").is_err());
+    }
+
+    #[test]
+    fn policy_mock_menolak_hanya_saat_reject() {
+        assert!(!MockLocationPolicy::Flag.menolak(true));
+        assert!(MockLocationPolicy::Reject.menolak(true));
+        assert!(!MockLocationPolicy::Reject.menolak(false));
     }
 }

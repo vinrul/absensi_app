@@ -42,11 +42,11 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     private val repo = Graf.repositori
 
-    	var pengguna by mutableStateOf<Pengguna?>(null)
-        		private set
+    var pengguna by mutableStateOf<Pengguna?>(null)
+        private set
 
-        	var wizardIzinSelesai by mutableStateOf<Boolean?>(null)
-        		private set
+    var wizardIzinSelesai by mutableStateOf<Boolean?>(null)
+        private set
 
     var memuatSesi by mutableStateOf(true)
         private set
@@ -60,18 +60,18 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     var galat by mutableStateOf<String?>(null)
         private set
 
-    	var riwayat by mutableStateOf<List<Absensi>>(emptyList())
-        		private set
+    var riwayat by mutableStateOf<List<Absensi>>(emptyList())
+        private set
 
-        	var absensiHariIni by mutableStateOf<AbsensiHariIni?>(null)
-        		private set
+    var absensiHariIni by mutableStateOf<AbsensiHariIni?>(null)
+        private set
 
-        	var memuatAbsensiHariIni by mutableStateOf(false)
-        		private set
+    var memuatAbsensiHariIni by mutableStateOf(false)
+        private set
 
-        	/** True bila status absensi hari ini tidak dapat diambil dari server. */
-        	var absensiHariIniOffline by mutableStateOf(false)
-        		private set
+    /** True bila status absensi hari ini tidak dapat diambil dari server. */
+    var absensiHariIniOffline by mutableStateOf(false)
+        private set
 
     var antrean by mutableStateOf<List<AbsensiAntrean>>(emptyList())
         private set
@@ -132,13 +132,13 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         private set
 
     init {
-        		viewModelScope.launch {
-        			alamatServer = repo.alamatServer()
-        			pengguna = repo.penggunaTersimpan()
-        			wizardIzinSelesai = runCatching { repo.wizardIzinSelesai() }.getOrDefault(false)
-        			memuatSesi = false
-        			if (pengguna != null) muatSemua()
-        		}
+        viewModelScope.launch {
+            alamatServer = repo.alamatServer()
+            pengguna = repo.penggunaTersimpan()
+            wizardIzinSelesai = runCatching { repo.wizardIzinSelesai() }.getOrDefault(false)
+            memuatSesi = false
+            if (pengguna != null) muatSemua()
+        }
     }
 
     // ------------------------------------------------------------------ util
@@ -282,40 +282,40 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     // --------------------------------------------------------------- absensi
 
-    	fun muatSemua() {
-    		jalankan { muatSemuaLangsung() }
-    	}
+    fun muatSemua() {
+        jalankan { muatSemuaLangsung() }
+    }
 
-    	fun tandaiWizardIzinSelesai() {
-    		viewModelScope.launch {
-    			repo.tandaiWizardIzinSelesai()
-    			wizardIzinSelesai = true
-    		}
-    	}
+    fun tandaiWizardIzinSelesai() {
+        viewModelScope.launch {
+            repo.tandaiWizardIzinSelesai()
+            wizardIzinSelesai = true
+        }
+    }
 
-    	/** Memuat status absensi hari ini dari server (tanggal server, bukan jam perangkat). */
-    	fun muatAbsensiHariIni() {
-    		viewModelScope.launch {
-    			memuatAbsensiHariIni = true
-    			try {
-    				absensiHariIni = repo.absensiHariIni()
-    				absensiHariIniOffline = false
-    			} catch (error: ApiException) {
-    				absensiHariIni = null
-    				if (error.status == 401) {
-    					pengguna = null
-    					galat = "Sesi berakhir, silakan login kembali"
-    				} else {
-    					absensiHariIniOffline = true
-    				}
-    			} catch (_: Exception) {
-    				absensiHariIni = null
-    				absensiHariIniOffline = true
-    			} finally {
-    				memuatAbsensiHariIni = false
-    			}
-    		}
-    	}
+    /** Memuat status absensi hari ini dari server (tanggal server, bukan jam perangkat). */
+    fun muatAbsensiHariIni() {
+        viewModelScope.launch {
+            memuatAbsensiHariIni = true
+            try {
+                absensiHariIni = repo.absensiHariIni()
+                absensiHariIniOffline = false
+            } catch (error: ApiException) {
+                absensiHariIni = null
+                if (error.status == 401) {
+                    pengguna = null
+                    galat = "Sesi berakhir, silakan login kembali"
+                } else {
+                    absensiHariIniOffline = true
+                }
+            } catch (_: Exception) {
+                absensiHariIni = null
+                absensiHariIniOffline = true
+            } finally {
+                memuatAbsensiHariIni = false
+            }
+        }
+    }
 
     private suspend fun muatSemuaLangsung() {
         periode = repo.periodeAktif()
@@ -405,16 +405,24 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     fun sinkronkanSekarang() {
         jalankan {
-            val jumlah = repo.sinkronkanAntrean()
-            val jumlahPh = repo.sinkronkanAntreanPh()
+            val hasilAbsensi = repo.sinkronkanAntrean()
+            val hasilPh = repo.sinkronkanAntreanPh()
             antrean = repo.daftarAntrean()
             antreanPh = repo.daftarAntreanPh()
             riwayat = repo.riwayatAbsensiBulanIni()
             runCatching { muatPhLangsung() }
             runCatching { absensiHariIni = repo.absensiHariIni() }
                 .onSuccess { absensiHariIniOffline = false }
-            val total = jumlah + jumlahPh
-            pesan = if (total > 0) "$total data berhasil dikirim" else "Tidak ada antrean yang dapat dikirim"
+            val total = hasilAbsensi.berhasil + hasilPh.berhasil
+            val ditolak = hasilAbsensi.ditolak + hasilPh.ditolak
+            pesan = when {
+                ditolak > 0 && total > 0 ->
+                    "$total data terkirim, $ditolak ditolak karena lokasi tiruan (mock GPS)"
+
+                ditolak > 0 -> "$ditolak data ditolak karena lokasi tiruan (mock GPS)"
+                total > 0 -> "$total data berhasil dikirim"
+                else -> "Tidak ada antrean yang dapat dikirim"
+            }
         }
     }
 

@@ -3,7 +3,7 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 18 November 2026 (35 unit test backend + 59 cek API pada DB uji;
+Terakhir diverifikasi: 18 November 2026 (37 unit test backend + 60 cek API pada DB uji;
 dashboard & web personel `bun run check`/`build`; APK debug; `openapi.json` 88 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
@@ -47,6 +47,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
 | Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (aturan 2 jam), wizard Rencana/Hasil/Output, persetujuan & verifikasi, profil; login memakai kanal `personel_web` |
+| Deteksi lokasi tiruan (fake GPS) | Android memeriksa `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/mock app; server `APP__MOCK_LOCATION_POLICY=flag|reject` (default `flag`, produksi `reject`); antrean mencatat penolakan; panduan `docs/fake-gps.md` |
 | Strong Point: roster + Export PDF | Jadwal memakai roster bulanan (anggota × tanggal, blok regu) dengan input rentang tanggal satu-per-satu; rekap menandai tidak strong point/hanya check-in beserta tanggal, tanpa kolom telat, dan hanya menghitung sampai hari ini; PDF `/ph/jadwal/ekspor` (roster) & `/ph/rekap/ekspor` (uji API + Chrome headless) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
@@ -235,6 +236,12 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     berlaku semua satker; terisi berarti khusus satker. Tanggal libur aktif otomatis
     dikeluarkan dari penyebut skor absensi. Status absensi `libur_nasional` tetap ada untuk
     data manual/legacy, tetapi penilaian tidak lagi bergantung pada status itu.
+29. **Kebijakan lokasi tiruan ditentukan server, bukan klien.** Android mengirim
+    `is_mock_suspect` dari `Location.isMock`/`isFromMockProvider`; backend membaca
+    `APP__MOCK_LOCATION_POLICY` (`flag` default development, `reject` produksi). Jangan
+    memblokir berdasarkan `BuildConfig.DEBUG`/`device_id` karena bisa dipalsukan. Developer
+    Options/aplikasi mock terpilih hanya peringatan UI, bukan penolakan. Detail:
+    `docs/fake-gps.md`.
 
 ---
 
@@ -463,9 +470,9 @@ memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).
 
 | Lapis | Perintah | Cakupan |
 |---|---|---|
-| Unit | `cd backend; cargo test` | geofence, scoring, deteksi berkas, kanal login |
+| Unit | `cd backend; cargo test` | geofence, scoring, deteksi berkas, kanal login, policy mock GPS |
 | Lint Rust | `cargo clippy --all-targets -- -D warnings` | — |
-| API e2e | `bun tools/uji/api-smoke.js` (DB `kinerja_test`, API :8091) | RBAC ber-scope, CRUD satker/personel/admin/titik dinas, kesiapan, libur, PH, jam palsu 48 cek |
+| API e2e | `bun tools/uji/api-smoke.js` (DB `kinerja_test`, API :8091) | RBAC ber-scope, CRUD satker/personel/admin/titik dinas, kesiapan, libur, PH, jam palsu, mock GPS flag, 60 cek |
 | OpenAPI | `bun tools/uji/openapi-check.js` | JSON valid + seluruh `$ref` ada |
 | Periode otomatis | `bun tools/uji/periode-auto-check.js` | Hapus periode DB uji → dashboard memicu pembuatan bulan berjalan |
 | Type-check UI | `cd dashboard; bun run check` | 0 error |
@@ -533,6 +540,11 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
   dan seluruh berkas sementara dibersihkan setelah PDF terbentuk.
 - `kinerja-api.exe` yang sedang berjalan mengunci `target/debug` → matikan dulu sebelum
   `cargo build` (lihat §8).
+- **Fake GPS:** `APP__MOCK_LOCATION_POLICY=flag` untuk development agar emulator + Fake GPS
+  tetap bisa menguji alur; `reject` untuk produksi. Antrean absensi/PH yang ditolak mock
+  dihapus dan dihitung `ditolak`, sedangkan kegagalan lain dipertahankan. `adb emu geo fix`
+  bukan mock provider dan cocok untuk jalur normal. Jangan memblokir hanya karena
+  Developer Options aktif.
 
 ---
 
@@ -556,6 +568,12 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
 11. Ekspor PDF server-side dengan kop & QR verifikasi.
 12. `GET /audit` UI di halaman Pengaturan (saat ini hanya API).
 13. Rate limit berbasis Redis bila API di-scale.
+14. **Play Integrity** (`APP__PLAY_INTEGRITY_MODE=off|log|enforce`) untuk memastikan APK asli;
+    bukan pengganti deteksi koordinat.
+15. **Validasi plausibilitas server**: lompatan koordinat, kecepatan tidak wajar, dan jarak/waktu
+    antarabsensi.
+16. Deteksi lokasi tiruan di web personel tidak tersedia di browser; pertimbangkan kebijakan
+    foto wajib + verifikasi atasan.
 
 **P3 — teknis**
 14. Pindahkan antrean offline Android ke Room (butuh KSP) agar query lebih kaya.

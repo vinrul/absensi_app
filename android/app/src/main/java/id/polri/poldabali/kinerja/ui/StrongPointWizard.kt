@@ -85,6 +85,8 @@ fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
     var lng by remember { mutableStateOf<Double?>(null) }
     var akurasi by remember { mutableStateOf<Double?>(null) }
     var mock by remember { mutableStateOf(false) }
+    var devOptions by remember { mutableStateOf(false) }
+    var aplikasiMock by remember { mutableStateOf<String?>(null) }
     var mengambilLokasi by remember { mutableStateOf(false) }
     var daring by remember { mutableStateOf(adaInternet(konteks)) }
 
@@ -116,7 +118,10 @@ fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
                     lat = posisi.latitude
                     lng = posisi.longitude
                     akurasi = if (posisi.hasAccuracy()) posisi.accuracy.toDouble() else null
-                    mock = Lokasi.adalahMock(posisi)
+                    val kondisi = Lokasi.kondisi(konteks, posisi)
+                    mock = kondisi.mock
+                    devOptions = kondisi.developerOptions
+                    aplikasiMock = kondisi.aplikasiMock
                     daring = adaInternet(konteks)
                 }
                 .onFailure { vm.pesanGalat(it.message ?: "Gagal mengambil lokasi") }
@@ -314,8 +319,20 @@ fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
                     if (mock) {
                         Spacer(Modifier.height(8.dp))
                         KotakPesan(
-                            "Terdeteksi lokasi tiruan (mock). Strong point akan ditandai untuk verifikasi atasan.",
+                            "Terdeteksi lokasi tiruan (mock). Strong point dapat ditolak server atau ditandai untuk verifikasi atasan.",
                             JenisPesan.Galat
+                        )
+                    } else if (aplikasiMock != null) {
+                        Spacer(Modifier.height(8.dp))
+                        KotakPesan(
+                            "Aplikasi lokasi tiruan terpilih: $aplikasiMock. Pastikan aplikasi tersebut tidak aktif.",
+                            JenisPesan.Info
+                        )
+                    } else if (devOptions) {
+                        Spacer(Modifier.height(8.dp))
+                        KotakPesan(
+                            "Developer Options aktif. GPS asli tetap dapat dipakai; lokasi tiruan akan ditolak server.",
+                            JenisPesan.Info
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -344,7 +361,7 @@ fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
                             Spacer(Modifier.height(6.dp))
                             KotakPesan(
                                 "Check-in pukul ${status.masukTerakhir?.jam.orEmpty()} belum check-out " +
-                                    "(lebih dari 2 jam). Check-in baru akan dicatat sebagai sesi berikutnya.",
+                                        "(lebih dari 2 jam). Check-in baru akan dicatat sebagai sesi berikutnya.",
                                 JenisPesan.Info
                             )
                         }
@@ -503,7 +520,7 @@ fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
                     },
                     memuat = vm.sedangMemproses,
                     aktif = lat != null && lng != null &&
-                        (jenis != "masuk" || fotoBase64 != null || lewatiFoto || !adaKamera),
+                            (jenis != "masuk" || fotoBase64 != null || lewatiFoto || !adaKamera),
                     onClick = { kirim(offline) }
                 )
 
@@ -561,6 +578,7 @@ private fun deskripsiLangkah(nomor: Int, jenis: String): String = when (nomor) {
     } else {
         "Periksa kembali data check-out lalu kirim."
     }
+
     else -> "Periksa kembali data strong point lalu kirim."
 }
 

@@ -106,6 +106,8 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
     var lng by remember { mutableStateOf<Double?>(null) }
     var akurasi by remember { mutableStateOf<Double?>(null) }
     var mock by remember { mutableStateOf(false) }
+    var devOptions by remember { mutableStateOf(false) }
+    var aplikasiMock by remember { mutableStateOf<String?>(null) }
     var mengambilLokasi by remember { mutableStateOf(false) }
 
     var berkasFoto by remember { mutableStateOf<File?>(null) }
@@ -125,7 +127,10 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
             lat = lokasi.latitude
             lng = lokasi.longitude
             akurasi = lokasi.accuracy.toDouble()
-            mock = Lokasi.adalahMock(lokasi)
+            val kondisi = Lokasi.kondisi(konteks, lokasi)
+            mock = kondisi.mock
+            devOptions = kondisi.developerOptions
+            aplikasiMock = kondisi.aplikasiMock
             vm.cekLokasi(lokasi.latitude, lokasi.longitude, lokasi.accuracy.toDouble())
         } catch (galat: Exception) {
             vm.pesanGalat(galat.message ?: "Gagal mengambil lokasi")
@@ -251,20 +256,22 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 }
 
                 Kartu {
-                    					val keterangan = when {
-                    						vm.memuatAbsensiHariIni && hariIni == null -> "Memeriksa absensi hari ini…"
-                    						vm.absensiHariIniOffline -> "Tidak dapat memeriksa absensi hari ini (offline)"
-                    						hariIni?.masuk != null && hariIni?.pulang != null ->
-                    							"Absensi hari ini sudah lengkap"
-                    						hariIni?.masuk != null ->
-                    							"Sudah absen masuk pukul ${hariIni?.masuk?.jam}"
-                    						else -> "Belum absen masuk hari ini"
-                    					}
-                    					JudulBagian("Status Hari Ini", keterangan)
-                    					if (hariIni?.pulang != null) {
-                    						Spacer(Modifier.height(4.dp))
-                    						Text(
-                    							"Sudah absen pulang pukul ${hariIni?.pulang?.jam}",
+                    val keterangan = when {
+                        vm.memuatAbsensiHariIni && hariIni == null -> "Memeriksa absensi hari ini…"
+                        vm.absensiHariIniOffline -> "Tidak dapat memeriksa absensi hari ini (offline)"
+                        hariIni?.masuk != null && hariIni?.pulang != null ->
+                            "Absensi hari ini sudah lengkap"
+
+                        hariIni?.masuk != null ->
+                            "Sudah absen masuk pukul ${hariIni?.masuk?.jam}"
+
+                        else -> "Belum absen masuk hari ini"
+                    }
+                    JudulBagian("Status Hari Ini", keterangan)
+                    if (hariIni?.pulang != null) {
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            "Sudah absen pulang pukul ${hariIni?.pulang?.jam}",
                             style = MaterialTheme.typography.bodySmall,
                             color = Warna.TeksLembut
                         )
@@ -349,50 +356,52 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 }
 
                 if (lat != null) {
-                    					val warna = when {
-                    						dalamRadius -> Warna.Hijau
-                    						vm.absensiHariIniOffline -> Warna.Kuning
-                    						else -> Warna.Merah
-                    					}
-                    					Surface(
-                    						shape = RoundedCornerShape(14.dp),
-                    						color = warna.copy(alpha = 0.08f),
-                    						border = BorderStroke(1.dp, warna.copy(alpha = 0.35f)),
-                    						modifier = Modifier.fillMaxWidth()
-                    					) {
-                    						Column(Modifier.padding(14.dp)) {
-                    							Row(verticalAlignment = Alignment.CenterVertically) {
-                    								Icon(
-                    									if (dalamRadius) Icons.Filled.CheckCircle else Icons.Filled.Warning,
-                    									contentDescription = null,
-                    									tint = warna,
-                    									modifier = Modifier.size(24.dp)
-                    								)
-                    								Spacer(Modifier.width(8.dp))
-                    								Text(
-                    									when {
-                    										dalamRadius -> "Lokasi Terverifikasi"
-                    										vm.absensiHariIniOffline -> "Lokasi Belum Terverifikasi"
-                    										else -> "Di Luar Radius"
-                    									},
-                    									style = MaterialTheme.typography.titleMedium,
-                    									color = warna,
-                    									fontWeight = FontWeight.Bold
-                    								)
-                    							}
-                    							Spacer(Modifier.height(4.dp))
-                    							Text(
-                    								when {
-                    									dalamRadius ->
-                    										"Anda berada dalam radius ${vm.titikTerdekat?.terdekat?.radiusM ?: 100} meter dari titik dinas."
-                    									vm.absensiHariIniOffline ->
-                    										"Titik dinas belum dapat diverifikasi karena server tidak terjangkau. Absensi akan disimpan offline dan diverifikasi saat sinkronisasi."
-                    									else ->
-                    										"Anda berada di luar radius titik dinas. Status Dinas Kantor/Piket tidak dapat dipilih."
-                    								},
-                    								style = MaterialTheme.typography.bodySmall,
-                    								color = Warna.TeksLembut
-                    							)
+                    val warna = when {
+                        dalamRadius -> Warna.Hijau
+                        vm.absensiHariIniOffline -> Warna.Kuning
+                        else -> Warna.Merah
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = warna.copy(alpha = 0.08f),
+                        border = BorderStroke(1.dp, warna.copy(alpha = 0.35f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(Modifier.padding(14.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    if (dalamRadius) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                                    contentDescription = null,
+                                    tint = warna,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    when {
+                                        dalamRadius -> "Lokasi Terverifikasi"
+                                        vm.absensiHariIniOffline -> "Lokasi Belum Terverifikasi"
+                                        else -> "Di Luar Radius"
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = warna,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                when {
+                                    dalamRadius ->
+                                        "Anda berada dalam radius ${vm.titikTerdekat?.terdekat?.radiusM ?: 100} meter dari titik dinas."
+
+                                    vm.absensiHariIniOffline ->
+                                        "Titik dinas belum dapat diverifikasi karena server tidak terjangkau. Absensi akan disimpan offline dan diverifikasi saat sinkronisasi."
+
+                                    else ->
+                                        "Anda berada di luar radius titik dinas. Status Dinas Kantor/Piket tidak dapat dipilih."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Warna.TeksLembut
+                            )
                             Spacer(Modifier.height(8.dp))
                             BarisInfo(
                                 "Koordinat Anda",
@@ -421,8 +430,18 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
 
                     if (mock) {
                         KotakPesan(
-                            "Terdeteksi lokasi tiruan (mock). Absensi akan ditandai untuk verifikasi atasan.",
+                            "Terdeteksi lokasi tiruan (mock). Absensi dapat ditolak server atau ditandai untuk verifikasi atasan.",
                             JenisPesan.Galat
+                        )
+                    } else if (aplikasiMock != null) {
+                        KotakPesan(
+                            "Aplikasi lokasi tiruan terpilih: $aplikasiMock. Pastikan aplikasi tersebut tidak aktif; lokasi asli tetap dapat dikirim.",
+                            JenisPesan.Info
+                        )
+                    } else if (devOptions) {
+                        KotakPesan(
+                            "Developer Options aktif. Selama tidak memakai aplikasi lokasi tiruan, absensi dengan GPS asli tetap dapat dikirim.",
+                            JenisPesan.Info
                         )
                     }
 
@@ -480,7 +499,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                             ) { lanjutPilihStatus("masuk") }
                         }
 
-		hariIni?.pulang == null -> {
+                        hariIni?.pulang == null -> {
                             TombolAbsen(
                                 "ABSEN PULANG",
                                 "(Check Out)",
@@ -537,7 +556,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                     }
 
                     val butuhRadius = status == "dinas_kantor" || status == "piket"
-                    					if (butuhRadius && !dalamRadius && !offline && !vm.absensiHariIniOffline) {
+                    if (butuhRadius && !dalamRadius && !offline && !vm.absensiHariIniOffline) {
                         KotakPesan(
                             "Status Dinas Kantor/Piket membutuhkan lokasi di dalam radius titik dinas. Pilih status lain atau perbarui lokasi.",
                             JenisPesan.Galat
@@ -591,9 +610,9 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 }
 
                 val butuhRadius = status == "dinas_kantor" || status == "piket"
-                					val bolehKirim =
-                						status != null &&
-                							(offline || vm.absensiHariIniOffline || !(butuhRadius && !dalamRadius))
+                val bolehKirim =
+                    status != null &&
+                            (offline || vm.absensiHariIniOffline || !(butuhRadius && !dalamRadius))
 
                 TombolUtama(
                     teks = if (offline) "Simpan Absensi (Offline)" else "Kirim Absensi",
@@ -627,27 +646,27 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 }
 
                 Kartu {
-                    					Row(
-                    						Modifier.fillMaxWidth(),
-                    						horizontalArrangement = Arrangement.SpaceBetween,
-                    						verticalAlignment = Alignment.CenterVertically
-                    					) {
-                    						Column(Modifier.weight(1f)) {
-                    							Text(
-                    								"Bulan Ini",
-                    								style = MaterialTheme.typography.titleMedium,
-                    								color = Warna.Teks
-                    							)
-                    							Text(
-                    								"${vm.riwayat.size} catatan",
-                    								style = MaterialTheme.typography.bodySmall,
-                    								color = Warna.TeksLembut
-                    							)
-                    						}
-                    						TextButton(onClick = { vm.muatRiwayatBulanIni() }) {
-                    							Text("Muat ulang", color = Warna.Navy)
-                    						}
-                    					}
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "Bulan Ini",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Warna.Teks
+                            )
+                            Text(
+                                "${vm.riwayat.size} catatan",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Warna.TeksLembut
+                            )
+                        }
+                        TextButton(onClick = { vm.muatRiwayatBulanIni() }) {
+                            Text("Muat ulang", color = Warna.Navy)
+                        }
+                    }
                     Spacer(Modifier.height(6.dp))
 
                     if (vm.riwayat.isEmpty()) {

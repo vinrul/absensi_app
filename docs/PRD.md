@@ -128,6 +128,9 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Di luar radius → HTTP 422 dengan pesan jarak aktual dan radius.
 - Data ditandai `perlu_verifikasi` bila: offline, mock location, akurasi > 100 m, atau status
   tanpa keterangan.
+- Server menerapkan kebijakan lokasi tiruan `APP__MOCK_LOCATION_POLICY`: `flag` menyimpan data
+  dengan `perlu_verifikasi=true`, `reject` menolak dengan HTTP 422. Default development `flag`,
+  produksi disarankan `reject`.
 - `client_uuid` menjamin idempotensi pengiriman ulang antrean offline.
 - Satu absen masuk dan satu absen pulang per personel per hari.
 - Foto bukti absensi yang diunggah dari Android dapat dilihat di dashboard: galeri pada rekap
@@ -273,6 +276,9 @@ aktif dan dapat diaktifkan kembali.
   untuk dikirim otomatis.
 - Foto dokumentasi check-in dapat dilihat pada rekap strong point dashboard melalui tombol
   **Lihat** (galeri per personel).
+- Absensi PH memakai kebijakan lokasi tiruan yang sama dengan absensi harian: `flag` menandai
+  `perlu_verifikasi`, `reject` menolak HTTP 422. Aplikasi menampilkan peringatan bila
+  `Location.isMock`, Developer Options aktif, atau aplikasi mock dipilih.
 
 ### FR-10 Pengingat jadwal (tanpa FCM)
 - Aplikasi Android menjadwalkan notifikasi lokal melalui WorkManager: H-1 pukul 19:00 dan
