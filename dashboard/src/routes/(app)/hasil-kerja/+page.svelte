@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api, apiBlob, ApiError } from '#lib/api/client';
-	import { adalahAtasan } from '#lib/stores/session.svelte';
+	import { adalahAtasan, adalahPimpinanSaja } from '#lib/stores/session.svelte';
 	import type { Hasil, ListResponse, Periode, Personel, Rencana, Satker, StatusHasil } from '#lib/types';
 	import { LABEL_STATUS_HASIL } from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
@@ -190,9 +190,11 @@
 					<Icon name="download" size={16} />
 					{mengekspor ? 'Menyiapkan PDF…' : 'Export PDF'}
 				</button>
-				<button class="btn btn-primary" onclick={bukaForm}>
-					<Icon name="plus" size={16} /> Tambah Hasil
-				</button>
+				{#if !adalahPimpinanSaja()}
+					<button class="btn btn-primary" onclick={bukaForm}>
+						<Icon name="plus" size={16} /> Tambah Hasil
+					</button>
+				{/if}
 			</div>
 		</div>
 

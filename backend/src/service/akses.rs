@@ -25,6 +25,14 @@ pub fn kanal_login_diizinkan(jenis_akun: JenisAkun, kanal: KanalLogin) -> bool {
     }
 }
 
+/// Dashboard web hanya untuk akun yang memiliki minimal satu role admin/pimpinan.
+/// Role atasan/personel tetap boleh ada pada akun yang sama, tetapi tidak membuka dashboard.
+pub fn boleh_login_dashboard(roles: &[AppRole]) -> bool {
+    roles
+        .iter()
+        .any(|role| role.admin_any() || role.pimpinan_any())
+}
+
 /// Menghitung seluruh satker yang boleh diakses oleh seorang pengguna.
 pub async fn hitung_satker_akses(
     pool: &PgPool,
@@ -388,5 +396,20 @@ mod tests {
             JenisAkun::Personel,
             KanalLogin::Android
         ));
+    }
+
+    #[test]
+    fn dashboard_hanya_untuk_admin_atau_pimpinan() {
+        assert!(boleh_login_dashboard(&[AppRole::AdminSatkerPolda]));
+        assert!(boleh_login_dashboard(&[AppRole::PimpinanSatkerPolda]));
+        assert!(boleh_login_dashboard(&[
+            AppRole::Atasan,
+            AppRole::Personel,
+            AppRole::Pimpinan
+        ]));
+        assert!(!boleh_login_dashboard(&[
+            AppRole::Atasan,
+            AppRole::Personel
+        ]));
     }
 }

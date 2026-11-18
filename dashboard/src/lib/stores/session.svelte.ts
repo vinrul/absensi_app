@@ -108,6 +108,17 @@ export function adalahPengelolaPh() {
 	return adalahAtasan() || adalahPimpinan();
 }
 
+/** Pimpinan tanpa role admin: dashboard tidak menampilkan Master Data. */
+export function adalahPimpinanSaja() {
+	return adalahPimpinan() && !adalahAdmin();
+}
+
+/** Hanya akun dengan role admin/pimpinan yang boleh masuk dashboard web. */
+export function bolehMasukDashboard(user = session.user) {
+	const roles = user?.roles ?? [];
+	return roles.some((role) => role.startsWith('admin_') || role.startsWith('pimpinan'));
+}
+
 export function bisaLihatManajemen() {
 	return adalahAdmin() || adalahPimpinan() || punyaRole('atasan');
 }

@@ -61,8 +61,9 @@ Akun demo (seed):
 | Atasan | `000100` | `Atasan#2026` |
 | Personel | `85000001` | `Polri#2026` |
 
-Admin memakai **username** dan hanya dapat login lewat dashboard web. Personel (termasuk
-pimpinan/atasan) memakai **NRP** dan dapat login lewat web maupun Android.
+Admin memakai **username** dan hanya dapat login lewat dashboard web. Pimpinan memakai **NRP** dan
+dapat login dashboard web maupun Android; **atasan langsung dan personel** hanya memakai Android
+(dashboard menolak login mereka dengan 403).
 
 Data demo ada di database `kinerja_db`. Untuk uji otomatis gunakan database terpisah
 `kinerja_test` (lihat `tools/uji/api-smoke.js`).
@@ -292,7 +293,8 @@ Catatan penting:
 - **Dashboard pimpinan**: KPI, capaian per indikator, tren, sebaran kategori, rekap
   berpaginasi, catatan & keputusan, cetak A4, ekspor CSV. Sidebar memakai menu bergrup
   (Master Data, Absensi, Strong Point, Kinerja, Laporan, Pengaturan) dengan submenu yang dapat
-  dilipat dan otomatis terbuka saat halamannya aktif.
+  dilipat dan otomatis terbuka saat halamannya aktif. Untuk pimpinan murni, grup **Master Data**
+  disembunyikan dan tombol **Buat Rencana/Tambah Hasil/Tambah Output/Ajukan** tidak ditampilkan.
 - **Branding**: logo Polda Bali di login (terpusat), sidebar, kop laporan, aplikasi Android, dan ikon launcher. Password pada login Android dapat ditampilkan/disembunyikan lewat ikon mata.
 - **Jam server palsu (development)**: `cargo run --bin fake -- DD-MM-YYYY HH:MM` mengubah jam yang dipakai backend untuk absensi; endpoint hanya aktif bila `APP__ALLOW_FAKE_TIME=true`.
 - **Operasional**: audit log setiap mutasi, rate limit login 5/menit/IP, RBAC ber-scope,
@@ -313,10 +315,11 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 ## Verifikasi yang sudah dilakukan
 
 - `cargo test` → **30 test lulus** (geofence, scoring, deteksi berkas, kanal login).
-- `bun tools/uji/api-smoke.js` → **48/48 cek lulus** pada database uji `kinerja_test`:
-  RBAC ber-scope, CRUD satker/personel/admin, titik dinas (termasuk ubah jenis & koordinat),
-  zona waktu & jam Sabtu, kanal login Android, tutup/buka periode, kesiapan satker,
-  kalender libur, jadwal & absensi PH, jam server palsu, verifikasi, rekap.
+- `bun tools/uji/api-smoke.js` → **56/56 cek lulus** pada database uji `kinerja_test`:
+  RBAC ber-scope, pembatasan login dashboard (pimpinan/admin vs atasan/personel), CRUD
+  satker/personel/admin, titik dinas (termasuk ubah jenis & koordinat), zona waktu & jam Sabtu,
+  kanal login Android, tutup/buka periode, kesiapan satker, kalender libur, jadwal & absensi PH,
+  jam server palsu, verifikasi, foto dokumentasi, rekap.
 - `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (70 path).
 - `bun run check` → 0 error · `bun run build` → sukses.
 - `gradlew :app:assembleDebug` → APK debug terbentuk (7 tab, termasuk PH).

@@ -3,7 +3,7 @@
 	import type { Snippet } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { logout, pulihkanSesi, session } from '#lib/stores/session.svelte';
+	import { logout, pulihkanSesi, session, bolehMasukDashboard } from '#lib/stores/session.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 
 	let { children }: { children?: Snippet } = $props();
@@ -106,10 +106,14 @@
 		return roles.some((role) => (session.user?.roles ?? []).includes(role as never));
 	}
 
+	/** Pimpinan murni (tanpa admin) tidak melihat Master Data. */
+	const pimpinanSaja = $derived(punyaAkses(pimpinanRole) && !punyaAkses(adminRole));
+
 	const menuTampil = $derived(menu.filter((item) => punyaAkses(item.roles)));
 
 	const grupTampil = $derived(
 		grupMenu
+			.filter((grup) => !(grup.label === 'Master Data' && pimpinanSaja))
 			.map((grup) => ({
 				...grup,
 				items: grup.items.filter((item) => punyaAkses(item.roles))
@@ -170,6 +174,22 @@
 		const masuk = session.user ? true : await pulihkanSesi();
 		if (!masuk) {
 			goto('/login', { replaceState: true });
+			return;
+		}
+		if (!bolehMasukDashboard()) {
+			await logout().catch(() => {});
+			goto('/login', { replaceState: true });
+			return;
+		}
+		const jalurMaster = ['/satker', '/personel', '/libur', '/absensi/titik-dinas'];
+		if (
+			pimpinanSaja &&
+			jalurMaster.some(
+				(jalur) =>
+					page.url.pathname === jalur || page.url.pathname.startsWith(jalur + '/')
+			)
+		) {
+			await goto('/dashboard', { replaceState: true });
 			return;
 		}
 		siap = true;

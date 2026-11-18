@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { login, pulihkanSesi, session } from '#lib/stores/session.svelte';
+	import { bolehMasukDashboard, login, logout, pulihkanSesi } from '#lib/stores/session.svelte';
 	import { ApiError } from '#lib/api/client';
 	import Icon from '#lib/components/Icon.svelte';
 
@@ -13,10 +13,11 @@
 
 	onMount(async () => {
 		if (await pulihkanSesi()) {
-			const bolehDashboard = session.user?.roles.some((role) =>
-				['atasan', 'pimpinan', 'admin_sistem'].includes(role)
-			);
-			goto(bolehDashboard ? '/dashboard' : '/absensi', { replaceState: true });
+			if (bolehMasukDashboard()) {
+				goto('/dashboard', { replaceState: true });
+			} else {
+				await logout().catch(() => {});
+			}
 		}
 	});
 
@@ -26,10 +27,13 @@
 		memuat = true;
 		try {
 			const user = await login(nrp.trim(), password);
-			const bolehDashboard = user.roles.some((role) =>
-				['atasan', 'pimpinan', 'admin_sistem'].includes(role)
-			);
-			await goto(bolehDashboard ? '/dashboard' : '/absensi', { replaceState: true });
+			if (!bolehMasukDashboard(user)) {
+				await logout().catch(() => {});
+				error =
+					'Dashboard hanya untuk akun pimpinan dan admin. Personel dan atasan langsung menggunakan aplikasi Android.';
+				return;
+			}
+			await goto('/dashboard', { replaceState: true });
 		} catch (err) {
 			error =
 				err instanceof ApiError

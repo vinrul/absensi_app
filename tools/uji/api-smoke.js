@@ -60,16 +60,30 @@ async function tungguSehat() {
 	throw new Error("API tidak siap");
 }
 
+async function kirimLogin(body) {
+	let r = await fetch(`${BASE}/auth/login`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify(body)
+	});
+	if (r.status === 429) {
+		const detik = Number(r.headers.get("retry-after") ?? "61");
+		await Bun.sleep((detik + 1) * 1000);
+		r = await fetch(`${BASE}/auth/login`, {
+			method: "POST",
+			headers: { "content-type": "application/json" },
+			body: JSON.stringify(body)
+		});
+	}
+	return r;
+}
+
 async function login(identitas, password, client = "web") {
 	const body =
 		client === "android"
 			? { nrp: identitas, password, client }
 			: { username: identitas, password, client };
-	const r = await fetch(`${BASE}/auth/login`, {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify(body)
-	});
+	const r = await kirimLogin(body);
 	const j = await r.json();
 	if (!r.ok) throw new Error(`login ${identitas} (${client}) gagal: ${JSON.stringify(j)}`);
 	return j;
@@ -80,11 +94,7 @@ async function cobaLogin(identitas, password, client = "web") {
 		client === "android"
 			? { nrp: identitas, password, client }
 			: { username: identitas, password, client };
-	const r = await fetch(`${BASE}/auth/login`, {
-		method: "POST",
-		headers: { "content-type": "application/json" },
-		body: JSON.stringify(body)
-	});
+	const r = await kirimLogin(body);
 	return { status: r.status, data: await r.json() };
 }
 
@@ -123,6 +133,26 @@ try {
 		"personel dapat login lewat Android",
 		personelViaAndroid.status === 200,
 		`status ${personelViaAndroid.status}`
+	);
+	const atasanViaWeb = await cobaLogin("000100", "Atasan#2026", "web");
+	cek(
+		"atasan langsung ditolak login dashboard",
+		atasanViaWeb.status === 403,
+		`status ${atasanViaWeb.status}`
+	);
+	const personelViaWeb = await cobaLogin("85000001", "Polri#2026", "web");
+	cek(
+		"personel ditolak login dashboard",
+		personelViaWeb.status === 403,
+		`status ${personelViaWeb.status}`
+	);
+	const pimpinanViaWeb = await cobaLogin("000002", "Pimpinan#2026", "web");
+	cek(
+		"pimpinan dapat login dashboard",
+		pimpinanViaWeb.status === 200 &&
+			Array.isArray(pimpinanViaWeb.data.user?.roles) &&
+			pimpinanViaWeb.data.user.roles.some((role) => String(role).includes("pimpinan")),
+		`status ${pimpinanViaWeb.status}`
 	);
 	const semuaSatker = await panggil(adminToken, "/satker");
 	cek("admin global melihat 31 node organisasi", semuaSatker.data.length === 31, `dapat ${semuaSatker.data.length}`);

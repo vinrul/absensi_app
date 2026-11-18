@@ -37,7 +37,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Dokumentasi foto absensi & strong point | Unggahan base64 Android disimpan sebagai `foto_path`; galeri dashboard lewat `/absensi/foto` dan `/ph/foto`; berkas `/api/v1/files/{key}` dengan cek pemilik/cakupan satker |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
-| Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
+| Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403; login dashboard hanya role admin/pimpinan (atasan/personel ditolak 403) |
 | Absensi + geofence + antrean offline | e2e: dalam radius 200, luar radius 422, duplikat 409 |
 | Rencana kerja + persetujuan + lampiran | e2e alur penuh + wizard Android 4 langkah (jenis → dasar → rincian kegiatan → lampiran); seed menyediakan contoh draft/diajukan/perlu revisi |
 | Hasil kerja + verifikasi | e2e API + wizard Android 3 langkah (pilih rencana → realisasi → bukti), draf, kirim, perbaikan; progres memakai slider 0–100 |
@@ -193,7 +193,13 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
     Ini menjaga seluruh foreign key audit/verifikasi tetap valid tanpa tabel polimorfik.
 21. **Kanal login ditegakkan di server.** `client=android` hanya menerima `jenis_akun=personel`
     (termasuk pimpinan/atasan); akun admin ditolak 403. Jangan hanya menyembunyikan tombol
-    di aplikasi.
+    di aplikasi. Untuk `client=web`, dashboard hanya menerima akun dengan role **admin atau
+    pimpinan**; role atasan/personel saja ditolak 403 (gunakan Android). Jika satu akun memiliki
+    beberapa role (mis. pimpinan + atasan + personel), login tetap diizinkan karena ada role
+    pimpinan; kemampuan di dashboard mengikuti **gabungan role** tersebut. Role admin tetap
+    melihat Master Data meski juga pimpinan; sembunyikan Master Data hanya untuk pimpinan murni
+    (`adalahPimpinanSaja`). Jika ingin pemisahan ketat, gunakan akun terpisah atau tambahkan
+    pemilih mode aktif saat login.
 22. **Halaman admin dan personel dipisah.** `/personel` hanya menangani akun personel; peran
     admin ditolak. Akun admin dikelola di `/admin` oleh admin global/Polda/Polres saja.
     Admin Polda hanya boleh membuat `admin_satker_polda`; admin Polres hanya
@@ -249,6 +255,10 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
   **Absensi** (Rekap Kehadiran, Detail Rekap, Verifikasi Offline); **Strong Point**
   (Jadwal Strong Point, Rekap Strong Point); **Kinerja** (Rencana Kerja, Hasil Kerja, Output);
   **Laporan** (Penilaian, Print Laporan); **Pengaturan** (Akun Admin, Kesiapan Periode, Periode).
+  Grup **Master Data** disembunyikan untuk pimpinan murni dan akses langsung ke
+  `/satker`, `/personel`, `/libur`, `/absensi/titik-dinas` dialihkan ke dashboard. Tombol
+  **Buat Rencana**, **Tambah Hasil**, **Tambah Output**, dan **Ajukan** rencana disembunyikan
+  untuk pimpinan murni; admin tetap melihatnya.
   Grup otomatis terbuka saat salah satu submenunya aktif; submenu Absensi memakai
   `/absensi/rekap?tab=rekap|detail|verifikasi` dan Strong Point memakai
   `/ph?tab=jadwal|rekap` sehingga sidebar dan tab di halaman tetap sinkron.

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api, apiBlob, ApiError } from '#lib/api/client';
+	import { adalahPimpinanSaja } from '#lib/stores/session.svelte';
 	import type { ListResponse, Periode, Personel, Rencana, Satker, StatusRencana } from '#lib/types';
 	import { LABEL_STATUS_RENCANA } from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
@@ -201,9 +202,11 @@
 					<Icon name="download" size={16} />
 					{mengekspor ? 'Menyiapkan PDF…' : 'Export PDF'}
 				</button>
-				<button class="btn btn-primary" onclick={() => (formTerbuka = true)}>
-					<Icon name="plus" size={16} /> Buat Rencana
-				</button>
+				{#if !adalahPimpinanSaja()}
+					<button class="btn btn-primary" onclick={() => (formTerbuka = true)}>
+						<Icon name="plus" size={16} /> Buat Rencana
+					</button>
+				{/if}
 			</div>
 		</div>
 
@@ -284,9 +287,11 @@
 							</td>
 							<td class="td no-print">
 								{#if row.status === 'draft' || row.status === 'perlu_revisi'}
-									<button class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs" onclick={() => ajukan(row)}>
-										Ajukan
-									</button>
+									{#if !adalahPimpinanSaja()}
+										<button class="btn btn-ghost border border-slate-300 px-2 py-1 text-xs" onclick={() => ajukan(row)}>
+											Ajukan
+										</button>
+									{/if}
 								{/if}
 							</td>
 						</tr>
@@ -317,9 +322,11 @@
 		<button class="btn btn-ghost border border-slate-300" disabled={menyimpan} onclick={() => simpan(false)}>
 			Simpan Draft
 		</button>
-		<button class="btn btn-primary" disabled={menyimpan} onclick={() => simpan(true)}>
-			<Icon name="check" size={16} /> Ajukan ke Atasan
-		</button>
+		{#if !adalahPimpinanSaja()}
+			<button class="btn btn-primary" disabled={menyimpan} onclick={() => simpan(true)}>
+				<Icon name="check" size={16} /> Ajukan ke Atasan
+			</button>
+		{/if}
 	</div>
 {/snippet}
 

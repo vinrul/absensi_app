@@ -31,8 +31,9 @@ Akun dibagi menjadi dua jenis:
 
 - **Admin** — mengelola sistem, memakai **username** (tanpa NRP), hanya login lewat dashboard web,
   dan tidak memiliki kewajiban absensi. Halaman pengelolaannya terpisah: **Akun Admin**.
-- **Personel** — pegawai yang wajib absen, memakai **NRP**, dapat login web dan Android.
-  Pimpinan dan atasan termasuk personel. Halaman pengelolaannya: **Data Personel**.
+- **Personel** — pegawai yang wajib absen, memakai **NRP**. Atasan langsung dan personel hanya
+  memakai **Android**; pimpinan memakai Android dan dashboard web. Halaman pengelolaannya:
+  **Data Personel**.
 
 | Peran | Cakupan data | Kemampuan utama |
 |---|---|---|
@@ -92,6 +93,11 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Login admin memakai **username**; login personel memakai **NRP**. Pesan gagal seragam.
 - Parameter `client` (`web`/`android`) menentukan kanal. Akun admin hanya boleh `web`;
   `client=android` hanya menerima akun personel (pimpinan/atasan termasuk).
+- Dashboard web hanya menerima akun yang memiliki **role admin atau pimpinan**. Akun dengan
+  role atasan/personel saja ditolak (403) dan diarahkan memakai aplikasi Android. Bila satu akun
+  memiliki beberapa role, akses dashboard terbuka karena adanya role pimpinan/admin; kemampuan
+  di dalam dashboard mengikuti gabungan role tersebut (mis. pimpinan yang juga atasan langsung
+  tetap dapat memutuskan rencana bawahannya).
 - Access token 15 menit; refresh token 30 hari dengan rotasi; logout mencabut token.
 - Password minimal 8 karakter, kombinasi huruf & angka; `must_change_password` diset saat akun dibuat.
 - Pembatasan 5 percobaan login/menit/IP → HTTP 429 + `Retry-After`.
@@ -139,6 +145,8 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Dashboard **Rencana Kerja** menyediakan filter periode, status, **satker**, dan **personel**,
   halaman **detail** lengkap (uraian, dasar tugas, rincian tahapan, lampiran), serta tombol
   **Export PDF** sesuai filter (kop Polda Bali, A4 landscape) memakai Chrome/Edge headless di server.
+  Untuk role pimpinan, tombol **Buat Rencana** dan aksi **Ajukan** disembunyikan (pimpinan hanya
+  memantau/memutuskan, bukan menyusun rencana).
 - Semua tanggal (dasar tugas, mulai/selesai kegiatan) dipilih lewat **date picker**, bukan input teks.
 - Lampiran yang sudah tersimpan dapat dilihat langsung di Android: PDF dirender per halaman dan
   gambar ditampilkan penuh dengan pinch-zoom; tidak memerlukan aplikasi eksternal.
@@ -161,7 +169,8 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Verifikator dapat meminta revisi dengan catatan wajib. Skor kualitas dipilih memakai slider 0–100
   pada layar verifikasi Android. Layar verifikasi dibuka dari kartu di Beranda atau tab Hasil Kerja.
 - Dashboard **Hasil Kerja** menyediakan filter periode, status, satker, dan personel, halaman detail
-  beserta lampiran bukti, serta **Export PDF** sesuai filter (Chrome/Edge headless).
+  beserta lampiran bukti, serta **Export PDF** sesuai filter (Chrome/Edge headless). Tombol
+  **Tambah Hasil** disembunyikan untuk role pimpinan.
 
 ### FR-05 Output
 - Hanya dari hasil kerja `terverifikasi`.
@@ -177,7 +186,7 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   lengkap dengan detail lampiran.
 - Dashboard **Output** menyediakan filter periode, status, satker, dan personel, halaman detail
   (uraian, tautan, komponen nilai, catatan, lampiran), serta **Export PDF** sesuai filter
-  (Chrome/Edge headless).
+  (Chrome/Edge headless). Tombol **Tambah Output** disembunyikan untuk role pimpinan.
 
 ### FR-06 Periode & penilaian
 - Periode bulanan dengan tanggal mulai/selesai; bobot default 20/20/30/30; total bobot harus 100.
@@ -189,7 +198,8 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   (Satker & Jam Kerja, Titik Dinas, Hari Libur, Data Personel); **Absensi** (Rekap Kehadiran,
   Detail Rekap, Verifikasi Offline); **Strong Point** (Jadwal Strong Point, Rekap Strong Point);
   **Kinerja** (Rencana Kerja, Hasil Kerja, Output); **Laporan** (Penilaian, Print Laporan);
-  **Pengaturan** (Akun Admin, Kesiapan Periode, Periode).
+  **Pengaturan** (Akun Admin, Kesiapan Periode, Periode). Grup **Master Data** disembunyikan untuk
+  role pimpinan (tanpa admin), termasuk akses langsung ke halaman master.
 - Filter periode dan satker.
 - KPI: total personel, hadir hari ini, rencana, hasil, output, rata-rata nilai.
 - Grafik: capaian per indikator, tren antar periode, sebaran kategori.

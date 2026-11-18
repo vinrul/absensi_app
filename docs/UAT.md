@@ -70,6 +70,10 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A56 | Tombol **Lihat** dokumentasi di Rekap Absensi | Galeri foto absensi per personel tampil (tanggal, masuk/pulang, jam, status); hanya pengelola sesuai cakupan yang dapat membuka | ✅ | API + build |
 | A57 | Dokumentasi di **Detail per Orang** | Tombol **Masuk** dan **Pulang** tampil pada tanggal yang memiliki foto; modal menampilkan gambar penuh | ✅ | API + build |
 | A58 | Tombol **Lihat** dokumentasi di Rekap Strong Point | Galeri foto check-in strong point per personel tampil; foto tanpa token ditolak 401, di luar cakupan 403 | ✅ | API |
+| A59 | Login dashboard dengan akun **atasan langsung** atau **personel** saja | Ditolak 403 dengan pesan dashboard hanya untuk pimpinan/admin; diarahkan memakai Android | ✅ | API |
+| A60 | Login dashboard akun **pimpinan** yang juga atasan langsung + personel | Tetap berhasil karena memiliki role pimpinan; dashboard memakai gabungan kemampuan role | ✅ | API |
+| A61 | Sidebar pimpinan murni | Grup **Master Data** tidak tampil; akses langsung `/satker`, `/personel`, `/libur`, `/absensi/titik-dinas` dialihkan ke dashboard | ✅ | UI build |
+| A62 | Aksi Kinerja pimpinan murni | Tombol **Buat Rencana**, **Tambah Hasil**, **Tambah Output**, dan **Ajukan** rencana tidak tampil; admin tetap melihat | ✅ | UI build |
 
 ## B. Admin ber-scope
 

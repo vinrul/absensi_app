@@ -97,6 +97,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.46 | Gabung absen masuk & pulang per tanggal | ✅ | `GET /absensi/harian` (dipakai tab Verifikasi & Detail + PDF); menit telat dihitung untuk status Dinas Kantor yang melewati jam masuk satker |
 | 3.47 | Sidebar dashboard bergrup dengan submenu | ✅ | Dashboard; Master Data; Absensi (Rekap Kehadiran/Detail Rekap/Verifikasi Offline via `?tab=`); Strong Point (Jadwal/Rekap via `?tab=`); Kinerja; Laporan (Penilaian/Print Laporan); Pengaturan (Akun Admin/Kesiapan Periode/Periode); grup aktif terbuka otomatis |
 | 3.48 | Galeri dokumentasi foto absensi | ✅ | Tombol **Lihat** di rekap membuka galeri foto per personel; detail per orang menampilkan tombol **Masuk/Pulang**; berkas disajikan `/api/v1/files/...` dengan cek kepemilikan/cakupan |
+| 3.49 | Pembatasan peran dashboard | ✅ | Login web hanya role admin/pimpinan; atasan/personel ditolak 403. Pimpinan murni tidak melihat Master Data dan tombol Buat Rencana/Tambah Hasil/Tambah Output/Ajukan disembunyikan; akun multi-role tetap masuk lewat role pimpinan/admin |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 

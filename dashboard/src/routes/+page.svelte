@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { pulihkanSesi, session } from '#lib/stores/session.svelte';
+	import { bolehMasukDashboard, logout, pulihkanSesi } from '#lib/stores/session.svelte';
 
 	onMount(async () => {
 		const masuk = await pulihkanSesi();
@@ -9,10 +9,12 @@
 			goto('/login', { replaceState: true });
 			return;
 		}
-		const bolehDashboard = session.user?.roles.some((role) =>
-			['atasan', 'pimpinan', 'admin_sistem'].includes(role)
-		);
-		goto(bolehDashboard ? '/dashboard' : '/absensi', { replaceState: true });
+		if (!bolehMasukDashboard()) {
+			await logout().catch(() => {});
+			goto('/login', { replaceState: true });
+			return;
+		}
+		goto('/dashboard', { replaceState: true });
 	});
 </script>
 

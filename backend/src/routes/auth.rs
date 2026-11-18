@@ -219,6 +219,12 @@ pub async fn login(
     if roles.is_empty() {
         return Err(AppError::Forbidden("Akun belum memiliki peran".into()));
     }
+    if matches!(kanal, KanalLogin::Web) && !akses::boleh_login_dashboard(&roles) {
+        return Err(AppError::Forbidden(
+            "Dashboard hanya untuk akun pimpinan dan admin. Personel dan atasan langsung menggunakan aplikasi Android."
+                .into(),
+        ));
+    }
     let role_scopes = personel::role_scopes(&state.pool, personel.id).await?;
 
     let user_agent = headers
@@ -282,6 +288,7 @@ pub async fn refresh(
     headers: HeaderMap,
     payload: Option<Json<RefreshRequest>>,
 ) -> AppResult<Response> {
+    let lewat_body = payload.is_some();
     let raw = payload
         .and_then(|Json(body)| body.refresh_token)
         .filter(|token| !token.is_empty())
@@ -298,6 +305,13 @@ pub async fn refresh(
 
     let personel = personel::active_personel(&state.pool, stored.personel_id).await?;
     let roles = personel::roles(&state.pool, personel.id).await?;
+
+    // Cookie refresh dipakai dashboard web; token lewat body dipakai Android.
+    if !lewat_body && !akses::boleh_login_dashboard(&roles) {
+        return Err(AppError::Forbidden(
+            "Dashboard hanya untuk akun pimpinan dan admin. Personel dan atasan langsung menggunakan aplikasi Android.".into(),
+        ));
+    }
 
     let (access_token, expires_in) = jwt::issue(
         jwt::TokenSubject {
