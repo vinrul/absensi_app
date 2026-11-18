@@ -270,3 +270,11 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 10.10 | Push FCM untuk notifikasi daring | P3 | pengingat lokal sudah memenuhi kebutuhan |
 | 10.11 | Utoipa/OpenAPI otomatis | P3 | `openapi.json` manual + validator |
 | 10.12 | Cache titik dinas untuk absensi offline sejak awal | P2 | saat offline total, radius belum diketahui sampai ada sinyal |
+
+## 11. Deploy VPS
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 11.1 | Seed demo VPS khusus Ditreskrimsus | ✅ | `seed --vps`: Polda + Ditreskrimsus, 40 personel, absensi/rekap PH 1–19 (tidak melewati hari ini), jadwal PH 1–30 (Regu 1 1–15, Regu 2 16–30), rencana/hasil/output draft–revisi–disetujui |
+| 11.2 | Dokumentasi deploy VPS native | ✅ | `docs/deploy-vps.md`: PostgreSQL, systemd `absensi-api`, nginx mTLS Cloudflare, `/var/www/absensi` & `/var/www/personel`, backup, pemecahan masalah |
+| 11.3 | Eksekusi deploy di VPS produksi | ⬜ | Ikuti `docs/deploy-vps.md`; ganti password demo, `JWT_SECRET`, dan aktifkan Authenticated Origin Pulls |

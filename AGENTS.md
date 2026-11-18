@@ -35,6 +35,12 @@ cd personel;  bun run check; bun run build
 cd android;  .\gradlew.bat :app:assembleDebug
 ```
 
+## Deploy VPS
+
+Panduan lengkap: `docs/deploy-vps.md`. Seed demo server (hanya Ditreskrimsus) memakai
+`cargo run --bin seed -- --reset --vps`; **jangan** menjalankan `--reset` pada database
+produksi yang sudah berisi data. Profil tanpa `--vps` tetap dipakai untuk development.
+
 ## Bahasa
 
 Kode, komentar, pesan error API, dan dokumentasi memakai **Bahasa Indonesia** agar konsisten

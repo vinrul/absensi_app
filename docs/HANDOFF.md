@@ -4,6 +4,7 @@ Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan 
 Baca ini dulu sebelum mengubah kode.
 
 Terakhir diverifikasi: 18 November 2026 (37 unit test backend + 60 cek API pada DB uji;
+seed `--vps` pada DB uji menghasilkan 40 personel, 30 jadwal PH, dan rekap PH sampai hari ini;
 dashboard & web personel `bun run check`/`build`; APK debug; `openapi.json` 88 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
@@ -17,6 +18,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Area | Bukti |
 |---|---|
 | Skema DB + seed demo (1 Polda, 9 Polres, 21 Satker, 145 personel + 5 admin) | `cargo run --bin seed -- --reset`; lampiran contoh PDF/PNG ikut ditulis ke `APP__UPLOAD_DIR` |
+| Seed demo VPS khusus Ditreskrimsus + panduan deploy native | `cargo run --bin seed -- --reset --vps`: Polda + Ditreskrimsus, absensi/rekap PH 1–19 (tidak melewati hari ini), jadwal PH 1–akhir bulan (Regu 1 1–15, Regu 2 16–akhir), status rencana/hasil/output lengkap; systemd + nginx mTLS di `docs/deploy-vps.md` |
 | Struktur 3 level (polda → polres → satker) + 12 peran ber-scope | `service/akses.rs`, migrasi `0003`/`0005` |
 | Akun admin terpisah secara logis (`jenis_akun=admin`, username, tanpa NRP) | migrasi `0007`, halaman **Akun Admin** |
 | Login berkanal: admin hanya web, Android hanya akun personel | `routes/auth.rs`, `KanalLogin` |
@@ -67,7 +69,7 @@ dashboard/  Svelte 5.57, SvelteKit 3.2, Tailwind 4.3, Vite 8.3, Leaflet 1.9 (pet
 personel/   Aplikasi web personel & atasan (SPA mobile-first) — Svelte 5, SvelteKit 3, Tailwind 4, Leaflet, **bun**
 android/    Kotlin 2.4.21, AGP 9.0.1, Gradle 9.3, Compose BOM 2025.06, OkHttp 4.12
 deploy/     docker compose (db :5433, dashboard :8088, personel :8089), nginx, backup.sh
-docs/       PRD.md, penilaian.md, UAT.md, CHECKLIST.md, HANDOFF.md (dokumen ini)
+docs/       PRD.md, penilaian.md, UAT.md, CHECKLIST.md, HANDOFF.md (dokumen ini), deploy-vps.md
 tools/uji/  api-smoke.js (e2e DB uji), openapi-check.js
 ```
 
@@ -75,6 +77,8 @@ tools/uji/  api-smoke.js (e2e DB uji), openapi-check.js
 # Database + API (demo)
 cd deploy; podman compose up -d db           # atau: docker compose up -d db
 cd ..\backend; cargo run --bin seed -- --reset; cargo run
+# profil VPS (hanya Ditreskrimsus; jangan pada DB produksi berisi data):
+# cargo run --bin seed -- --reset --vps
 
 # Jam server palsu (development; .env harus APP__ALLOW_FAKE_TIME=true)
 cargo run --bin fake -- 20-11-2026 07:45
@@ -478,6 +482,7 @@ memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).
 | Type-check UI | `cd dashboard; bun run check` | 0 error |
 | Build UI | `bun run build` | SPA statis |
 | Android | `.\gradlew.bat :app:assembleDebug` | APK debug |
+| Seed VPS | `cargo run --bin seed -- --reset --vps` (DB uji) | 40 personel, jadwal PH 1–30 (Regu 1 1–15, Regu 2 16–30), absensi & rekap PH sampai hari ini (maks. 19), status rencana/hasil/output lengkap |
 
 Jangan menjalankan skrip e2e pada `kinerja_db` (data demo untuk uji manual). Skrip men-spawn
 API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunci `target/debug`.
@@ -505,6 +510,15 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
 - Emulator GPS: `adb emu geo fix <longitude> <latitude>` (urutan longitude dulu), lalu
   `pm grant ... ACCESS_FINE_LOCATION`.
 - `emulator` butuh `-gpu swiftshader_indirect` di mesin ini agar tidak crash.
+- Seed `--vps` hanya membuat Polda Bali + Ditreskrimsus dan **tidak** membuat akun Polres
+  (`admin_polres`, `000022`, `000023`); jangan mencampurnya dengan database yang sudah berisi
+  data development. `--reset` tetap menghapus seluruh data.
+- Deploy native: proxy nginx `/files/` harus diarahkan ke `/api/v1/files/` (bukan
+  `lampiran/raw/`) agar galeri foto absensi/strong point bekerja.
+- Chrome headless di systemd membutuhkan `HOME` yang dapat ditulis (mis. `/var/lib/absensi`)
+  dan `ReadWritePaths` yang mencakup folder tersebut; tanpa itu ekspor PDF gagal 500.
+- Dengan `ssl_verify_client on`, `curl` langsung ke domain akan ditolak; uji lewat Cloudflare
+  (Authenticated Origin Pulls) atau server block diagnostik `optional_no_ca`.
 - Postgres 18: jangan mount ke `/var/lib/postgresql/data`.
 - SvelteKit 3: `svelte.config.js` yang tersisa akan menggagalkan build (`config_file_unsupported`).
 - `asset()` dari `$app/paths` menolak path berawalan `/`; logo dashboard memakai `src` absolut.

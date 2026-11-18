@@ -4,6 +4,9 @@
 //! Pemakaian:
 //!   cargo run --bin seed              # isi jika database masih kosong
 //!   cargo run --bin seed -- --reset   # hapus semua data lalu isi ulang
+//!   cargo run --bin seed -- --reset --vps
+//!       # data demo VPS: hanya Ditreskrimsus, absensi & rekap PH 1–19,
+//!       # jadwal strong point 1–akhir bulan (Regu 1/Regu 2)
 
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -226,6 +229,50 @@ const PANGKAT: &[&str] = &[
 
 const JUMLAH_PERSONEL: usize = 120;
 
+/// Profil isi data demo.
+///
+/// `Development` mengisi seluruh organisasi (Polda, 9 Polres, 21 satker) agar
+/// dashboard dan Android punya banyak contoh. `Vps` hanya mengisi Polda Bali
+/// dan Ditreskrimsus dengan rentang tanggal yang dipakai untuk demo di server
+/// produksi, tanpa mengubah perilaku seed development.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProfilSeed {
+    Development,
+    Vps,
+}
+
+impl ProfilSeed {
+    fn dari_argumen() -> Self {
+        if std::env::args().any(|arg| arg == "--vps") {
+            Self::Vps
+        } else {
+            Self::Development
+        }
+    }
+
+    fn jumlah_personel(self) -> usize {
+        match self {
+            Self::Development => JUMLAH_PERSONEL,
+            Self::Vps => 40,
+        }
+    }
+
+    /// Batas tanggal absensi kantor dan rekap strong point pada profil VPS.
+    fn batas_hari_absensi(self) -> Option<u32> {
+        match self {
+            Self::Development => None,
+            Self::Vps => Some(19),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Self::Development => "development (semua satker)",
+            Self::Vps => "vps (Ditreskrimsus)",
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenvy::dotenv().ok();
@@ -241,6 +288,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sqlx::migrate!("./migrations").run(&pool).await?;
 
     let reset = std::env::args().any(|arg| arg == "--reset");
+    let profil = ProfilSeed::dari_argumen();
 
     let existing: i64 = sqlx::query_scalar("SELECT count(*) FROM satker")
         .fetch_one(&pool)
@@ -279,6 +327,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     for (kode, nama, lat, lng, units) in POLDA_SATKER {
+        if profil == ProfilSeed::Vps && *kode != "DITRESKRIMSUS" {
+            continue;
+        }
         nodes.push(NodeSeed {
             kode,
             nama: (*nama).to_string(),
@@ -291,6 +342,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     for (kode, nama, lat, lng) in POLRES {
+        if profil == ProfilSeed::Vps {
+            break;
+        }
         nodes.push(NodeSeed {
             kode,
             nama: (*nama).to_string(),
@@ -561,63 +615,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )
     .await?;
 
-    insert_admin(
-        &pool,
-        uid("admin-polres"),
-        "admin_polres",
-        "Admin Polresta Denpasar",
-        "AKP",
-        "Administrator Polres",
-        satker_polres_dps_id,
-        &hash_admin_polres,
-        AppRole::AdminPolres,
-        Some(polres_dps_id),
-    )
-    .await?;
+    // Akun Polres hanya dibuat pada profil development; profil VPS tidak
+    // memiliki satker Polres sehingga baris ini akan melanggar foreign key.
+    if profil == ProfilSeed::Development {
+        insert_admin(
+            &pool,
+            uid("admin-polres"),
+            "admin_polres",
+            "Admin Polresta Denpasar",
+            "AKP",
+            "Administrator Polres",
+            satker_polres_dps_id,
+            &hash_admin_polres,
+            AppRole::AdminPolres,
+            Some(polres_dps_id),
+        )
+        .await?;
 
-    insert_admin(
-        &pool,
-        uid("admin-satker-polres"),
-        "admin_satker_polres",
-        "Admin Satker Polres",
-        "AKP",
-        "Administrator Satker",
-        satker_polres_dps_id,
-        &hash_admin_satker,
-        AppRole::AdminSatkerPolres,
-        Some(satker_polres_dps_id),
-    )
-    .await?;
+        insert_admin(
+            &pool,
+            uid("admin-satker-polres"),
+            "admin_satker_polres",
+            "Admin Satker Polres",
+            "AKP",
+            "Administrator Satker",
+            satker_polres_dps_id,
+            &hash_admin_satker,
+            AppRole::AdminSatkerPolres,
+            Some(satker_polres_dps_id),
+        )
+        .await?;
 
-    insert_personel(
-        &pool,
-        uid("pimpinan-polres"),
-        "000022",
-        "Pimpinan Polresta Denpasar",
-        "AKP",
-        "Kasatreskrim",
-        Some("Unit Reskrim"),
-        satker_polres_dps_id,
-        None,
-        &hash_pimpinan_polres,
-        &[(AppRole::PimpinanPolres, Some(polres_dps_id))],
-    )
-    .await?;
+        insert_personel(
+            &pool,
+            uid("pimpinan-polres"),
+            "000022",
+            "Pimpinan Polresta Denpasar",
+            "AKP",
+            "Kasatreskrim",
+            Some("Unit Reskrim"),
+            satker_polres_dps_id,
+            None,
+            &hash_pimpinan_polres,
+            &[(AppRole::PimpinanPolres, Some(polres_dps_id))],
+        )
+        .await?;
 
-    insert_personel(
-        &pool,
-        uid("pimpinan-satker-polres"),
-        "000023",
-        "Pimpinan Satker Polres",
-        "AKP",
-        "Kanit",
-        Some("Unit Reskrim"),
-        satker_polres_dps_id,
-        None,
-        &hash_pimpinan_satker,
-        &[(AppRole::PimpinanSatkerPolres, Some(satker_polres_dps_id))],
-    )
-    .await?;
+        insert_personel(
+            &pool,
+            uid("pimpinan-satker-polres"),
+            "000023",
+            "Pimpinan Satker Polres",
+            "AKP",
+            "Kanit",
+            Some("Unit Reskrim"),
+            satker_polres_dps_id,
+            None,
+            &hash_pimpinan_satker,
+            &[(AppRole::PimpinanSatkerPolres, Some(satker_polres_dps_id))],
+        )
+        .await?;
+    }
 
     let pimpinan_polda_id = uid("pimpinan-polda");
     let mut atasan_map: HashMap<Uuid, Uuid> = HashMap::new();
@@ -646,7 +704,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Personel tersebar merata di satker.
-    for index in 0..JUMLAH_PERSONEL {
+    for index in 0..profil.jumlah_personel() {
         let node = satker_nodes[index % satker_nodes.len()];
         let satker_id = uid(node.kode);
         let unit = node.units[(index / satker_nodes.len()) % node.units.len()];
@@ -772,14 +830,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -------------------------------------------------------- jadwal PH demo
     // Roster penuh sebulan untuk Ditreskrimsus dapat dimatikan lewat env agar
     // database uji memakai jadwal contoh yang tidak menabrak skenario e2e.
-    let roster_penuh = std::env::var("APP__SEED_FULL_ROSTER")
-        .map(|nilai| {
-            !matches!(
-                nilai.trim().to_ascii_lowercase().as_str(),
-                "0" | "false" | "off"
-            )
-        })
-        .unwrap_or(true);
+    // Profil VPS selalu memakai roster penuh agar jadwal Regu 1/Regu 2 lengkap
+    // sesuai kebutuhan demo, terlepas dari env yang terbawa dari development.
+    let roster_penuh = profil == ProfilSeed::Vps
+        || std::env::var("APP__SEED_FULL_ROSTER")
+            .map(|nilai| {
+                !matches!(
+                    nilai.trim().to_ascii_lowercase().as_str(),
+                    "0" | "false" | "off"
+                )
+            })
+            .unwrap_or(true);
     let mut ph_dates: HashMap<Uuid, HashSet<NaiveDate>> = HashMap::new();
     let mut jadwal_ph_rows: Vec<(Uuid, Uuid, Uuid, NaiveDate, NaiveTime, NaiveTime)> = Vec::new();
 
@@ -876,8 +937,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // -------------------------------------------------------------- absensi
+    // Development: sampai kemarin. VPS: sampai hari ini, maksimal tanggal 19
+    // (dan tetap tidak melewati akhir bulan).
+    let mut batas_absensi = akhir_bulan.min(today - Delta::days(1));
+    if let Some(hari) = profil.batas_hari_absensi() {
+        let batas_profil = NaiveDate::from_ymd_opt(awal_bulan.year(), awal_bulan.month(), hari)
+            .expect("batas absensi valid");
+        batas_absensi = batas_absensi.max(today).min(batas_profil);
+    }
     let mut tanggal = awal_bulan;
-    while tanggal <= akhir_bulan.min(today - Delta::days(1)) {
+    while tanggal <= batas_absensi {
         let iso_weekday = tanggal.weekday().num_days_from_monday() + 1;
         if iso_weekday <= 5 {
             for (index, (personel_id, satker_id, _nrp)) in personel_ids.iter().enumerate() {
@@ -961,10 +1030,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         tanggal += Delta::days(1);
     }
 
-    // Absensi PH untuk jadwal yang sudah lewat.
+    // Absensi PH untuk jadwal yang sudah lewat. Profil VPS boleh mengisi hari
+    // ini agar rekap "sampai hari ini" tidak menampilkan semua personel sebagai
+    // belum strong point; tanggal yang akan datang tetap dilewati.
     for (jadwal_id, satker_id, strong_point_id, tanggal, jam_mulai, jam_selesai) in &jadwal_ph_rows
     {
-        if *tanggal >= today {
+        let belum_terjadi = if profil == ProfilSeed::Vps {
+            *tanggal > today
+        } else {
+            *tanggal >= today
+        };
+        if belum_terjadi
+            || profil
+                .batas_hari_absensi()
+                .is_some_and(|hari| tanggal.day() > hari)
+        {
             continue;
         }
         let assignments: Vec<Uuid> = sqlx::query_scalar(
@@ -2018,8 +2098,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .await?;
 
     println!("\nSeed selesai.");
+    println!("  Profil    : {}", profil.label());
     println!("  Polda     : 1");
-    println!("  Polres    : {}", POLRES.len());
+    println!(
+        "  Polres    : {}",
+        if profil == ProfilSeed::Vps {
+            0
+        } else {
+            POLRES.len()
+        }
+    );
     println!("  Satker    : {}", satker_nodes.len());
     println!(
         "  Personel  : {} ({} reguler + {} atasan + 4 pimpinan)",
@@ -2029,6 +2117,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("  Admin     : {total_admin} akun (login dashboard)");
     println!("  Periode   : {nama_periode} ({awal_bulan} s/d {akhir_bulan})");
+    println!("  Absensi   : {awal_bulan} s/d {batas_absensi}");
     println!("  Jadwal PH : {}", jadwal_ph_rows.len());
     println!("  Hari libur: {libur_tetap_len}");
     println!("  Rencana demo: 1 draft, 1 diajukan, 1 perlu revisi (NRP 85000001)");
@@ -2036,16 +2125,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Rencana personel lain: 1 diajukan dengan lampiran PDF + PNG");
     println!("  Lampiran demo: PDF dan PNG ditulis ke folder upload");
     println!("  Hasil demo: 1 draft, 1 diajukan, 1 perlu revisi, 1 dari personel lain");
+    println!(
+        "  Status contoh: rencana draft/perlu revisi/disetujui, hasil draft/perlu revisi/terverifikasi, output draft/dalam verifikasi/disetujui"
+    );
     println!("\nAkun demo:");
     println!("  Admin global        : superuser / Superuser#2026");
     println!("  Admin Polda         : admin_polda / AdminPolda#2026");
     println!("  Admin Satker Polda  : admin_satker_polda / AdminSatker#2026");
-    println!("  Admin Polres        : admin_polres / AdminPolres#2026");
-    println!("  Admin Satker Polres : admin_satker_polres / AdminSatker#2026");
+    if profil == ProfilSeed::Development {
+        println!("  Admin Polres        : admin_polres / AdminPolres#2026");
+        println!("  Admin Satker Polres : admin_satker_polres / AdminSatker#2026");
+    }
     println!("  Pimpinan Polda      : NRP 000002 / Pimpinan#2026");
-    println!("  Pimpinan Polres     : NRP 000022 / PimpinanPolres#2026");
+    if profil == ProfilSeed::Development {
+        println!("  Pimpinan Polres     : NRP 000022 / PimpinanPolres#2026");
+    }
     println!("  Pimpinan Satker     : NRP 000012 / PimpinanSatker#2026");
-    println!("  Pimpinan Satker Polres: NRP 000023 / PimpinanSatker#2026");
+    if profil == ProfilSeed::Development {
+        println!("  Pimpinan Satker Polres: NRP 000023 / PimpinanSatker#2026");
+    }
     println!("  Atasan              : NRP 000100 / Atasan#2026");
     println!(
         "  Personel            : NRP {} / Polri#2026",

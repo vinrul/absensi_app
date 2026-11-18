@@ -17,6 +17,7 @@ Dokumen pendamping:
 | [`docs/penilaian.md`](docs/penilaian.md) | Rumus perhitungan nilai per indikator |
 | [`docs/UAT.md`](docs/UAT.md) | Checklist uji terima per peran |
 | [`docs/fake-gps.md`](docs/fake-gps.md) | Deteksi lokasi tiruan, kebijakan `flag`/`reject`, dan cara menguji di development |
+| [`docs/deploy-vps.md`](docs/deploy-vps.md) | Deploy VPS: systemd, nginx mTLS, dashboard/personel, seed demo Ditreskrimsus |
 | `AGENTS.md` | Aturan singkat untuk agent AI |
 
 ## Isi repositori
@@ -413,3 +414,22 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
   ```
 
   Cara restore ada di komentar bagian bawah `deploy/backup.sh`.
+
+## Deploy VPS
+
+Panduan lengkap (systemd, nginx mTLS Cloudflare, dashboard di `/var/www/absensi`, web
+personel di `/var/www/personel`, backup, dan pemecahan masalah) ada di
+[`docs/deploy-vps.md`](docs/deploy-vps.md).
+
+Ringkasnya, API berjalan di `127.0.0.1:7085` sebagai layanan systemd, kedua SPA disajikan
+nginx pada `absensi.jagradewata.id` dan `personel.jagradewata.id`, dan database diisi dengan
+profil khusus server:
+
+```bash
+sudo -u absensi bash -c 'set -a; . /etc/absensi/absensi.env; set +a; /opt/absensi/seed --reset --vps'
+```
+
+Profil `--vps` hanya mengisi Polda Bali + Ditreskrimsus, absensi & rekap strong point tanggal
+1–19, jadwal strong point tanggal 1–akhir bulan (Regu 1/Regu 2), serta contoh rencana, hasil,
+dan output pada status draft/revisi/disetujui. Seed development tanpa `--vps` tetap mengisi
+seluruh satker.
