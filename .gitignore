@@ -8,6 +8,7 @@
 # Dashboard
 /dashboard/node_modules/
 /dashboard/build/
+/dashboard/absensi/
 /dashboard/.svelte-kit/
 /dashboard/.env
 /dashboard/.env.*
@@ -15,6 +16,7 @@
 # Aplikasi web personel
 /personel/node_modules/
 /personel/build/
+/personel/personel/
 /personel/.svelte-kit/
 /personel/.env
 /personel/.env.*

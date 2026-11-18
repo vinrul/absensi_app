@@ -221,6 +221,7 @@ class Api(private val sesi: PenyimpananSesi) {
 
     companion object {
         /** Emulator: 10.0.2.2 menuju localhost mesin pengembang. */
-        const val ALAMAT_BAWAAN = "http://10.0.2.2:8080/api/v1/"
+        //const val ALAMAT_BAWAAN = "http://10.0.2.2:8080/api/v1/"
+        const val ALAMAT_BAWAAN = "https://absensi.jagradewata.id/api/v1/"
     }
 }
