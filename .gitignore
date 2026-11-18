@@ -12,6 +12,17 @@
 /dashboard/.env
 /dashboard/.env.*
 
+# Aplikasi web personel
+/personel/node_modules/
+/personel/build/
+/personel/.svelte-kit/
+/personel/.env
+/personel/.env.*
+/personel/dev.log
+/personel/preview.log
+/personel/uji-*.png
+/personel/static/uji-masuk.html
+
 # Android
 /android/.gradle/
 /android/build/

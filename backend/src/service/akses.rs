@@ -17,11 +17,11 @@ use crate::repo::satker::{self, SatkerRow};
 /// Menentukan apakah sebuah jenis akun boleh login pada kanal tertentu.
 ///
 /// Admin adalah pengelola sistem dan hanya boleh masuk lewat dashboard web.
-/// Android hanya menerima akun personel (termasuk pimpinan/atasan).
+/// Android dan web personel hanya menerima akun personel (termasuk pimpinan/atasan).
 pub fn kanal_login_diizinkan(jenis_akun: JenisAkun, kanal: KanalLogin) -> bool {
     match kanal {
         KanalLogin::Web => true,
-        KanalLogin::Android => jenis_akun == JenisAkun::Personel,
+        KanalLogin::Android | KanalLogin::PersonelWeb => jenis_akun == JenisAkun::Personel,
     }
 }
 
@@ -31,6 +31,12 @@ pub fn boleh_login_dashboard(roles: &[AppRole]) -> bool {
     roles
         .iter()
         .any(|role| role.admin_any() || role.pimpinan_any())
+}
+
+/// Refresh lewat cookie diizinkan untuk dashboard dan web personel.
+/// Web personel menandai sesinya dengan `device_id = "web-personel"`.
+pub fn refresh_cookie_diizinkan(roles: &[AppRole], device_id: Option<&str>) -> bool {
+    device_id == Some("web-personel") || boleh_login_dashboard(roles)
 }
 
 /// Menghitung seluruh satker yang boleh diakses oleh seorang pengguna.
@@ -396,6 +402,35 @@ mod tests {
             JenisAkun::Personel,
             KanalLogin::Android
         ));
+        assert!(kanal_login_diizinkan(
+            JenisAkun::Personel,
+            KanalLogin::PersonelWeb
+        ));
+    }
+
+    #[test]
+    fn admin_ditolak_login_personel_web() {
+        assert!(!kanal_login_diizinkan(
+            JenisAkun::Admin,
+            KanalLogin::PersonelWeb
+        ));
+    }
+
+    #[test]
+    fn refresh_cookie_hanya_dashboard_atau_web_personel() {
+        assert!(refresh_cookie_diizinkan(
+            &[AppRole::Pimpinan],
+            Some("dashboard")
+        ));
+        assert!(refresh_cookie_diizinkan(
+            &[AppRole::Atasan, AppRole::Personel],
+            Some("web-personel")
+        ));
+        assert!(!refresh_cookie_diizinkan(
+            &[AppRole::Atasan, AppRole::Personel],
+            Some("dashboard")
+        ));
+        assert!(!refresh_cookie_diizinkan(&[AppRole::Personel], None));
     }
 
     #[test]

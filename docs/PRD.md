@@ -354,6 +354,28 @@ aktif dan dapat diaktifkan kembali.
   notifikasi (pengingat PH), serta WorkManager/penyimpanan (antrean offline, cache privat).
 - Setiap izin dapat diberikan, ditolak, atau dilewati; status dapat diubah lewat Pengaturan Android.
 
+### FR-20 Aplikasi web personel & atasan
+- Aplikasi terpisah di folder `personel/` memakai Svelte 5, SvelteKit 3 SPA, Tailwind 4, dan Bun.
+  Login memakai NRP + password dengan tombol tampil/sembunyikan password.
+- Kanal login server `personel_web` hanya menerima akun personel (termasuk atasan/pimpinan);
+  akun admin ditolak. Access token berada di memori dan refresh memakai cookie httpOnly.
+- Navigasi bawah 6 tab: Beranda, Absensi, Rencana, Hasil, Output, Strong Point. Desain
+  mobile-first dan responsif, berbeda dari dashboard (tanpa sidebar desktop).
+- Wizard izin browser menjelaskan lokasi, kamera, notifikasi, dan antrean offline sekali
+  setelah login pertama.
+- Absensi memakai GPS perangkat, peta OpenStreetMap, validasi radius ke titik dinas terdekat,
+  8 status kehadiran, foto opsional, serta antrean offline di penyimpanan browser.
+- Strong Point memakai marker hijau tanpa titik dinas, koordinat, akurasi, reverse-geocode
+  `geocode.vinrul.my.id`, dokumentasi hanya saat check-in, aturan sesi baru setelah 2 jam,
+  dan antrean offline.
+- Wizard rencana (4 langkah), hasil (3 langkah), dan output (3 langkah) mendukung simpan draft,
+  lampiran/bukti, serta ajukan ke atasan. Atasan dapat menyetujui/merevisi/menolak rencana dan
+  memverifikasi hasil/output dengan slider skor.
+- Profil menyediakan foto, edit nama/pangkat/jabatan/telepon/email, ganti password dengan
+  tombol mata, dan logout. Beranda menampilkan nilai kinerja periode berjalan.
+- Keterbatasan dibanding Android: tidak ada pengingat notifikasi latar (WorkManager) dan alamat
+  server mengikuti origin aplikasi, bukan dapat diubah pengguna.
+
 ## 6. Kebutuhan non-fungsional
 
 | Aspek | Target |
@@ -362,7 +384,7 @@ aktif dan dapat diaktifkan kembali.
 | Perhitungan periode | < 60 detik untuk 200 personel |
 | Keamanan | Argon2id, JWT HS256, RBAC per satker, audit log, rate limit, HTTPS di produksi |
 | Privasi | Tidak ada token di localStorage browser; berkas diunduh dengan bearer token |
-| Perangkat | Android 8.0+ (minSdk 26), GPS + kamera opsional; dashboard Chrome/Edge/Firefox terbaru |
+| Perangkat | Android 8.0+ (minSdk 26); web personel pada Chrome/Edge/Firefox/Safari mobile dan desktop; dashboard Chrome/Edge/Firefox terbaru |
 | Offline | Absensi tersimpan lokal dan tersinkron otomatis (WorkManager, 30 menit / manual) |
 | Kapasitas awal | 1 Polda + 9 Polres, ±200 personel, 1 periode aktif |
 

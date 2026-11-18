@@ -24,6 +24,7 @@ Dokumen pendamping:
 |---|---|---|
 | `backend/` | REST API, autentikasi, geofencing, mesin penilaian | Rust (axum 0.8, sqlx 0.9, PostgreSQL 18) |
 | `dashboard/` | Dashboard pimpinan & admin (SPA) | Svelte 5, SvelteKit 3, Tailwind CSS 4 — **Bun** |
+| `personel/` | Aplikasi web personel & atasan langsung (SPA mobile-first) | Svelte 5, SvelteKit 3, Tailwind CSS 4, Leaflet — **Bun** |
 | `android/` | Aplikasi personel (absensi GPS, offline queue) | Kotlin, Jetpack Compose, OkHttp |
 | `deploy/` | Docker Compose, nginx, backup, contoh env | Docker |
 
@@ -62,8 +63,12 @@ Akun demo (seed):
 | Personel | `85000001` | `Polri#2026` |
 
 Admin memakai **username** dan hanya dapat login lewat dashboard web. Pimpinan memakai **NRP** dan
-dapat login dashboard web maupun Android; **atasan langsung dan personel** hanya memakai Android
-(dashboard menolak login mereka dengan 403).
+dapat login dashboard web maupun Android. **Atasan langsung dan personel** memakai Android atau
+**aplikasi web personel** (`personel/`); dashboard menolak login mereka dengan 403.
+
+Aplikasi web personel memakai kanal login `personel_web`: hanya akun personel (termasuk
+atasan/pimpinan) yang diterima. Access token disimpan di memori dan refresh memakai cookie
+httpOnly (`device_id = "web-personel"`).
 
 Data demo ada di database `kinerja_db`. Untuk uji otomatis gunakan database terpisah
 `kinerja_test` (lihat `tools/uji/api-smoke.js`).
@@ -103,7 +108,25 @@ bun run build                  # hasil statis di dashboard/build
 > headless**. Pastikan salah satunya terpasang; lokasi dideteksi otomatis, atau set
 > `APP__CHROME_PATH` di `backend/.env` (contoh ada di `backend/.env.example`).
 
-### 3. Aplikasi Android
+### 3. Aplikasi web personel (Bun)
+
+```powershell
+cd F:\absensi_polda_bali\personel
+bun install                    # lockfile resmi: bun.lock
+bun run dev                    # http://localhost:5174 (proxy /api → :8080)
+bun run check
+bun run build                  # hasil statis di personel/build
+```
+
+Aplikasi ini memakai desain mobile-first dengan bottom navigation dan alur yang sama dengan
+Android: Beranda, Absensi, Rencana, Hasil, Output, dan Strong Point. Untuk produksi, sajikan
+isi `personel/build` pada host/port terpisah. Contoh: salin ke `deploy/data/web-personel/`
+lalu jalankan `docker compose up -d web-personel` (port default `8089`).
+
+> Web personel **wajib memakai HTTPS** di produksi (kecuali `localhost`) agar browser
+> mengizinkan geolocation dan kamera.
+
+### 4. Aplikasi Android
 
 ```powershell
 cd F:\absensi_polda_bali\android
@@ -287,6 +310,12 @@ Catatan penting:
   (JPG/PNG maks. 5 MB) dan ganti password; setiap kolom password punya ikon mata
   tampil/sembunyikan. Avatar tampil di sidebar dan header, dan ganti password mencabut seluruh
   sesi sehingga pengguna kembali ke halaman login.
+- **Aplikasi web personel & atasan** (`personel/`): SPA mobile-first dengan bottom navigation
+  (Beranda, Absensi, Rencana, Hasil, Output, Strong) dan alur yang sama dengan Android. Mencakup
+  absensi GPS + peta OSM, status kehadiran, dokumentasi foto, antrean offline di browser, wizard
+  strong point (marker hijau, koordinat, akurasi, reverse-geocode, aturan 2 jam), wizard rencana
+  4 langkah, hasil/output 3 langkah, persetujuan rencana, verifikasi hasil/output berslider,
+  nilai kinerja di Beranda, serta profil (foto, edit, ganti password dengan tombol mata).
 - **Penilaian**: periode bulanan dibuat otomatis (penutupan manual), bobot per periode
   (default 20/20/30/30), snapshot komponen untuk audit, hari ber-jadwal PH dikeluarkan dari
   skor absensi harian.
@@ -319,16 +348,20 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 
 ## Verifikasi yang sudah dilakukan
 
-- `cargo test` → **30 test lulus** (geofence, scoring, deteksi berkas, kanal login).
-- `bun tools/uji/api-smoke.js` → **56/56 cek lulus** pada database uji `kinerja_test`:
-  RBAC ber-scope, pembatasan login dashboard (pimpinan/admin vs atasan/personel), CRUD
-  satker/personel/admin, titik dinas (termasuk ubah jenis & koordinat), zona waktu & jam Sabtu,
-  kanal login Android, tutup/buka periode, kesiapan satker, kalender libur, jadwal & absensi PH,
-  jam server palsu, verifikasi, foto dokumentasi, rekap.
-- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (70 path).
-- `bun run check` → 0 error · `bun run build` → sukses.
+- `cargo test` → **34 test lulus** (geofence, scoring, deteksi berkas, kanal login).
+- `bun tools/uji/api-smoke.js` → **59/59 cek lulus** pada database uji `kinerja_test`:
+  RBAC ber-scope, pembatasan login dashboard (pimpinan/admin vs atasan/personel), kanal
+  `personel_web` (personel & atasan 200, admin 403), CRUD satker/personel/admin, titik dinas
+  (termasuk ubah jenis & koordinat), zona waktu & jam Sabtu, kanal login Android, tutup/buka
+  periode, kesiapan satker, kalender libur, jadwal & absensi PH, jam server palsu, verifikasi,
+  foto dokumentasi, rekap.
+- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (88 path).
+- `bun run check` → 0 error · `bun run build` → sukses (dashboard dan `personel/`).
+- Login `personel_web` diuji pada API: atasan & personel 200, admin 403, refresh cookie 200.
 - `gradlew :app:assembleDebug` → APK debug terbentuk (7 tab, termasuk PH).
 - Emulator Pixel 6a: login, absen GPS, dan navigasi modul utama.
+- Chrome headless: login, Beranda, Absensi, Strong, wizard Rencana, Persetujuan, dan Profil
+  aplikasi `personel/` tampil tanpa error pada lebar 500 px.
 
 ## Catatan teknis penting
 

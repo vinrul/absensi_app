@@ -55,14 +55,15 @@ impl JenisAkun {
 
 /// Kanal login yang dikirim klien.
 ///
-/// Akun admin hanya boleh masuk lewat `web`; aplikasi Android hanya menerima
-/// akun personel (termasuk pimpinan/atasan).
+/// Akun admin hanya boleh masuk lewat `web`; aplikasi Android dan web personel
+/// hanya menerima akun personel (termasuk pimpinan/atasan).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum KanalLogin {
     #[default]
     Web,
     Android,
+    PersonelWeb,
 }
 
 pg_enum!(

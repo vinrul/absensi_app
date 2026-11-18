@@ -12,7 +12,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| A1 | Buka `/docs` | Daftar 108 operasi (83 path) tampil, filter tag berfungsi | ✅ | |
+| A1 | Buka `/docs` | Daftar seluruh operasi (88 path) tampil, filter tag berfungsi | ✅ | |
 | A2 | Login memakai username `superuser` | Berhasil; `jenis_akun=admin`, `nrp=null` | ✅ | API |
 | A3 | Login memakai NRP `000001` | Gagal (admin tidak punya NRP) | ✅ | API |
 | A4 | Login `superuser` dengan `client=android` | 403 "Akun admin hanya dapat masuk melalui dashboard web" | ✅ | API |
@@ -199,12 +199,12 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| F1 | `cargo test` | 30 unit test lulus | ✅ | |
+| F1 | `cargo test` | 35 unit test lulus | ✅ | |
 | F2 | `cargo fmt --check` + clippy `-D warnings` | Bersih | ✅ | |
-| F3 | `bun run check` | 0 error, 0 warning | ✅ | |
-| F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` | ✅ | |
+| F3 | `bun run check` | 0 error, 0 warning (dashboard & personel) | ✅ | |
+| F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` dan `personel/build` | ✅ | |
 | F5 | `.gradlew :app:assembleDebug` | APK debug terbentuk | ✅ | |
-| F6 | `bun tools/uji/api-smoke.js` | 48/48 cek lulus (DB `kinerja_test`) | ✅ | |
+| F6 | `bun tools/uji/api-smoke.js` | 59/59 cek lulus (DB `kinerja_test`) | ✅ | |
 | F7 | `bun tools/uji/openapi-check.js` | JSON valid, semua `$ref` ada | ✅ | |
 | F8 | Restore backup di lingkungan uji | Data & berkas kembali utuh | ⬜ | |
 | F9 | Uji 1 bulan data riil | Hitung periode < 60 detik | ⬜ | |
@@ -230,3 +230,22 @@ Hasil: ...
 Diharapkan: ...
 Bukti: screenshot / log
 ```
+
+## I. Aplikasi web personel & atasan (`personel/`)
+
+| # | Skenario | Hasil yang diharapkan | Status | Catatan |
+|---|---|---|---|---|
+| W1 | Login `85000001` / `000100` di `localhost:5174` | Berhasil masuk ke Beranda; tombol mata pada password berfungsi | ✅ | API + Chrome headless (sesi uji) |
+| W2 | Login akun admin (`superuser`) di web personel | Ditolak 403 dengan pesan kanal login | ✅ | API |
+| W3 | Buka aplikasi pertama kali setelah login | Wizard izin browser tampil (lokasi, kamera, notifikasi, antrean), dapat dilewati | ✅ | build |
+| W4 | Beranda | Salam + avatar, status masuk/pulang hari ini, kartu strong point, nilai periode, ringkasan dokumen, bottom navigation 6 tab | ✅ | Chrome headless |
+| W5 | Absensi → ambil lokasi → pilih status → kirim | Peta OSM, koordinat/akurasi/jarak/titik dinas tampil; Dinas Kantor/Piket ditolak di luar radius; foto opsional | ⬜ | perlu GPS perangkat |
+| W6 | Absensi saat server tidak terjangkau | Kedua tombol Masuk/Pulang tampil; data dapat disimpan offline dan dikirim lewat antrean | ✅ | build + API antrean |
+| W7 | Strong Point tanpa jadwal hari ini | Pesan “tidak ada jadwal” tampil; wizard tidak mengirim data | ✅ | Chrome headless |
+| W8 | Strong Point check-in > 2 jam tanpa check-out | Tombol check-in kembali tampil dengan catatan sesi baru; check-out tanpa dokumentasi | ✅ | build (logika) |
+| W9 | Wizard Rencana 4 langkah | Jenis → dasar SP/TOR/lisan → rincian kegiatan (multi) → lampiran; simpan draft, ajukan, dan ubah/perbaiki | ✅ | Chrome headless (tampilan) + endpoint Android |
+| W10 | Wizard Hasil 3 langkah & Output 3 langkah | Pilih rencana disetujui/hasil terverifikasi, isi data, unggah bukti, simpan draft/ajukan | ✅ | build + endpoint Android |
+| W11 | Atasan membuka Persetujuan Rencana | Dua rencana tampil; detail + lampiran; Setujui/Minta Revisi/Tolak dengan catatan wajib untuk non-setuju | ✅ | Chrome headless (daftar) + endpoint Android |
+| W12 | Atasan membuka Verifikasi Hasil/Output | Slider skor tampil; keputusan valid/revisi tersimpan | ✅ | build + endpoint Android |
+| W13 | Profil: unggah foto, edit profil, ganti password | Avatar berubah; pangkat dari 21 tingkat; tiga kolom password punya tombol mata; sukses ganti password kembali ke login | ✅ | build + endpoint Android |
+| W14 | Tampilan pada lebar 500 px | Tidak ada elemen terpotong; bottom navigation tetap terlihat; kartu responsif | ✅ | Chrome headless |

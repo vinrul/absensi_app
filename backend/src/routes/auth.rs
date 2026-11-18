@@ -306,10 +306,10 @@ pub async fn refresh(
     let personel = personel::active_personel(&state.pool, stored.personel_id).await?;
     let roles = personel::roles(&state.pool, personel.id).await?;
 
-    // Cookie refresh dipakai dashboard web; token lewat body dipakai Android.
-    if !lewat_body && !akses::boleh_login_dashboard(&roles) {
+    // Cookie refresh dipakai dashboard web dan web personel; token lewat body dipakai Android.
+    if !lewat_body && !akses::refresh_cookie_diizinkan(&roles, stored.device_id.as_deref()) {
         return Err(AppError::Forbidden(
-            "Dashboard hanya untuk akun pimpinan dan admin. Personel dan atasan langsung menggunakan aplikasi Android.".into(),
+            "Sesi web ini tidak diizinkan. Silakan login melalui aplikasi yang sesuai.".into(),
         ));
     }
 
@@ -328,14 +328,15 @@ pub async fn refresh(
         state.settings.access_token_ttl_minutes,
     )?;
 
-    // Rotasi token: token lama dicabut, token baru diterbitkan.
+    // Rotasi token: token lama dicabut, token baru diterbitkan dengan penanda perangkat yang sama
+    // agar refresh cookie web personel tetap dikenali pada rotasi berikutnya.
     personel::revoke_refresh_token(&state.pool, stored.id).await?;
     let new_raw = auth::generate_refresh_token();
     personel::create_refresh_token(
         &state.pool,
         personel.id,
         &auth::hash_token(&new_raw),
-        None,
+        stored.device_id.as_deref(),
         None,
         Utc::now() + Duration::days(state.settings.refresh_token_ttl_days),
     )

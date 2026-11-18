@@ -118,13 +118,13 @@
       },
       "LoginRequest": {
         "type": "object",
-        "description": "Isi salah satu: `username` untuk akun admin atau `nrp` untuk personel. `client=android` hanya menerima akun personel.",
+        "description": "Isi salah satu: `username` untuk akun admin atau `nrp` untuk personel. `client=android` dan `client=personel_web` hanya menerima akun personel.",
         "properties": {
           "nrp": { "type": "string", "nullable": true, "example": "85000001" },
           "username": { "type": "string", "nullable": true, "example": "superuser" },
           "password": { "type": "string", "format": "password" },
           "device_id": { "type": "string", "nullable": true },
-          "client": { "type": "string", "enum": ["web", "android"], "default": "web" }
+          "client": { "type": "string", "enum": ["web", "android", "personel_web"], "default": "web" }
         },
         "required": ["password"]
       },

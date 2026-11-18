@@ -3,8 +3,8 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 18 November 2026 (backend unit test + 48 cek API pada DB uji;
-dashboard `bun run check`/`build`; APK debug; `openapi.json` 83 path).
+Terakhir diverifikasi: 18 November 2026 (35 unit test backend + 59 cek API pada DB uji;
+dashboard & web personel `bun run check`/`build`; APK debug; `openapi.json` 88 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
@@ -46,11 +46,12 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser; Rencana/Hasil/Output memiliki halaman detail + lampiran, filter periode/status/satker/personel, dan **Export PDF** lewat Chrome/Edge headless |
 | Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
+| Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (aturan 2 jam), wizard Rencana/Hasil/Output, persetujuan & verifikasi, profil; login memakai kanal `personel_web` |
 | Strong Point: roster + Export PDF | Jadwal memakai roster bulanan (anggota × tanggal, blok regu) dengan input rentang tanggal satu-per-satu; rekap menandai tidak strong point/hanya check-in beserta tanggal, tanpa kolom telat, dan hanya menghitung sampai hari ini; PDF `/ph/jadwal/ekspor` (roster) & `/ph/rekap/ekspor` (uji API + Chrome headless) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
-| Dokumentasi API | `/docs` (83 path), `/api-docs/openapi.json` |
+| Dokumentasi API | `/docs` (88 path), `/api-docs/openapi.json` |
 | Backup script | `deploy/backup.sh` (belum dijadwalkan di server) |
 
 **Belum / pekerjaan lanjutan** — lihat §9 backlog.
@@ -62,8 +63,9 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 ```
 backend/    Rust 1.99, axum 0.8.9, sqlx 0.9, PostgreSQL 18
 dashboard/  Svelte 5.57, SvelteKit 3.2, Tailwind 4.3, Vite 8.3, Leaflet 1.9 (peta OSM) — kelola dengan **bun**
+personel/   Aplikasi web personel & atasan (SPA mobile-first) — Svelte 5, SvelteKit 3, Tailwind 4, Leaflet, **bun**
 android/    Kotlin 2.4.21, AGP 9.0.1, Gradle 9.3, Compose BOM 2025.06, OkHttp 4.12
-deploy/     docker compose (db :5433), nginx, backup.sh
+deploy/     docker compose (db :5433, dashboard :8088, personel :8089), nginx, backup.sh
 docs/       PRD.md, penilaian.md, UAT.md, CHECKLIST.md, HANDOFF.md (dokumen ini)
 tools/uji/  api-smoke.js (e2e DB uji), openapi-check.js
 ```
@@ -86,6 +88,10 @@ cd ..; bun tools/uji/api-smoke.js              # spawn API di :8091
 # Dashboard (Bun)
 cd dashboard; bun install; bun run dev      # http://localhost:5173
 bun run check; bun run build                # type-check + build statis ke build/
+
+# Aplikasi web personel (Bun)
+cd personel; bun install; bun run dev       # http://localhost:5174 (proxy /api → :8080)
+bun run check; bun run build                # build statis ke personel/build
 
 # Android
 cd android; .\gradlew.bat :app:assembleDebug
@@ -111,8 +117,9 @@ Akun seed:
 | Atasan | `000100` | `Atasan#2026` |
 | Personel | `85000001` | `Polri#2026` |
 
-Admin hanya dapat login lewat dashboard (`client=web`). Android hanya menerima akun
-personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
+Admin hanya dapat login lewat dashboard (`client=web`). Android dan web personel hanya menerima
+akun personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403. Web personel
+mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
 
 ---
 
@@ -122,8 +129,10 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
    Semua query ditulis literal; filter opsional memakai pola `($n::tipe IS NULL OR kolom = $n)`.
 2. **Numeric → f64.** Kolom `numeric` di-cast `::float8` saat SELECT dan di-bind `$n::float8::numeric`
    saat INSERT. Jangan menambah `rust_decimal` tanpa memigrasikan seluruh repo/penilaian.
-3. **Refresh token juga dikirim di body.** Browser memakai cookie httpOnly; Android menyimpan
-   `refresh_token` di DataStore dan mengirimnya di body `POST /auth/refresh`.
+3. **Refresh token juga dikirim di body.** Browser dashboard memakai cookie httpOnly; Android
+   menyimpan `refresh_token` di DataStore dan mengirimnya di body `POST /auth/refresh`. Web
+   personel memakai cookie httpOnly dengan `device_id = "web-personel"`; access token hanya
+   berada di memori browser.
 4. **SvelteKit 3**: `svelte.config.js` **tidak dipakai**; adapter static dikonfigurasi di
    `vite.config.ts` lewat `sveltekit({ adapter })`. Alias `$lib` dihapus → gunakan `#lib/...`
    (subpath import di `package.json`, plus `paths` di `tsconfig.json` agar type-check lolos).
@@ -281,6 +290,33 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
 - **Halaman detail** dashboard: `/rencana-kerja/{id}`, `/hasil-kerja/{id}`, dan `/output/{id}`
   memuat data lengkap + lampiran (`apiBlobUrl` → object URL, dibuka di tab baru). Tautan berasal
   dari judul baris tabel maupun tombol **Detail**.
+
+**Web personel (`personel/`)**
+- SPA SvelteKit dengan `ssr=false`; `+layout.ts` root, CSS global diimpor dari
+  `src/routes/+layout.svelte` (jangan lupa, kalau tidak Tailwind tidak termuat).
+- Desain sengaja berbeda dari dashboard: mobile-first, header ringkas, **bottom navigation**
+  6 tab (Beranda, Absensi, Rencana, Hasil, Output, Strong), kartu membulat, aksen teal
+  `brand-*`, bukan sidebar navy/gold.
+- Sesi: access token hanya di memori; refresh memakai **cookie httpOnly** hasil login.
+  Backend mengizinkan refresh cookie bila `device_id = "web-personel"` atau role
+  admin/pimpinan. `#lib/api/client` memancarkan event `personel:sesi-berakhir` saat refresh
+  gagal; layout mendengarkan event itu lalu redirect ke `/login`.
+- Wizard izin browser tampil sekali setelah login (`localStorage['personel.izin_selesai']`),
+  menjelaskan lokasi, kamera, notifikasi, dan antrean offline.
+- Antrean offline: `#lib/offline.ts` (kunci per pengguna). Absensi yang gagal tetap disimpan;
+  antrean PH membuang kegagalan permanen 4xx (kecuali 401) seperti Android.
+- Absensi: `GET /absensi/hari-ini` menentukan tombol Masuk/Pulang; bila gagal, kedua tombol
+  tampil dan mode offline aktif. Status Dinas Kantor/Piket memerlukan radius kecuali offline.
+- Strong Point: `#lib/strong.ts` menggabungkan sesi server + antrean; check-in terbuka > 2 jam
+  dianggap sesi baru. Dokumentasi foto hanya untuk check-in; check-out tanpa dokumentasi.
+- Reverse geocode memakai `https://geocode.vinrul.my.id/reverse` (sama dengan Android).
+- Wizard memakai komponen `WizardHeader` (judul, deskripsi, “Langkah X dari Y”, progress bar)
+  seperti tampilan wizard Android.
+- Foto disimpan sebagai base64 JPEG (kanvas, sisi maks. 1280, kualitas 0.82) agar cocok dengan
+  field `foto_base64` backend.
+- Keterbatasan web dibanding Android: tidak ada WorkManager/notifikasi latar (pengingat hanya
+  dapat dibuat saat tab aktif, belum diimplementasikan), dan alamat server mengikuti origin
+  aplikasi (proxy `/api`), jadi tidak ada pengaturan alamat server.
 
 **Android**
 - Satu `KinerjaViewModel` menangani semua state & pemanggilan repo; layar Compose hanya
@@ -482,6 +518,16 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
   `adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/<nama>.png`.
 - Foto profil disimpan di `upload_dir/foto/<personel_id>/<uuid>.<ext>` dan `personel.foto_path`
   hanya menyimpan kunci; jangan menaruh biner di database.
+- **Kanal login `personel_web` baru**; API yang masih berjalan dari biner lama akan menolak
+  login web personel dengan 400/422. Jalankan ulang `cargo run` setelah mengubah enum.
+- Web personel berjalan di **:5174** (dashboard :5173). Jangan tertukar saat menguji; proxy
+  `/api` hanya ada di dev server. Produksi wajib HTTPS agar geolocation/kamera tidak diblokir
+  browser (kecuali `localhost`).
+- Aplikasi web personel memakai cookie refresh httpOnly dengan penanda `device_id = "web-personel"`.
+  Jangan mengubah penanda itu tanpa memperbarui `akses::refresh_cookie_diizinkan`; tanpa penanda,
+  refresh cookie untuk role atasan/personel akan ditolak 403.
+- `Pesan`/`WizardHeader`/`Sheet` adalah komponen khusus `personel/`; jangan memakai komponen
+  dashboard karena gaya dan alias impornya berbeda.
 - Ekspor PDF butuh Chrome/Edge terpasang. Di mesin ini `chrome.exe` dan `msedge.exe` terdeteksi;
   bila tidak, set `APP__CHROME_PATH`. Chrome dijalankan dengan profil sementara di folder temp
   dan seluruh berkas sementara dibersihkan setelah PDF terbentuk.

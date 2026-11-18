@@ -1,0 +1,229 @@
+@import 'tailwindcss';
+
+@theme {
+	--color-brand-50: #edfbf7;
+	--color-brand-100: #d0f5ea;
+	--color-brand-200: #a4ebd8;
+	--color-brand-300: #6edbc2;
+	--color-brand-400: #35c2a6;
+	--color-brand-500: #14a88d;
+	--color-brand-600: #0b8a74;
+	--color-brand-700: #0c6f5f;
+	--color-brand-800: #0e594e;
+	--color-brand-900: #0d4a42;
+
+	--color-ink-50: #f6f8f8;
+	--color-ink-100: #e9eeed;
+	--color-ink-200: #d3dddb;
+	--color-ink-300: #adbfbb;
+	--color-ink-400: #7f9994;
+	--color-ink-500: #5e7c77;
+	--color-ink-600: #4a635f;
+	--color-ink-700: #3d514e;
+	--color-ink-800: #334441;
+	--color-ink-900: #2c3a38;
+
+	--color-sun-400: #f5c451;
+	--color-sun-500: #e8ab25;
+	--color-sun-600: #c48612;
+
+	--font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+	html {
+		-webkit-text-size-adjust: 100%;
+	}
+
+	body {
+		background:
+			radial-gradient(1200px 520px at 50% -180px, #d7f3ec 0%, transparent 62%),
+			var(--color-ink-50);
+		color: var(--color-ink-800);
+		font-family: var(--font-sans);
+		-webkit-tap-highlight-color: transparent;
+	}
+
+	*:focus-visible {
+		outline: 2px solid var(--color-brand-500);
+		outline-offset: 2px;
+	}
+
+	button,
+	a {
+		touch-action: manipulation;
+	}
+}
+
+@layer components {
+	.kartu {
+		border-radius: 1.25rem;
+		border: 1px solid rgb(211 221 219 / 0.9);
+		background-color: white;
+		box-shadow: 0 8px 24px -18px rgb(15 76 66 / 0.35);
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		border-radius: 0.9rem;
+		padding: 0.7rem 1rem;
+		font-size: 0.875rem;
+		font-weight: 600;
+		transition:
+			background-color 120ms ease,
+			color 120ms ease,
+			transform 120ms ease;
+		cursor: pointer;
+	}
+
+	.btn:active:not(:disabled) {
+		transform: scale(0.985);
+	}
+
+	.btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.btn-utama {
+		background-color: var(--color-brand-600);
+		color: white;
+	}
+
+	.btn-utama:hover:not(:disabled) {
+		background-color: var(--color-brand-700);
+	}
+
+	.btn-kedua {
+		background-color: var(--color-brand-50);
+		color: var(--color-brand-800);
+		border: 1px solid var(--color-brand-100);
+	}
+
+	.btn-kedua:hover:not(:disabled) {
+		background-color: var(--color-brand-100);
+	}
+
+	.btn-bahaya {
+		background-color: #e11d48;
+		color: white;
+	}
+
+	.btn-bahaya:hover:not(:disabled) {
+		background-color: #be123c;
+	}
+
+	.btn-hantu {
+		background-color: transparent;
+		color: var(--color-ink-500);
+	}
+
+	.btn-hantu:hover:not(:disabled) {
+		background-color: var(--color-ink-100);
+	}
+
+	.input {
+		width: 100%;
+		border-radius: 0.9rem;
+		border: 1px solid var(--color-ink-200);
+		background-color: white;
+		padding: 0.65rem 0.85rem;
+		font-size: 0.9rem;
+		color: var(--color-ink-800);
+	}
+
+	.input:focus {
+		border-color: var(--color-brand-400);
+		outline: none;
+		box-shadow: 0 0 0 3px rgb(20 168 141 / 0.12);
+	}
+
+	.label {
+		display: block;
+		margin-bottom: 0.3rem;
+		font-size: 0.72rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--color-ink-500);
+	}
+
+	.chip {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.3rem;
+		border-radius: 9999px;
+		padding: 0.22rem 0.6rem;
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.01em;
+	}
+
+	.sheet-backdrop {
+		background-color: rgb(15 35 31 / 0.48);
+		backdrop-filter: blur(2px);
+	}
+
+	.nav-tab {
+		display: flex;
+		width: 100%;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 0.18rem;
+		border-radius: 0.85rem;
+		padding: 0.35rem 0.15rem;
+		font-size: 0.62rem;
+		font-weight: 600;
+		color: var(--color-ink-400);
+		transition:
+			color 120ms ease,
+			background-color 120ms ease;
+	}
+
+	.nav-tab[data-aktif='true'] {
+		background-color: var(--color-brand-50);
+		color: var(--color-brand-700);
+	}
+
+	.judul-bagian {
+		font-size: 0.95rem;
+		font-weight: 700;
+		color: var(--color-ink-800);
+	}
+
+	.teks-kecil {
+		font-size: 0.75rem;
+		color: var(--color-ink-500);
+	}
+
+	.baris-info {
+		display: flex;
+		align-items: flex-start;
+		justify-content: space-between;
+		gap: 0.75rem;
+		padding: 0.3rem 0;
+		font-size: 0.8rem;
+	}
+
+	.baris-info > dt {
+		color: var(--color-ink-500);
+	}
+
+	.baris-info > dd {
+		max-width: 62%;
+		text-align: right;
+		font-weight: 600;
+		color: var(--color-ink-800);
+		overflow-wrap: anywhere;
+	}
+}
+
+@layer utilities {
+	.pb-aman {
+		padding-bottom: calc(6.4rem + env(safe-area-inset-bottom));
+	}
+}

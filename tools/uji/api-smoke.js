@@ -80,7 +80,7 @@ async function kirimLogin(body) {
 
 async function login(identitas, password, client = "web") {
 	const body =
-		client === "android"
+		client === "android" || client === "personel_web"
 			? { nrp: identitas, password, client }
 			: { username: identitas, password, client };
 	const r = await kirimLogin(body);
@@ -91,7 +91,7 @@ async function login(identitas, password, client = "web") {
 
 async function cobaLogin(identitas, password, client = "web") {
 	const body =
-		client === "android"
+		client === "android" || client === "personel_web"
 			? { nrp: identitas, password, client }
 			: { username: identitas, password, client };
 	const r = await kirimLogin(body);
@@ -145,6 +145,24 @@ try {
 		"personel ditolak login dashboard",
 		personelViaWeb.status === 403,
 		`status ${personelViaWeb.status}`
+	);
+	const personelViaWebPersonel = await cobaLogin("85000001", "Polri#2026", "personel_web");
+	cek(
+		"personel dapat login lewat web personel",
+		personelViaWebPersonel.status === 200,
+		`status ${personelViaWebPersonel.status}`
+	);
+	const atasanViaWebPersonel = await cobaLogin("000100", "Atasan#2026", "personel_web");
+	cek(
+		"atasan dapat login lewat web personel",
+		atasanViaWebPersonel.status === 200,
+		`status ${atasanViaWebPersonel.status}`
+	);
+	const adminViaWebPersonel = await cobaLogin("superuser", "Superuser#2026", "personel_web");
+	cek(
+		"admin ditolak login lewat web personel",
+		adminViaWebPersonel.status === 403,
+		`status ${adminViaWebPersonel.status}`
 	);
 	const pimpinanViaWeb = await cobaLogin("000002", "Pimpinan#2026", "web");
 	cek(

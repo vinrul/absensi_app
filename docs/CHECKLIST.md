@@ -99,6 +99,11 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.48 | Galeri dokumentasi foto absensi | ✅ | Tombol **Lihat** di rekap membuka galeri foto per personel; detail per orang menampilkan tombol **Masuk/Pulang**; berkas disajikan `/api/v1/files/...` dengan cek kepemilikan/cakupan |
 | 3.49 | Pembatasan peran dashboard | ✅ | Login web hanya role admin/pimpinan; atasan/personel ditolak 403. Pimpinan murni tidak melihat Master Data, **Verifikasi Offline**, dan tombol Buat Rencana/Tambah Hasil/Tambah Output/Ajukan; akun multi-role tetap masuk lewat role pimpinan/admin |
 | 3.50 | Profil Saya di dashboard | ✅ | `/profil`: unggah foto (JPG/PNG maks. 5 MB, avatar di sidebar/header) dan ganti password dengan tombol mata; ganti password mencabut semua sesi lalu diarahkan ke login |
+| 3.51 | Aplikasi web personel terpisah | ✅ | `personel/` (Bun, Svelte 5, SvelteKit 3 SPA, Tailwind 4, Leaflet); desain mobile-first, bottom navigation 6 tab, port dev 5174 |
+| 3.52 | Login web personel `personel_web` | ✅ | Hanya akun personel (termasuk atasan/pimpinan); admin 403; access token di memori + refresh cookie httpOnly `device_id=web-personel`; API 200 |
+| 3.53 | Absensi & Strong Point web personel | ✅ | Peta OSM, radius/titik dinas, 8 status, foto via kamera/file, antrean offline browser; strong point marker hijau tanpa titik dinas, geocode, aturan 2 jam, dokumentasi hanya check-in |
+| 3.54 | Wizard & persetujuan web personel | ✅ | Rencana 4 langkah, hasil/output 3 langkah, draft/ajukan, persetujuan rencana, verifikasi hasil/output berslider; endpoint sama dengan Android |
+| 3.55 | Profil & nilai web personel | ✅ | Foto, edit nama/pangkat 21 tingkat/jabatan/telepon/email, ganti password dengan tombol mata; nilai periode tampil di Beranda |
 
 ## 4. Modul PH / Strong Point (terpisah dari absensi harian)
 
@@ -199,7 +204,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 83 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/absensi/harian`, `/dev/waktu`, hasil/output draf + verifikasi, profil/foto, ekspor PDF rencana/hasil/output/rekap/verifikasi/detail absensi |
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 88 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/absensi/harian`, `/dev/waktu`, hasil/output draf + verifikasi, profil/foto, ekspor PDF rencana/hasil/output/rekap/verifikasi/detail absensi |
 | 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
 | 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
 | 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
@@ -239,6 +244,8 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.26 | Modal dashboard responsif | ✅ | `Modal.svelte`: tinggi maksimal `100vh-2rem`, header + tombol tutup selalu terlihat, isi digulir, footer aksi tetap tampil; modal Rencana Kerja memakai slot `footer` untuk Batal/Simpan Draft/Ajukan ke Atasan |
 | 9.27 | Filter & PDF Rencana Kerja | ✅ | API: filter satker+personel menghasilkan 2 baris; PDF 200 `application/pdf` ~89 KB (~2,2 s), semua satker ~1,0 MB dengan kolom Satker; UI: `bun run check` 0 error |
 | 9.28 | Detail & PDF Hasil/Output | ✅ | API: detail rencana (2 tahapan, 1 lampiran), detail hasil & output (lampiran terbaca); PDF hasil/output 200 `application/pdf` ~100 KB; UI: `bun run check` 0 error, `bun run build` sukses |
+| 9.29 | Aplikasi web personel | ✅ | `personel/`: `bun run check` 0 error, `bun run build` sukses; Chrome headless 500 px: login, Beranda, Absensi, Strong, wizard Rencana, Persetujuan, Profil tampil |
+| 9.30 | Kanal login `personel_web` + refresh cookie | ✅ | API: atasan/personel login 200, admin 403, refresh cookie 200; `cargo test` 35 lulus |
 
 ## 10. Yang belum dikerjakan (backlog)
 

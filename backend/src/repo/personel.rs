@@ -590,6 +590,7 @@ pub async fn bawahan_ids(pool: &PgPool, atasan_id: Uuid) -> AppResult<Vec<Uuid>>
 pub struct RefreshRow {
     pub id: Uuid,
     pub personel_id: Uuid,
+    pub device_id: Option<String>,
     pub expires_at: DateTime<Utc>,
     pub revoked_at: Option<DateTime<Utc>>,
 }
@@ -620,7 +621,7 @@ pub async fn create_refresh_token(
 
 pub async fn find_refresh_token(pool: &PgPool, token_hash: &str) -> AppResult<Option<RefreshRow>> {
     Ok(sqlx::query_as::<_, RefreshRow>(
-        "SELECT id, personel_id, expires_at, revoked_at
+        "SELECT id, personel_id, device_id, expires_at, revoked_at
            FROM refresh_token
           WHERE token_hash = $1",
     )
