@@ -199,7 +199,9 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   Detail Rekap, Verifikasi Offline); **Strong Point** (Jadwal Strong Point, Rekap Strong Point);
   **Kinerja** (Rencana Kerja, Hasil Kerja, Output); **Laporan** (Penilaian, Print Laporan);
   **Pengaturan** (Akun Admin, Kesiapan Periode, Periode). Grup **Master Data** disembunyikan untuk
-  role pimpinan (tanpa admin), termasuk akses langsung ke halaman master.
+  role pimpinan (tanpa admin), termasuk akses langsung ke halaman master. Submenu **Verifikasi
+  Offline** dan tab verifikasinya juga disembunyikan untuk pimpinan; akses `?tab=verifikasi`
+  dialihkan ke Rekap Kehadiran.
 - Filter periode dan satker.
 - KPI: total personel, hadir hari ini, rencana, hasil, output, rata-rata nilai.
 - Grafik: capaian per indikator, tren antar periode, sebaran kategori.

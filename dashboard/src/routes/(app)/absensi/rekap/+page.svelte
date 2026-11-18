@@ -13,6 +13,7 @@
 		Satker,
 		StatusKehadiran
 	} from '#lib/types';
+	import { adalahPimpinanSaja } from '#lib/stores/session.svelte';
 	import { LABEL_STATUS_KEHADIRAN } from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
 	import Icon from '#lib/components/Icon.svelte';
@@ -40,6 +41,9 @@
 	];
 
 	let tab = $state<TabId>('rekap');
+	const tabTampil = $derived(
+		TAB.filter((item) => !(item.id === 'verifikasi' && adalahPimpinanSaja()))
+	);
 	let periodeList = $state<Periode[]>([]);
 	let satkerList = $state<Satker[]>([]);
 	let personelList = $state<Personel[]>([]);
@@ -80,7 +84,7 @@
 		rekap.slice((halamanRekapAman - 1) * perPage, halamanRekapAman * perPage)
 	);
 
-	const tabAktif = $derived(TAB.find((item) => item.id === tab) ?? TAB[0]);
+	const tabAktif = $derived(tabTampil.find((item) => item.id === tab) ?? TAB[0]);
 	const satkerMap = $derived(new Map(satkerList.map((s) => [s.id, s.nama])));
 	const detailPersonel = $derived(
 		personelList.find((p) => p.id === filter.detail.personel_id) ?? null
@@ -219,12 +223,14 @@
 	}
 
 	function muatTab(id: TabId, page = 1) {
+		if (id === 'verifikasi' && adalahPimpinanSaja()) return muatRekap();
 		if (id === 'rekap') return muatRekap();
 		if (id === 'verifikasi') return muatVerifikasi(page);
 		return muatDetail(page);
 	}
 
-	function pilihTab(id: TabId) {
+	function pilihTab(nilai: TabId) {
+		const id: TabId = nilai === 'verifikasi' && adalahPimpinanSaja() ? 'rekap' : nilai;
 		tab = id;
 		error = null;
 		if (page.url.searchParams.get('tab') !== id) {
@@ -240,6 +246,10 @@
 		const nilai = page.url.searchParams.get('tab') ?? 'rekap';
 		if (nilai === tabUrlTerakhir) return;
 		tabUrlTerakhir = nilai;
+		if (nilai === 'verifikasi' && adalahPimpinanSaja()) {
+			goto('/absensi/rekap?tab=rekap', { replace: true, reset: false });
+			return;
+		}
 		if (nilai === 'rekap' || nilai === 'verifikasi' || nilai === 'detail') {
 			if (nilai !== tab) {
 				tab = nilai;
@@ -396,7 +406,8 @@
 		filter.detail.periode_id = periodeAwal;
 
 		const tabAwal = page.url.searchParams.get('tab');
-		if (tabAwal === 'verifikasi' || tabAwal === 'detail') tab = tabAwal;
+		if (tabAwal === 'detail') tab = 'detail';
+		else if (tabAwal === 'verifikasi') tab = adalahPimpinanSaja() ? 'rekap' : 'verifikasi';
 
 		await muatTab(tab);
 	});
@@ -422,7 +433,7 @@
 		</div>
 
 		<div class="flex flex-wrap gap-1 border-b border-slate-200 pb-2">
-			{#each TAB as item (item.id)}
+			{#each tabTampil as item (item.id)}
 				<button
 					class="rounded-lg px-3 py-1.5 text-sm font-medium transition {tab === item.id
 						? 'bg-navy-800 text-white'

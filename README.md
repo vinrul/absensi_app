@@ -294,7 +294,8 @@ Catatan penting:
   berpaginasi, catatan & keputusan, cetak A4, ekspor CSV. Sidebar memakai menu bergrup
   (Master Data, Absensi, Strong Point, Kinerja, Laporan, Pengaturan) dengan submenu yang dapat
   dilipat dan otomatis terbuka saat halamannya aktif. Untuk pimpinan murni, grup **Master Data**
-  disembunyikan dan tombol **Buat Rencana/Tambah Hasil/Tambah Output/Ajukan** tidak ditampilkan.
+  disembunyikan, submenu/tab **Verifikasi Offline** tidak ditampilkan, dan tombol
+  **Buat Rencana/Tambah Hasil/Tambah Output/Ajukan** tidak ditampilkan.
 - **Branding**: logo Polda Bali di login (terpusat), sidebar, kop laporan, aplikasi Android, dan ikon launcher. Password pada login Android dapat ditampilkan/disembunyikan lewat ikon mata.
 - **Jam server palsu (development)**: `cargo run --bin fake -- DD-MM-YYYY HH:MM` mengubah jam yang dipakai backend untuk absensi; endpoint hanya aktif bila `APP__ALLOW_FAKE_TIME=true`.
 - **Operasional**: audit log setiap mutasi, rate limit login 5/menit/IP, RBAC ber-scope,

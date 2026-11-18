@@ -74,6 +74,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A60 | Login dashboard akun **pimpinan** yang juga atasan langsung + personel | Tetap berhasil karena memiliki role pimpinan; dashboard memakai gabungan kemampuan role | ✅ | API |
 | A61 | Sidebar pimpinan murni | Grup **Master Data** tidak tampil; akses langsung `/satker`, `/personel`, `/libur`, `/absensi/titik-dinas` dialihkan ke dashboard | ✅ | UI build |
 | A62 | Aksi Kinerja pimpinan murni | Tombol **Buat Rencana**, **Tambah Hasil**, **Tambah Output**, dan **Ajukan** rencana tidak tampil; admin tetap melihat | ✅ | UI build |
+| A63 | Tab **Verifikasi Offline** pimpinan murni | Submenu **Verifikasi Offline** dan tab **Verifikasi** disembunyikan; akses `?tab=verifikasi` dialihkan ke Rekap Kehadiran | ✅ | UI build |
 
 ## B. Admin ber-scope
 

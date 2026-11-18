@@ -116,7 +116,12 @@
 			.filter((grup) => !(grup.label === 'Master Data' && pimpinanSaja))
 			.map((grup) => ({
 				...grup,
-				items: grup.items.filter((item) => punyaAkses(item.roles))
+				items: grup.items
+					.filter((item) => punyaAkses(item.roles))
+					.filter(
+						(item) =>
+							!(pimpinanSaja && item.href.includes('/absensi/rekap?tab=verifikasi'))
+					)
 			}))
 			.filter((grup) => grup.items.length > 0)
 	);

@@ -256,7 +256,8 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
   (Jadwal Strong Point, Rekap Strong Point); **Kinerja** (Rencana Kerja, Hasil Kerja, Output);
   **Laporan** (Penilaian, Print Laporan); **Pengaturan** (Akun Admin, Kesiapan Periode, Periode).
   Grup **Master Data** disembunyikan untuk pimpinan murni dan akses langsung ke
-  `/satker`, `/personel`, `/libur`, `/absensi/titik-dinas` dialihkan ke dashboard. Tombol
+  `/satker`, `/personel`, `/libur`, `/absensi/titik-dinas` dialihkan ke dashboard. Submenu dan tab
+  **Verifikasi Offline** juga disembunyikan (`?tab=verifikasi` dialihkan ke rekap). Tombol
   **Buat Rencana**, **Tambah Hasil**, **Tambah Output**, dan **Ajukan** rencana disembunyikan
   untuk pimpinan murni; admin tetap melihatnya.
   Grup otomatis terbuka saat salah satu submenunya aktif; submenu Absensi memakai
