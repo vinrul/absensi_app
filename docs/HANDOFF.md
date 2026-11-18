@@ -516,6 +516,8 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
 - Signing Android dibaca dari `android/keystore.properties` (gitignored). Jangan menaruh
   password keystore di `build.gradle.kts` atau berkas yang di-commit; `storeFile` harus ada
   saat `assembleRelease`/`bundleRelease`, sedangkan build debug tetap berjalan tanpa berkas itu.
+- `network_security_config.xml` dipisah per build: `src/main` = `cleartextTrafficPermitted=false`
+  (release/HTTPS) dan `src/debug` = `true` (emulator HTTP). Jangan membalik keduanya.
 - Seed `--vps` hanya membuat Polda Bali + Ditreskrimsus dan **tidak** membuat akun Polres
   (`admin_polres`, `000022`, `000023`); jangan mencampurnya dengan database yang sudah berisi
   data development. `--reset` tetap menghapus seluruh data.

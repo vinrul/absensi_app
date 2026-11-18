@@ -4,7 +4,7 @@
       Server Polda berjalan di jaringan internal (LAN) dan umumnya tanpa TLS.
       Untuk produksi, pasang sertifikat dan ubah cleartextTrafficPermitted ke false.
     -->
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />

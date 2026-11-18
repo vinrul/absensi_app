@@ -173,8 +173,10 @@ Build keduanya sekaligus:
 ```
 
 APK release memakai `applicationId` `id.polri.poldabali.kinerja` (tanpa `.debug`), sehingga
-dapat terpasang berdampingan dengan build debug. Untuk produksi, pastikan server memakai
-HTTPS dan `network_security_config.xml` tidak mengizinkan cleartext.
+dapat terpasang berdampingan dengan build debug. Untuk produksi, server memakai HTTPS dan
+`src/main/res/xml/network_security_config.xml` menetapkan `cleartextTrafficPermitted="false"`.
+Build debug memakai override `src/debug/res/xml/network_security_config.xml` yang masih
+mengizinkan HTTP untuk emulator (`http://10.0.2.2:8080`).
 
 #### Menjalankan emulator & memasang APK lewat command line
 

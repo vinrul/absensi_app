@@ -527,9 +527,10 @@ seed `--reset` pada database produksi.
 - Alamat server: `https://absensi.jagradewata.id/api/v1/` (isi lewat **Profil → Server** pada
   build debug, atau ubah `ALAMAT_BAWAAN` di `android/app/src/main/java/id/polri/poldabali/kinerja/data/Api.kt`
   untuk build rilis).
-- Untuk build rilis, ubah `network_security_config.xml` menjadi
-  `cleartextTrafficPermitted="false"` karena server sudah HTTPS, lalu buat APK/AAB dengan
-  `android\build-release.bat` (signing dari `android/keystore.properties`).
+- Konfigurasi jaringan sudah dipisah: `src/main/res/xml/network_security_config.xml` menetapkan
+  `cleartextTrafficPermitted="false"` untuk rilis, sedangkan `src/debug/res/xml/` mengizinkan
+  HTTP untuk emulator. Buat APK/AAB dengan `android\build-release.bat` (signing dari
+  `android/keystore.properties`).
 - Android terhubung ke Cloudflare, bukan langsung ke origin; mTLS origin tidak mengganggu
   aplikasi selama DNS diproksikan Cloudflare.
 
