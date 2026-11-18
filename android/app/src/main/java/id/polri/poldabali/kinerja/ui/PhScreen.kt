@@ -16,6 +16,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,13 @@ fun PhScreen(vm: KinerjaViewModel) {
     val skop = rememberCoroutineScope()
     var menunggu by remember { mutableStateOf<Pair<JadwalPhSaya, String>?>(null) }
     var mengambil by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) { vm.muatPh() }
+
+    val hariIni = tanggalHariIni()
+    val daftarJadwal = vm.jadwalPh.sortedWith(
+        compareByDescending<JadwalPhSaya> { it.tanggal == hariIni }.thenBy { it.tanggal }
+    )
 
     fun punyaLokasi(): Boolean =
         ContextCompat.checkSelfPermission(konteks, Manifest.permission.ACCESS_FINE_LOCATION) ==
@@ -70,7 +78,7 @@ fun PhScreen(vm: KinerjaViewModel) {
         if (hasil.values.any { it } && item != null) {
             kirimDenganLokasi(item.first, item.second)
         } else if (item != null) {
-            vm.pesanGalat("Izin lokasi diperlukan untuk absensi PH")
+            vm.pesanGalat("Izin lokasi diperlukan untuk absensi strong point")
         }
     }
 
@@ -96,12 +104,12 @@ fun PhScreen(vm: KinerjaViewModel) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            "PH & Strong Point",
+            "Jadwal Strong Point",
             style = MaterialTheme.typography.titleLarge,
             color = Warna.Teks
         )
         Text(
-            "Check-in dan check-out wajib di lokasi strong point. Lokasi diambil setiap kali absen.",
+            "Jadwal penjagaan bulan ini. Check-in dan check-out wajib dilakukan di lokasi strong point.",
             style = MaterialTheme.typography.bodySmall,
             color = Warna.TeksLembut
         )
@@ -111,23 +119,33 @@ fun PhScreen(vm: KinerjaViewModel) {
 
         if (vm.jadwalPh.isEmpty()) {
             Kartu {
-                JudulBagian("Jadwal PH", "Belum ada jadwal PH bulan ini")
+                JudulBagian("Jadwal Strong Point", "Belum ada jadwal bulan ini")
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Admin satker belum menyusun jadwal PH untuk Anda pada bulan ini.",
+                    "Admin satker belum menyusun jadwal strong point untuk Anda pada bulan ini.",
                     style = MaterialTheme.typography.bodySmall,
                     color = Warna.TeksLembut
                 )
             }
         } else {
-            			vm.jadwalPh.forEach { item ->
-            				val masuk = vm.absensiPh.firstOrNull {
-            					it.jadwalPhId == item.id && it.jenis == "masuk"
-            				}
-            				val pulang = vm.absensiPh.firstOrNull {
-            					it.jadwalPhId == item.id && it.jenis == "pulang"
-            				}
-            				val hariIni = item.tanggal == tanggalHariIni()
+            daftarJadwal.forEach { item ->
+                val masuk = vm.absensiPh.firstOrNull {
+                    it.jadwalPhId == item.id && it.jenis == "masuk"
+                }
+                val pulang = vm.absensiPh.firstOrNull {
+                    it.jadwalPhId == item.id && it.jenis == "pulang"
+                }
+                val jadwalHariIni = item.tanggal == hariIni
+                val waktu = if (item.jamMulai == "00:00" && item.jamSelesai == "23:59") {
+                    "Sepanjang hari"
+                } else {
+                    "${item.jamMulai}–${item.jamSelesai}"
+                }
+                val keterangan = listOfNotNull(
+                    item.strongPointNama,
+                    item.regu?.takeIf { it.isNotBlank() },
+                    waktu
+                ).joinToString(" · ")
                 Kartu {
                     Row(
                         Modifier.fillMaxWidth(),
@@ -139,8 +157,15 @@ fun PhScreen(vm: KinerjaViewModel) {
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Warna.Teks
                             )
+                            if (jadwalHariIni) {
+                                Text(
+                                    "Hari ini",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Warna.Biru
+                                )
+                            }
                             Text(
-                                "${item.jamMulai}–${item.jamSelesai} · ${item.strongPointNama}",
+                                keterangan,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Warna.TeksLembut
                             )
@@ -181,28 +206,28 @@ fun PhScreen(vm: KinerjaViewModel) {
                     if (pulang != null) {
                         BarisInfo("Check-out", "${pulang.jam} · ${jarakTeks(pulang)}", Warna.Hijau)
                     }
-                    					Spacer(Modifier.height(8.dp))
-                    					if (!hariIni) {
-                    						Text(
-                    							if (item.tanggal < tanggalHariIni()) "Jadwal PH sudah lewat." else "Check-in dapat dilakukan pada tanggal jadwal.",
-                    							style = MaterialTheme.typography.bodySmall,
-                    							color = Warna.TeksLembut
-                    						)
-                    					} else if (masuk == null) {
+                    Spacer(Modifier.height(8.dp))
+                    if (!jadwalHariIni) {
+                        Text(
+                            if (item.tanggal < hariIni) "Jadwal strong point sudah lewat." else "Check-in dapat dilakukan pada tanggal jadwal.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Warna.TeksLembut
+                        )
+                    } else if (masuk == null) {
                         TombolUtama(
-                            teks = if (mengambil) "Mengambil lokasi…" else "Check-in PH",
+                            teks = if (mengambil) "Mengambil lokasi…" else "Check-in Strong Point",
                             aktif = !mengambil,
                             onClick = { proses(item, "masuk") }
                         )
                     } else if (pulang == null) {
                         TombolUtama(
-                            teks = if (mengambil) "Mengambil lokasi…" else "Check-out PH",
+                            teks = if (mengambil) "Mengambil lokasi…" else "Check-out Strong Point",
                             aktif = !mengambil,
                             onClick = { proses(item, "pulang") }
                         )
                     } else {
                         Text(
-                            "Absensi PH untuk jadwal ini sudah lengkap.",
+                            "Absensi strong point untuk jadwal ini sudah lengkap.",
                             style = MaterialTheme.typography.bodySmall,
                             color = Warna.Hijau
                         )
@@ -213,7 +238,7 @@ fun PhScreen(vm: KinerjaViewModel) {
 
         if (vm.absensiPh.isNotEmpty()) {
             Kartu {
-                JudulBagian("Riwayat PH Bulan Ini", "${vm.absensiPh.size} catatan")
+                JudulBagian("Riwayat Strong Point Bulan Ini", "${vm.absensiPh.size} catatan")
                 Spacer(Modifier.height(8.dp))
                 vm.absensiPh.takeLast(10).reversed().forEach { item ->
                     BarisInfo(

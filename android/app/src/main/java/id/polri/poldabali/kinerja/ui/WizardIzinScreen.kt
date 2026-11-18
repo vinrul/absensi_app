@@ -102,7 +102,7 @@ fun WizardIzinScreen(onSelesai: () -> Unit) {
         ),
         HalamanIzin(
             judul = "Notifikasi",
-            deskripsi = "Notifikasi mengingatkan jadwal PH: sehari sebelumnya pukul 19.00 dan 60 menit sebelum jadwal dimulai.",
+            deskripsi = "Notifikasi mengingatkan jadwal strong point: sehari sebelumnya pukul 19.00 dan pagi hari saat jadwal berlangsung.",
             alasan = if (notifikasi.isEmpty()) {
                 "Versi Android ini tidak memerlukan izin notifikasi terpisah. Pengingat akan muncul otomatis."
             } else {

@@ -452,6 +452,7 @@ data class JadwalPhSaya(
     val tanggal: String,
     val jamMulai: String,
     val jamSelesai: String,
+    val regu: String? = null,
     val catatan: String? = null,
     val peran: String? = null
 )

@@ -98,7 +98,8 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C6 | Nyalakan data → kirim antrean | Terkirim sekali (tidak duplikat), antrean kosong | ⬜ | |
 | C7 | Lihat daftar absensi satker | Hanya data sendiri | ✅ | API |
 | C8 | Buka dashboard pimpinan | 403 (tidak berhak) | ✅ | API |
-| C9 | Buka tab **PH** | Tab disembunyikan sementara dari bottom nav; fitur PH tetap tersedia lewat kode/API | ⬜ | permintaan pengguna |
+| C9 | Buka tab **Strong** | Tab Strong Point (ke-6) menampilkan jadwal bulan ini dengan jadwal hari ini di paling atas; regu, radius, status Belum/Check-in/Selesai, dan riwayat tampil | ✅ | emulator |
+| C9a | Check-in & check-out strong point di lokasi | Lokasi emulator diatur ke koordinat strong point; check-in memberi pesan “0 m dari strong point”, lalu tombol berubah menjadi Check-out dan status Selesai | ✅ | emulator + API |
 | C10 | Check-in PH tanpa GPS | 422 "Lokasi GPS wajib diambil untuk absensi PH" | ✅ | API |
 | C11 | Check-in PH di luar radius strong point | 422 dengan jarak aktual | ✅ | API |
 | C12 | Check-out PH dari lokasi berbeda (mis. rumah) | Ditolak 422 (wajib lokasi & radius) | ✅ | API |
@@ -117,7 +118,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C25 | Riwayat absensi | Terbuka di halaman terpisah dan memuat riwayat bulan berjalan | ✅ | emulator |
 | C26 | Jam server palsu `20-11-2026 07:45` | Absensi tercatat tanggal 20 Nov 2026 pukul 07:45; reset mengembalikan jam sistem | ✅ | API + emulator |
 | C27 | Pilih status **PH (Perintah Hadir)** | Tersimpan sebagai status `ph` dan dihitung hadir | ✅ | API |
-| C28 | Buka tab Rencana → **+ Baru** | Wizard langkah 1 (jenis rencana) tampil; bottom nav hanya 5 tab | ✅ | emulator |
+| C28 | Buka tab Rencana → **+ Baru** | Wizard langkah 1 (jenis rencana) tampil; bottom nav menampilkan 6 tab termasuk Strong | ✅ | emulator |
 | C29 | Pilih jenis, isi dasar SP, tambah 2 kegiatan | Langkah 3 menampilkan daftar rincian dengan ubah/hapus; field target & tanggal tervalidasi | ✅ | emulator |
 | C30 | Tambah 2 lampiran PDF sekaligus | Langkah 4 menampilkan dua berkas; dapat dihapus sebelum simpan | ✅ | emulator |
 | C31 | Tekan **Simpan Draf** | Kembali ke daftar, kartu berstatus Draft, lampiran terunggah, pesan sukses | ✅ | emulator + DB |

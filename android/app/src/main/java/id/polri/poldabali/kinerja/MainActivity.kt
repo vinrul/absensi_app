@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -56,6 +57,7 @@ import id.polri.poldabali.kinerja.ui.HasilScreen
 import id.polri.poldabali.kinerja.ui.KinerjaViewModel
 import id.polri.poldabali.kinerja.ui.LoginScreen
 import id.polri.poldabali.kinerja.ui.OutputScreen
+import id.polri.poldabali.kinerja.ui.PhScreen
 import id.polri.poldabali.kinerja.ui.ProfilScreen
 import id.polri.poldabali.kinerja.ui.RencanaScreen
 import id.polri.poldabali.kinerja.ui.WizardIzinScreen
@@ -71,14 +73,15 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class Tab(val label: String, val ikon: ImageVector)
+private data class Tab(val label: String, val judul: String, val ikon: ImageVector)
 
 private val DAFTAR_TAB = listOf(
-    Tab("Beranda", Icons.Filled.Home),
-    Tab("Absensi", Icons.Filled.Place),
-    Tab("Rencana", Icons.AutoMirrored.Filled.List),
-    Tab("Hasil", Icons.Filled.CheckCircle),
-    Tab("Output", Icons.Filled.Star)
+    Tab("Beranda", "Absensi Kinerja", Icons.Filled.Home),
+    Tab("Absensi", "Absensi", Icons.Filled.Place),
+    Tab("Rencana", "Rencana Kerja", Icons.AutoMirrored.Filled.List),
+    Tab("Hasil", "Hasil Kerja", Icons.Filled.CheckCircle),
+    Tab("Output", "Output", Icons.Filled.Star),
+    Tab("Strong", "Strong Point", Icons.Filled.DateRange)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -168,7 +171,7 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                             )
                         }
                         Text(
-                            if (tabAktif == 0) "Absensi Kinerja" else DAFTAR_TAB[tabAktif].label,
+                            DAFTAR_TAB[tabAktif].judul,
                             modifier = Modifier.padding(start = 10.dp)
                         )
                     }
@@ -233,6 +236,7 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                     mintaBukaVerifikasi = bukaVerifikasiOutput,
                     onVerifikasiDibuka = { bukaVerifikasiOutput = false }
                 )
+                5 -> PhScreen(vm)
             }
         }
     }

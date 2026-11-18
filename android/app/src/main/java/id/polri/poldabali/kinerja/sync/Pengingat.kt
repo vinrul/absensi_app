@@ -41,10 +41,10 @@ object Pengingat {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Pengingat Jadwal PH",
+            "Pengingat Strong Point",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Pengingat jadwal PH dan strong point"
+            description = "Pengingat jadwal strong point"
         }
         manager.createNotificationChannel(channel)
     }
@@ -57,22 +57,45 @@ object Pengingat {
         val sekarang = ZonedDateTime.now()
         for (item in jadwal) {
             val tanggal = runCatching { LocalDate.parse(item.tanggal) }.getOrNull() ?: continue
-            val mulai = runCatching { LocalTime.parse(item.jamMulai) }.getOrNull() ?: continue
-            val mulaiZoned = ZonedDateTime.of(tanggal, mulai, ZoneId.systemDefault())
+            val semuaHari = item.jamMulai == "00:00" && item.jamSelesai == "23:59"
+            val mulai = runCatching { LocalTime.parse(item.jamMulai) }.getOrNull()
+            val lokasi = buildString {
+                append(item.strongPointNama)
+                item.regu?.takeIf { it.isNotBlank() }?.let { append(" ($it)") }
+            }
 
             val hMinusSatu = tanggal.minusDays(1).atTime(19, 0)
                 .atZone(ZoneId.systemDefault())
             if (hMinusSatu.isAfter(sekarang)) {
-                val judul = "Jadwal PH besok"
-                val isi = "Besok ${tanggal} di ${item.strongPointNama}, pukul ${item.jamMulai}–${item.jamSelesai}."
+                val judul = "Jadwal strong point besok"
+                val isi = if (semuaHari) {
+                    "Besok $tanggal di $lokasi. Lakukan check-in di lokasi strong point."
+                } else {
+                    "Besok $tanggal di $lokasi, pukul ${item.jamMulai}–${item.jamSelesai}."
+                }
                 jadwalkanSatu(context, work, "${item.id}-h1", hMinusSatu, judul, isi)
             }
 
-            val satuJamSebelum = mulaiZoned.minusHours(1)
-            if (satuJamSebelum.isAfter(sekarang)) {
-                val judul = "PH dimulai 1 jam lagi"
-                val isi = "PH di ${item.strongPointNama} pukul ${item.jamMulai}. Lakukan check-in di lokasi."
-                jadwalkanSatu(context, work, "${item.id}-m60", satuJamSebelum, judul, isi)
+            if (semuaHari) {
+                val pagi = tanggal.atTime(7, 0).atZone(ZoneId.systemDefault())
+                if (pagi.isAfter(sekarang)) {
+                    jadwalkanSatu(
+                        context,
+                        work,
+                        "${item.id}-pagi",
+                        pagi,
+                        "Jadwal strong point hari ini",
+                        "Hari ini di $lokasi. Lakukan check-in di lokasi strong point."
+                    )
+                }
+            } else if (mulai != null) {
+                val mulaiZoned = ZonedDateTime.of(tanggal, mulai, ZoneId.systemDefault())
+                val satuJamSebelum = mulaiZoned.minusHours(1)
+                if (satuJamSebelum.isAfter(sekarang)) {
+                    val judul = "Jadwal strong point 1 jam lagi"
+                    val isi = "Di $lokasi pukul ${item.jamMulai}. Lakukan check-in di lokasi."
+                    jadwalkanSatu(context, work, "${item.id}-m60", satuJamSebelum, judul, isi)
+                }
             }
         }
     }
@@ -102,8 +125,8 @@ object Pengingat {
 
 class PengingatWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {
-        val judul = inputData.getString(KEY_JUDUL) ?: "Jadwal PH"
-        val isi = inputData.getString(KEY_ISI) ?: "Ada jadwal PH."
+        val judul = inputData.getString(KEY_JUDUL) ?: "Jadwal Strong Point"
+        val isi = inputData.getString(KEY_ISI) ?: "Ada jadwal strong point."
 
         if (Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(

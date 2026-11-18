@@ -874,7 +874,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
             val jarak = hasil.jarakM
             selesai(
                 buildString {
-                    append("Absensi PH ${hasil.jenis} tercatat pukul ${hasil.jam}")
+                    append("Absensi strong point ${hasil.jenis} tercatat pukul ${hasil.jam}")
                     if (jarak != null) {
                         append(String.format(java.util.Locale.US, " (%.0f m dari strong point)", jarak))
                     }

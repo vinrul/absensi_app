@@ -33,7 +33,8 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Absensi Android bertahap + peta OSM | tombol besar → validasi GPS/peta → status → kirim/offline; `PetaAbsensi.kt` |
 | Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
 | Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; rekap menandai tidak strong point / hanya check-in |
-| Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00 & 60 menit sebelum |
+| Tab **Strong Point** di Android | bottom nav 6 tab; jadwal hari ini di atas, regu, check-in/out ber-lokasi (uji emulator), riwayat bulan ini |
+| Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403 |
 | Absensi + geofence + antrean offline | e2e: dalam radius 200, luar radius 422, duplikat 409 |
@@ -258,9 +259,9 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
 **Android**
 - Satu `KinerjaViewModel` menangani semua state & pemanggilan repo; layar Compose hanya
   memanggil method VM.
-- Navigasi: bottom bar 5 tab (Beranda, Absensi, Rencana, Hasil, Output) + Profil lewat ikon
-  di top bar (tanpa Navigation-Compose). Tab **Nilai** dan **PH** disembunyikan sementara;
-  `NilaiScreen`/`PhScreen` masih ada di kode dan dapat diaktifkan kembali.
+- Navigasi: bottom bar 6 tab (Beranda, Absensi, Rencana, Hasil, Output, Strong Point) + Profil
+  lewat ikon di top bar (tanpa Navigation-Compose). Tab **Nilai** tetap diringkas di Beranda;
+  `NilaiScreen` masih ada di kode dan dapat diaktifkan kembali.
 - **Persetujuan di Android** (`ui/PersetujuanScreen.kt`) dibuka dari kartu **Persetujuan Rencana**
   di Beranda atau tombol **Tinjau Persetujuan** pada tab Rencana (tanpa tab terpisah).
   Daftar `GET /rencana-kerja/persetujuan` hanya memuat bawahan langsung berstatus `diajukan`,

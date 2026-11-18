@@ -81,7 +81,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.32 | Wizard input rencana kerja Android 4 langkah | ✅ | `WizardRencana.kt`: jenis → dasar tugas → rincian kegiatan → lampiran; **Simpan Draf** & **Ajukan ke Atasan** |
 | 3.33 | Rincian kegiatan multi-entri dengan field lengkap | ✅ | program, kegiatan, uraian, tujuan, indikator, target kuantitas/kualitas, tanggal mulai/selesai; migrasi `0013` menambah kolom pada `rencana_tahapan`; detail dashboard menampilkan seluruh field |
 | 3.34 | Lampiran lebih dari satu berkas pada wizard | ✅ | pemilih dokumen multi-select; tiap berkas diunggah ke `POST /lampiran` setelah rencana tersimpan |
-| 3.35 | Tab **Nilai** dan **PH** disembunyikan sementara dari bottom nav | ✅ | bottom bar 5 tab; ringkasan nilai tetap tampil di Beranda, kode layar lama dipertahankan |
+| 3.35 | Pengaturan tab bottom nav | ✅ | **Nilai** tetap diringkas di Beranda; **Strong Point** menjadi tab ke-6 (Beranda, Absensi, Rencana, Hasil, Output, Strong) |
 | 3.36 | Ubah draft / perbaiki rencana yang diminta revisi | ✅ | tombol **Ubah Rencana** / **Perbaiki Rencana** membuka wizard terisi data lama, catatan atasan, rincian, dan lampiran; `PATCH /rencana-kerja/{id}` mengganti tahapan secara transaksional |
 | 3.37 | Date picker untuk seluruh tanggal rencana | ✅ | `FieldTanggal` + `DatePickerDialog` Material 3: tanggal dasar, tanggal mulai/selesai kegiatan; tanpa input teks |
 | 3.38 | Persetujuan rencana di Android untuk atasan/pimpinan | ✅ | kartu **Persetujuan Rencana** di Beranda + tombol **Tinjau Persetujuan** di tab Rencana; daftar `GET /rencana-kerja/persetujuan`, detail rincian + lampiran, keputusan Setujui / Minta Revisi / Tolak |
@@ -115,7 +115,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.12 | Hari strong point tetap dinilai absensi kantor | ✅ | Telat kantor diabaikan bila check-in strong point; bila tidak strong point, telat dihitung; pulang cepat tetap dihitung (`skor_harian_dengan_strong_point`) |
 | 4.13 | Absensi PH tidak mengubah bobot 20/20/30/30 | ✅ | hanya rekap PH terpisah |
 | 4.14 | Verifikasi absensi PH oleh atasan/admin | ✅ | `POST /ph/absensi/{id}/verifikasi` |
-| 4.15 | Tab **PH** di aplikasi Android | 🟡 | disembunyikan sementara dari bottom nav (permintaan pengguna); kode `PhScreen` tetap ada |
+| 4.15 | Tab **Strong Point** di aplikasi Android | ✅ | Tab ke-6 di bottom nav (`PhScreen`): jadwal hari ini di atas, regu, radius, check-in/check-out ber-lokasi, riwayat bulan ini; pengingat disesuaikan untuk jadwal tanpa jam |
 | 4.16 | Antrean offline untuk absensi PH | ⬜ | absensi PH saat ini butuh koneksi |
 | 4.17 | Ekspor CSV rekap PH | ⬜ | baru JSON + tampilan dashboard |
 | 4.18 | Rekap menandai tidak strong point & hanya check-in | ✅ | `hanya_check_in`, `tanggal_tidak_hadir`, `tanggal_hanya_check_in`; badge + tanggal di tab **Rekap Strong Point** |
