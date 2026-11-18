@@ -250,8 +250,9 @@ Catatan penting:
   mendukung rentang (disimpan satu jadwal per tanggal). Rekap menandai personel yang
   **tidak strong point** dan yang **hanya check-in** beserta tanggalnya; absensi kantor tetap
   wajib pada hari strong point, dan telat kantor tidak dihitung bila sudah check-in strong point.
-  Jadwal dan rekap strong point dapat diekspor PDF; rekap tidak menampilkan kolom telat karena
-  jadwal tidak memakai jam mulai/selesai. Tab master strong point disembunyikan sementara karena
+  Jadwal dan rekap strong point dapat diekspor PDF; PDF jadwal berbentuk roster (anggota × tanggal)
+  dan rekap tidak menampilkan kolom telat serta hanya menghitung sampai hari ini karena jadwal
+  tidak memakai jam mulai/selesai. Tab master strong point disembunyikan sementara karena
   titiknya belum tetap.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
   60 menit sebelum jadwal.

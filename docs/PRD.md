@@ -234,9 +234,11 @@ aktif dan dapat diaktifkan kembali.
 - Rekap PH per bulan menampilkan jumlah jadwal, check-in, **hanya check-in**, dan
   **tidak strong point** beserta tanggalnya, sehingga personel yang hanya check-in atau tidak
   menjalankan jadwal langsung terlihat (kolom telat tidak ditampilkan karena jadwal strong point
-  tidak lagi memakai jam mulai/selesai).
+  tidak lagi memakai jam mulai/selesai). Perhitungan rekap dibatasi **sampai hari ini**; tanggal
+  yang belum berjalan tidak dianggap tidak strong point.
 - Jadwal dan rekap strong point dapat diekspor ke **PDF** (A4 landscape) sesuai bulan dan filter
-  satker, memakai kop laporan dan kolom yang sama dengan tampilan dashboard.
+  satker. PDF jadwal berbentuk roster (kolom anggota/pangkat × tanggal 1–akhir bulan dengan blok
+  regu), sedangkan PDF rekap memakai batas tanggal yang sama dengan dashboard.
 - Strong point dan absensi kantor tetap terpisah namun saling terkait: hari ber-jadwal strong point
   **tetap wajib absensi kantor**. Keterlambatan absensi kantor **tidak dihitung** bila personel
   check-in strong point pada hari itu; bila jadwal strong point tidak dijalankan, keterlambatan

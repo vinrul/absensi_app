@@ -61,12 +61,12 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A47 | Buka `/ph?tab=strong` | Dialihkan ke `?tab=jadwal`; tombol master **Strong Point** tidak tampil; tab hanya Jadwal Strong Point & Rekap Strong Point | ✅ | UI (Chrome headless) |
 | A48 | Hari kerja dengan jadwal strong point; personel check-in strong point lalu absen kantor 08:30 | Menit telat absensi kantor pada hari itu **0** (dikecualikan) dan detail menandai **Strong point** | ✅ | API + seed |
 | A49 | Personel punya jadwal strong point tetapi tidak check-in, lalu absen kantor 08:30 | Menit telat tetap dihitung (60 menit bila jam masuk 07:30) | ✅ | API + seed |
-| A50 | Rekap Strong Point | Kolom Check-in, **Hanya Check-in**, **Tidak Strong Point** beserta tanggal; badge per personel (Hanya check-in / Tidak strong point / Lengkap); kolom telat tidak ada | ✅ | UI (Chrome headless) |
+| A50 | Rekap Strong Point | Kolom Check-in, **Hanya Check-in**, **Tidak Strong Point** beserta tanggal; badge per personel (Hanya check-in / Tidak strong point / Lengkap); kolom telat tidak ada; jadwal setelah hari ini **tidak dihitung** | ✅ | UI (Chrome headless) |
 | A51 | Tambah/Edit Jadwal Strong Point | Form hanya berisi Satker, Regu, Tanggal, Catatan, dan Personel; tidak ada combo strong point maupun jam mulai/selesai; simpan/ubah berhasil | ✅ | UI (Chrome headless) + API |
 | A52 | Isi tanggal mulai 1 dan selesai 6 lalu simpan | Terbentuk **6 jadwal** (satu per tanggal) dengan regu & anggota yang sama, bukan satu baris rentang | ✅ | API + UI |
 | A53 | Buka tab Jadwal Strong Point | Roster bulanan: kolom tanggal 1–akhir bulan, anggota × pangkat, dan blok biru berlabel regu pada tanggal yang dijadwalkan; daftar kelola jadwal dapat dibuka | ✅ | UI (Chrome headless) |
-| A54 | **Export PDF** pada tab Jadwal Strong Point | `jadwal-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh sesuai bulan & satker; memuat No, Tanggal, Satker, Regu, Anggota, Jumlah, dan Catatan | ✅ | API |
-| A55 | **Export PDF** pada tab Rekap Strong Point | `rekap-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh; memuat Check-in, Hanya Check-in + tanggal, Tidak Strong Point + tanggal, Menunggu (tanpa telat) | ✅ | API |
+| A54 | **Export PDF** pada tab Jadwal Strong Point | `jadwal-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh sesuai bulan & satker; berbentuk **roster** seperti dashboard: No, Anggota, Pangkat, dan kolom tanggal 1–akhir bulan dengan blok biru berlabel regu | ✅ | API + Chrome headless |
+| A55 | **Export PDF** pada tab Rekap Strong Point | `rekap-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh; perhitungan dibatasi sampai hari ini (tanggal setelahnya tidak dianggap tidak strong point); memuat Check-in, Hanya Check-in + tanggal, Tidak Strong Point + tanggal, Menunggu (tanpa telat) | ✅ | API |
 
 ## B. Admin ber-scope
 

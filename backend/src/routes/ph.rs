@@ -9,7 +9,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use chrono::{Datelike, Duration, NaiveDate, NaiveTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::auth::extractor::AuthUser;
@@ -973,7 +973,10 @@ pub async fn rekap_ph(
     Query(query): Query<BulanQuery>,
 ) -> AppResult<Json<serde_json::Value>> {
     pastikan_pengelola(&user)?;
-    let (dari, sampai) = rentang_bulan(query.bulan.as_deref())?;
+    let (dari, sampai_bulan) = rentang_bulan(query.bulan.as_deref())?;
+    // Rekap hanya menghitung jadwal sampai hari ini; tanggal yang belum berjalan
+    // tidak boleh dianggap "tidak strong point".
+    let sampai = sampai_bulan.min(hari_ini_wita());
     let mut scope = user.satker_akses().to_vec();
     if let Some(satker_id) = query.satker_id {
         if !scope.contains(&satker_id) {
@@ -983,7 +986,11 @@ pub async fn rekap_ph(
         }
         scope = vec![satker_id];
     }
-    let rows = ph::rekap_ph(&state.pool, &scope, dari, sampai).await?;
+    let rows = if dari > sampai {
+        Vec::new()
+    } else {
+        ph::rekap_ph(&state.pool, &scope, dari, sampai).await?
+    };
     let data: Vec<RekapPhDto> = rows
         .into_iter()
         .map(|row| RekapPhDto {
@@ -1091,7 +1098,22 @@ fn sel_jumlah_tanggal(jumlah: i64, tanggal: &[NaiveDate], warna: &str) -> String
     )
 }
 
-/// Ekspor jadwal strong point sebulan menjadi PDF.
+const CSS_ROSTER: &str = r#"
+table.data th, table.data td { padding: 2px 1px; text-align: center; }
+table.data th:nth-child(-n+3) { text-align: left; padding-left: 4px; }
+table.data td.nama { text-align: left; padding-left: 4px; white-space: nowrap; }
+table.data tr:nth-child(even) td { background: transparent; }
+"#;
+
+struct BlokRoster {
+    satker_id: Uuid,
+    regu: String,
+    /// (personel_id, nama, pangkat)
+    anggota: Vec<(Uuid, String, String)>,
+    per_hari: Vec<HashSet<Uuid>>,
+}
+
+/// Ekspor jadwal strong point sebulan menjadi PDF roster (anggota × tanggal).
 pub async fn ekspor_jadwal_pdf(
     State(state): State<AppState>,
     user: AuthUser,
@@ -1101,6 +1123,7 @@ pub async fn ekspor_jadwal_pdf(
     let (dari, sampai) = rentang_bulan(query.bulan.as_deref())?;
     let scope = scope_ekspor(&user, query.satker_id)?;
     let rows = ph::list_jadwal(&state.pool, &scope, dari, sampai).await?;
+    let jumlah_hari = sampai.day() as usize;
 
     let nama_satker_map: HashMap<Uuid, String> = satker::list(&state.pool)
         .await?
@@ -1108,89 +1131,145 @@ pub async fn ekspor_jadwal_pdf(
         .map(|row| (row.id, row.nama))
         .collect();
 
-    let mut baris = String::new();
-    for (indeks, row) in rows.iter().enumerate() {
-        let anggota = ph::personel_jadwal(&state.pool, row.id)
-            .await?
-            .into_iter()
-            .map(|personel| {
-                format!(
-                    "{} ({})",
-                    laporan::esc(&personel.nama),
-                    laporan::esc(&personel.pangkat)
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("<br>");
-        let satker_nama = nama_satker_map
-            .get(&row.satker_id)
-            .cloned()
-            .unwrap_or_else(|| "-".into());
-        let regu = row.regu.clone().unwrap_or_else(|| "-".into());
-        let catatan = row.catatan.clone().unwrap_or_else(|| "-".into());
-        baris.push_str(&format!(
-            "<tr>\
-                <td style=\"text-align:center\">{}</td>\
-                <td style=\"text-align:center\">{}</td>\
-                <td>{}</td>\
-                <td>{}</td>\
-                <td>{}</td>\
-                <td style=\"text-align:center\">{}</td>\
-                <td>{}</td>\
-             </tr>",
-            indeks + 1,
-            laporan::format_tanggal(row.tanggal),
-            laporan::esc(&satker_nama),
-            laporan::esc(&regu),
-            anggota,
-            row.jumlah_personel,
-            laporan::esc(&catatan),
-        ));
+    let mut daftar: Vec<BlokRoster> = Vec::new();
+    let mut posisi: HashMap<(Uuid, String), usize> = HashMap::new();
+    for row in &rows {
+        let regu = row
+            .regu
+            .clone()
+            .filter(|nilai| !nilai.trim().is_empty())
+            .unwrap_or_else(|| "Tanpa Regu".into());
+        let kunci = (row.satker_id, regu.clone());
+        let pos = if let Some(pos) = posisi.get(&kunci) {
+            *pos
+        } else {
+            daftar.push(BlokRoster {
+                satker_id: row.satker_id,
+                regu,
+                anggota: Vec::new(),
+                per_hari: vec![HashSet::new(); jumlah_hari],
+            });
+            let pos = daftar.len() - 1;
+            posisi.insert(kunci, pos);
+            pos
+        };
+        let blok = &mut daftar[pos];
+        let hari = row.tanggal.day() as usize - 1;
+        for personel in ph::personel_jadwal(&state.pool, row.id).await? {
+            if !blok
+                .anggota
+                .iter()
+                .any(|(id, _, _)| *id == personel.personel_id)
+            {
+                blok.anggota
+                    .push((personel.personel_id, personel.nama, personel.pangkat));
+            }
+            if let Some(set) = blok.per_hari.get_mut(hari) {
+                set.insert(personel.personel_id);
+            }
+        }
+    }
+    for blok in &mut daftar {
+        blok.anggota.sort_by(|a, b| a.1.cmp(&b.1));
     }
 
-    let html = laporan::html(&laporan::Laporan {
-        judul: "Jadwal Strong Point",
-        periode: &label_periode_bulan(dari, sampai),
-        satker: &nama_satker_ekspor(&state, query.satker_id).await?,
-        personel: "Semua Personel",
-        status: "Semua regu",
-        dicetak_oleh: &nama_pencetak(&state, &user).await?,
-        dicetak_pada: &waktu_cetak(),
-        kolom: vec![
-            laporan::Kolom {
-                judul: "No",
-                lebar: 4,
-            },
-            laporan::Kolom {
-                judul: "Tanggal",
-                lebar: 10,
-            },
-            laporan::Kolom {
-                judul: "Satker",
-                lebar: 19,
-            },
-            laporan::Kolom {
-                judul: "Regu",
-                lebar: 10,
-            },
-            laporan::Kolom {
-                judul: "Anggota",
-                lebar: 36,
-            },
-            laporan::Kolom {
-                judul: "Jumlah",
-                lebar: 7,
-            },
-            laporan::Kolom {
-                judul: "Catatan",
-                lebar: 14,
-            },
-        ],
-        baris,
-        jumlah: rows.len(),
-        total: rows.len() as i64,
-        catatan: None,
-    });
+    let mut baris = String::new();
+    for blok in &daftar {
+        if blok.anggota.is_empty() {
+            continue;
+        }
+        let satker_nama = nama_satker_map
+            .get(&blok.satker_id)
+            .cloned()
+            .unwrap_or_else(|| "-".into());
+        baris.push_str(&format!(
+            "<tr><td colspan=\"{}\" style=\"background:#dbeafe;color:#0c4a6e;font-weight:600;text-align:left\">{} — {} · {} anggota</td></tr>",
+            3 + jumlah_hari,
+            laporan::esc(&satker_nama),
+            laporan::esc(&blok.regu),
+            blok.anggota.len()
+        ));
+
+        let lengkap: Vec<bool> = blok
+            .per_hari
+            .iter()
+            .map(|set| set.len() == blok.anggota.len())
+            .collect();
+
+        for (nomor, (personel_id, nama, pangkat)) in blok.anggota.iter().enumerate() {
+            baris.push_str("<tr>");
+            baris.push_str(&format!(
+                "<td style=\"text-align:center\">{}</td><td class=\"nama\">{}</td><td>{}</td>",
+                nomor + 1,
+                laporan::esc(nama),
+                laporan::esc(pangkat)
+            ));
+            for i in 0..jumlah_hari {
+                if lengkap[i] {
+                    if nomor == 0 && (i == 0 || !lengkap[i - 1]) {
+                        let panjang = lengkap[i..].iter().take_while(|nilai| **nilai).count();
+                        baris.push_str(&format!(
+                            "<td rowspan=\"{}\" colspan=\"{panjang}\" style=\"background:#bae6fd;border:1px solid #64748b;text-align:center;vertical-align:middle;font-weight:600;color:#0c4a6e\">{}</td>",
+                            blok.anggota.len(),
+                            laporan::esc(&blok.regu)
+                        ));
+                    }
+                } else {
+                    let dijadwalkan = blok.per_hari[i].contains(personel_id);
+                    baris.push_str(&format!(
+                        "<td style=\"text-align:center{}\">{}</td>",
+                        if dijadwalkan {
+                            ";background:#bae6fd;font-weight:600"
+                        } else {
+                            ""
+                        },
+                        if dijadwalkan { "•" } else { "" }
+                    ));
+                }
+            }
+            baris.push_str("</tr>");
+        }
+    }
+
+    let judul_tanggal: Vec<String> = (1..=jumlah_hari).map(|hari| hari.to_string()).collect();
+    let mut kolom = vec![
+        laporan::Kolom {
+            judul: "No",
+            lebar: 3,
+        },
+        laporan::Kolom {
+            judul: "Anggota",
+            lebar: 24,
+        },
+        laporan::Kolom {
+            judul: "Pangkat",
+            lebar: 11,
+        },
+    ];
+    for judul in &judul_tanggal {
+        kolom.push(laporan::Kolom { judul, lebar: 2 });
+    }
+
+    let html = laporan::html_dengan_css(
+        &laporan::Laporan {
+            judul: "Jadwal Strong Point",
+            periode: &label_periode_bulan(dari, sampai),
+            satker: &nama_satker_ekspor(&state, query.satker_id).await?,
+            personel: "Semua Personel",
+            status: "Semua regu",
+            dicetak_oleh: &nama_pencetak(&state, &user).await?,
+            dicetak_pada: &waktu_cetak(),
+            kolom,
+            baris,
+            jumlah: daftar.len(),
+            total: daftar.len() as i64,
+            catatan: Some(format!(
+                "Blok biru menandai seluruh anggota regu bertugas; titik menandai anggota yang bertugas sendiri. Total {} regu.",
+                daftar.len()
+            )),
+        },
+        CSS_ROSTER,
+    );
     let pdf = pdf::render_pdf(&html).await?;
     Ok(respons_pdf(
         pdf,
@@ -1209,9 +1288,15 @@ pub async fn ekspor_rekap_pdf(
     Query(query): Query<BulanQuery>,
 ) -> AppResult<Response> {
     pastikan_pengelola(&user)?;
-    let (dari, sampai) = rentang_bulan(query.bulan.as_deref())?;
+    let (dari, sampai_bulan) = rentang_bulan(query.bulan.as_deref())?;
+    // Sama seperti tampilan rekap: hitung sampai hari ini saja.
+    let sampai = sampai_bulan.min(hari_ini_wita());
     let scope = scope_ekspor(&user, query.satker_id)?;
-    let rows = ph::rekap_ph(&state.pool, &scope, dari, sampai).await?;
+    let rows = if dari > sampai {
+        Vec::new()
+    } else {
+        ph::rekap_ph(&state.pool, &scope, dari, sampai).await?
+    };
 
     let mut baris = String::new();
     for (indeks, row) in rows.iter().enumerate() {
@@ -1283,7 +1368,11 @@ pub async fn ekspor_rekap_pdf(
         baris,
         jumlah: rows.len(),
         total: rows.len() as i64,
-        catatan: None,
+        catatan: Some(format!(
+            "Perhitungan rekap sampai {} (tanggal setelahnya belum dinilai). Total {} personel.",
+            laporan::format_tanggal(sampai),
+            rows.len()
+        )),
     });
     let pdf = pdf::render_pdf(&html).await?;
     Ok(respons_pdf(

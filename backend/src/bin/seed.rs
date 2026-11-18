@@ -793,67 +793,85 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if orang.is_empty() {
             continue;
         }
-        // Ditreskrimsus memakai roster penuh sebulan (1–akhir bulan) sebagai contoh
-        // tampilan spreadsheet; satker lain cukup contoh tanggal 3–5.
-        let hari_jadwal: Vec<u32> = if node.kode == "DITRESKRIMSUS" && roster_penuh {
-            (1..=akhir_bulan.day()).collect()
-        } else {
-            [3u32, 4, 5]
-                .into_iter()
-                .filter(|hari| *hari <= akhir_bulan.day())
-                .collect()
-        };
-        let jumlah_anggota = if node.kode == "DITRESKRIMSUS" && roster_penuh {
-            6.min(orang.len())
-        } else {
-            4.min(orang.len())
-        };
-        let anggota_regu: Vec<Uuid> = (0..jumlah_anggota)
-            .map(|offset| orang[(satker_index + offset) % orang.len()])
-            .collect();
+        // Ditreskrimsus dibagi dua regu: Regu 1 tanggal 1–15 dan Regu 2 tanggal 16–akhir
+        // bulan. Satker lain cukup contoh tanggal 3–5 dengan satu regu.
+        let rencana_regu: Vec<(&str, Vec<Uuid>, Vec<u32>)> =
+            if node.kode == "DITRESKRIMSUS" && roster_penuh {
+                let tengah = orang.len().div_ceil(2);
+                vec![
+                    (
+                        "Regu 1",
+                        orang.iter().take(tengah).copied().collect(),
+                        (1..=15).filter(|hari| *hari <= akhir_bulan.day()).collect(),
+                    ),
+                    (
+                        "Regu 2",
+                        orang.iter().skip(tengah).copied().collect(),
+                        (16..=akhir_bulan.day()).collect(),
+                    ),
+                ]
+            } else {
+                let anggota: Vec<Uuid> = (0..4.min(orang.len()))
+                    .map(|offset| orang[(satker_index + offset) % orang.len()])
+                    .collect();
+                vec![(
+                    "Regu 1",
+                    anggota,
+                    [3u32, 4, 5]
+                        .into_iter()
+                        .filter(|hari| *hari <= akhir_bulan.day())
+                        .collect(),
+                )]
+            };
         let jam_mulai = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
         let jam_selesai = NaiveTime::from_hms_opt(16, 0, 0).unwrap();
-        for hari in hari_jadwal {
-            let tanggal = NaiveDate::from_ymd_opt(awal_bulan.year(), awal_bulan.month(), hari)
-                .expect("tanggal PH valid");
-            let id = uid(&format!("jadwal-ph-{satker_id}-{hari}"));
-            sqlx::query(
-                "INSERT INTO jadwal_ph (id, satker_id, strong_point_id, tanggal, jam_mulai,
+        for (regu, anggota_regu, hari_jadwal) in &rencana_regu {
+            if anggota_regu.is_empty() {
+                continue;
+            }
+            for hari in hari_jadwal {
+                let hari = *hari;
+                let tanggal = NaiveDate::from_ymd_opt(awal_bulan.year(), awal_bulan.month(), hari)
+                    .expect("tanggal PH valid");
+                let id = uid(&format!("jadwal-ph-{satker_id}-{regu}-{hari}"));
+                sqlx::query(
+                    "INSERT INTO jadwal_ph (id, satker_id, strong_point_id, tanggal, jam_mulai,
                                         jam_selesai, regu, catatan, created_by)
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-            )
-            .bind(id)
-            .bind(satker_id)
-            .bind(strong_point_id)
-            .bind(tanggal)
-            .bind(jam_mulai)
-            .bind(jam_selesai)
-            .bind("Regu 1")
-            .bind(format!("Jadwal Strong Point {}", node.nama))
-            .bind(uid("admin-polda"))
-            .execute(&pool)
-            .await?;
-
-            for personel_id in &anggota_regu {
-                sqlx::query(
-                    "INSERT INTO jadwal_ph_personel (jadwal_ph_id, personel_id, peran)
-                     VALUES ($1, $2, $3)",
                 )
                 .bind(id)
-                .bind(personel_id)
-                .bind("Anggota")
+                .bind(satker_id)
+                .bind(strong_point_id)
+                .bind(tanggal)
+                .bind(jam_mulai)
+                .bind(jam_selesai)
+                .bind(regu)
+                .bind(format!("Jadwal Strong Point {}", node.nama))
+                .bind(uid("admin-polda"))
                 .execute(&pool)
                 .await?;
-                ph_dates.entry(*personel_id).or_default().insert(tanggal);
+
+                for personel_id in anggota_regu {
+                    sqlx::query(
+                        "INSERT INTO jadwal_ph_personel (jadwal_ph_id, personel_id, peran)
+                     VALUES ($1, $2, $3)",
+                    )
+                    .bind(id)
+                    .bind(personel_id)
+                    .bind("Anggota")
+                    .execute(&pool)
+                    .await?;
+                    ph_dates.entry(*personel_id).or_default().insert(tanggal);
+                }
+                jadwal_ph_rows.push((
+                    id,
+                    satker_id,
+                    strong_point_id,
+                    tanggal,
+                    jam_mulai,
+                    jam_selesai,
+                ));
             }
-            jadwal_ph_rows.push((
-                id,
-                satker_id,
-                strong_point_id,
-                tanggal,
-                jam_mulai,
-                jam_selesai,
-            ));
         }
     }
 

@@ -106,7 +106,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.3 | Jadwal PH per satker per bulan | ✅ | filter `?bulan=YYYY-MM&satker_id=`; form dashboard hanya satker, tanggal, catatan, personel (tanpa strong point & jam) |
 | 4.4 | Satu jadwal berisi banyak personel + peran | ✅ | mis. ketua/anggota |
 | 4.5 | Deteksi bentrok jadwal personel | ✅ | `repo/ph.rs::ada_bentrok` (jam beririsan) |
-| 4.6 | Tiap personel dapat jadwal berbeda tiap bulan | ✅ | seed: 90 jadwal contoh (Ditreskrimsus Polda Bali setiap tanggal 1–30) |
+| 4.6 | Tiap personel dapat jadwal berbeda tiap bulan | ✅ | seed: 90 jadwal contoh (Ditreskrimsus Polda Bali dua regu, tanggal 1–akhir bulan) |
 | 4.7 | Check-in PH **wajib lokasi** | ✅ | HTTP 422 bila GPS kosong |
 | 4.8 | Check-out PH **wajib lokasi** | ✅ | lokasi diambil ulang saat check-out |
 | 4.9 | Validasi radius strong point sisi server | ✅ | jarak dihitung Haversine |
@@ -124,7 +124,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.21 | Roster bulanan strong point ala spreadsheet | ✅ | Tab **Jadwal Strong Point**: kolom Anggota/Pangkat × tanggal 1–akhir bulan, blok biru berlabel regu, akhir pekan merah; daftar kelola jadwal tetap tersedia |
 | 4.22 | Input rentang tanggal jadwal | ✅ | `tanggal_selesai` membuat satu jadwal per tanggal (bukan satu baris rentang); semua tanggal divalidasi bentrok sebelum disimpan |
 | 4.23 | Ekspor PDF jadwal & rekap strong point | ✅ | `/ph/jadwal/ekspor` dan `/ph/rekap/ekspor` (Chrome/Edge headless); rekap tanpa kolom telat; tombol Export PDF di tab Jadwal/Rekap |
-| 4.24 | Seed roster sebulan Ditreskrimsus | ✅ | Tanggal 1–30 November (mengikuti bulan berjalan), Regu 1, 6 anggota tetap; satker lain tetap contoh tanggal 3–5 |
+| 4.24 | Seed roster sebulan Ditreskrimsus | ✅ | Dua regu: Regu 1 tanggal 1–15 dan Regu 2 tanggal 16–akhir bulan (3 anggota per regu); satker lain tetap contoh tanggal 3–5 |
 
 ## 5. Pengingat jadwal tanpa FCM
 

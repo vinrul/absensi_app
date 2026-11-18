@@ -39,6 +39,11 @@ pub struct Laporan<'a> {
 
 /// Merangkai HTML laporan A4 landscape lengkap dengan kop, tabel, dan footer.
 pub fn html(laporan: &Laporan<'_>) -> String {
+    html_dengan_css(laporan, "")
+}
+
+/// Merangkai HTML laporan dengan tambahan CSS khusus (mis. roster tanggal).
+pub fn html_dengan_css(laporan: &Laporan<'_>, css_tambahan: &str) -> String {
     let logo = base64::engine::general_purpose::STANDARD.encode(include_bytes!(
         "../../../dashboard/static/logo-polda-bali.png"
     ));
@@ -78,7 +83,7 @@ pub fn html(laporan: &Laporan<'_>) -> String {
     format!(
         r#"<!doctype html>
 <html lang="id">
-<head><meta charset="utf-8"><style>{css}</style></head>
+<head><meta charset="utf-8"><style>{css}{css_tambahan}</style></head>
 <body>
   <table class="kop"><tr>
     <td class="logo"><img src="data:image/png;base64,{logo}" alt="Logo Polda Bali"></td>
@@ -112,6 +117,7 @@ pub fn html(laporan: &Laporan<'_>) -> String {
 </body>
 </html>"#,
         css = CSS_LAPORAN,
+        css_tambahan = css_tambahan,
         logo = logo,
         judul = esc(laporan.judul),
         periode = esc(laporan.periode),

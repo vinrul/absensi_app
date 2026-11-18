@@ -719,7 +719,7 @@
     "/ph/jadwal/ekspor": {
       "get": {
         "tags": ["ph"],
-        "summary": "Ekspor jadwal strong point ke PDF",
+        "summary": "Ekspor jadwal strong point (roster anggota × tanggal) ke PDF",
         "parameters": [
           { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
@@ -805,7 +805,7 @@
     "/ph/rekap": {
       "get": {
         "tags": ["ph"],
-        "summary": "Rekap PH per personel per bulan",
+        "summary": "Rekap PH per personel per bulan (dihitung sampai hari ini)",
         "parameters": [
           { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
@@ -816,7 +816,7 @@
     "/ph/rekap/ekspor": {
       "get": {
         "tags": ["ph"],
-        "summary": "Ekspor rekap strong point ke PDF",
+        "summary": "Ekspor rekap strong point ke PDF (sampai hari ini)",
         "parameters": [
           { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }

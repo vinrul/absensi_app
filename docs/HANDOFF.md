@@ -43,7 +43,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser; Rencana/Hasil/Output memiliki halaman detail + lampiran, filter periode/status/satker/personel, dan **Export PDF** lewat Chrome/Edge headless |
 | Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
-| Strong Point: roster + Export PDF | Jadwal memakai roster bulanan (anggota × tanggal, blok regu) dengan input rentang tanggal satu-per-satu; rekap menandai tidak strong point/hanya check-in beserta tanggal, tanpa kolom telat; PDF `/ph/jadwal/ekspor` & `/ph/rekap/ekspor` (uji API) |
+| Strong Point: roster + Export PDF | Jadwal memakai roster bulanan (anggota × tanggal, blok regu) dengan input rentang tanggal satu-per-satu; rekap menandai tidak strong point/hanya check-in beserta tanggal, tanpa kolom telat, dan hanya menghitung sampai hari ini; PDF `/ph/jadwal/ekspor` (roster) & `/ph/rekap/ekspor` (uji API + Chrome headless) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
@@ -165,8 +165,10 @@ personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403.
     roster bulanan ala spreadsheet: anggota × tanggal 1–akhir bulan, blok biru berlabel regu untuk
     rentang tanggal yang dijadwalkan. Jadwal dan rekap dapat diekspor PDF lewat Chrome/Edge
     headless (`/ph/jadwal/ekspor`, `/ph/rekap/ekspor`); rekap tidak lagi menampilkan telat karena
-    jadwal dashboard tidak memakai jam mulai/selesai. Seed memberi Ditreskrimsus jadwal penuh
-    tanggal 1–akhir bulan berjalan sebagai contoh roster.
+    jadwal dashboard tidak memakai jam mulai/selesai, dan perhitungannya dibatasi sampai hari ini.
+    PDF jadwal berbentuk roster seperti dashboard (No, Anggota, Pangkat, tanggal 1–akhir bulan,
+    blok biru regu). Seed memberi Ditreskrimsus dua regu penuh sebulan (Regu 1 tanggal 1–15,
+    Regu 2 tanggal 16–akhir bulan) sebagai contoh roster.
 18. **Pengingat jadwal tanpa FCM.** Android memakai WorkManager + notifikasi lokal
     (H-1 19:00 dan 60 menit sebelum). Tidak ada ketergantungan layanan push eksternal.
 19. **Database uji terpisah (`kinerja_test`).** Seed demo ada di `kinerja_db`; skrip e2e
