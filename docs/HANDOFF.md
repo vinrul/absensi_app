@@ -27,7 +27,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Periode bulan berjalan dibuat otomatis + dapat dibuka kembali | `repo/periode.rs::pastikan_bulan_ini` / `buka`; alasan tersimpan |
 | Kesiapan satker per periode (admin satker menandai, admin global memantau) | tabel `periode_satker_kesiapan`, halaman **Kesiapan Periode** |
 | Kalender hari libur nasional & khusus satker | tabel `hari_libur`, halaman **Hari Libur**, otomatis netral di penilaian |
-| CRUD personel + atasan + peran/cakupan + reset password | halaman **Data Personel**; form tanpa unit/email, pangkat combobox 21 tingkat |
+| CRUD personel + atasan + peran/cakupan + reset password | halaman **Data Personel**; form tanpa unit/email, pangkat combobox 22 tingkat Polri + 17 pangkat ASN |
 | Pagination seragam di seluruh modul daftar | komponen `Pagination.svelte`; lihat CHECKLIST §3.24 |
 | CRUD akun admin + username + cakupan + reset password | halaman **Akun Admin** (`/admin`) |
 | Modul PH / Strong Point terpisah | migrasi `0006`, `/ph/*`, halaman **Strong Point** (tab master disembunyikan sementara) |
@@ -384,7 +384,7 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
   verifikasi, perlu revisi, dan disetujui untuk akun demo.
 - **Profil & Pengaturan** (`ui/ProfilScreen.kt`): avatar bulat dari `GET /auth/foto/{id}`
   (dimuat ke `vm.fotoProfil`), **Ganti Foto Profil** lewat pemilih gambar sistem (JPG/PNG maks. 5 MB,
-  `POST /auth/foto`), **Edit Profil** (nama, pangkat lewat combobox 21 tingkat Polri terendah→tertinggi,
+  `POST /auth/foto`), **Edit Profil** (nama, pangkat lewat combobox 22 tingkat Polri + 17 pangkat ASN terendah→tertinggi,
   jabatan, telepon, email via `PATCH /auth/profile`), dan **Ganti Password**
   (`POST /auth/change-password`). Tiap kolom password punya ikon mata tampil/sembunyi (`IkonMata`,
   tanpa dependensi tambahan). Satker/NRP/peran tetap hanya admin. Ganti password memicu

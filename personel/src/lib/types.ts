@@ -483,6 +483,7 @@ export const PANGKAT_POLRI = [
 	'ABRIPKA',
 	'BRIPDA',
 	'BRIPTU',
+	'BRIGPOL',
 	'BRIPKA',
 	'AIPDA',
 	'AIPTU',
@@ -497,3 +498,72 @@ export const PANGKAT_POLRI = [
 	'KOMJEN POL',
 	'JENDERAL POL'
 ];
+
+/** Pangkat PNS/ASN dari golongan terendah (I/a) sampai tertinggi (IV/e). */
+export const PANGKAT_ASN = [
+	'JURU MUDA (I/A)',
+	'JURU MUDA TINGKAT I (I/B)',
+	'JURU (I/C)',
+	'JURU TINGKAT I (I/D)',
+	'PENGATUR MUDA (II/A)',
+	'PENGATUR MUDA TINGKAT I (II/B)',
+	'PENGATUR (II/C)',
+	'PENGATUR TINGKAT I (II/D)',
+	'PENATA MUDA (III/A)',
+	'PENATA MUDA TINGKAT I (III/B)',
+	'PENATA (III/C)',
+	'PENATA TINGKAT I (III/D)',
+	'PEMBINA (IV/A)',
+	'PEMBINA TINGKAT I (IV/B)',
+	'PEMBINA UTAMA MUDA (IV/C)',
+	'PEMBINA UTAMA MADYA (IV/D)',
+	'PEMBINA UTAMA (IV/E)'
+];
+
+export const PANGKAT_SEMUA = [...PANGKAT_POLRI, ...PANGKAT_ASN];
+
+const LABEL_PANGKAT: Record<string, string> = {
+	BHARADA: 'Bhayangkara Dua (Bharada)',
+	BHARATU: 'Bhayangkara Satu (Bharatu)',
+	BHARAKA: 'Bhayangkara Kepala (Bharaka)',
+	ABRIPDA: 'Ajun Brigadir Polisi Dua (Abripda)',
+	ABRIPTU: 'Ajun Brigadir Polisi Satu (Abriptu)',
+	ABRIPKA: 'Ajun Brigadir Polisi Kepala (Abripka)',
+	BRIPDA: 'Brigadir Polisi Dua (Bripda)',
+	BRIPTU: 'Brigadir Polisi Satu (Briptu)',
+	BRIGPOL: 'Brigadir Polisi (Brigpol)',
+	BRIPKA: 'Brigadir Polisi Kepala (Bripka)',
+	AIPDA: 'Ajun Inspektur Polisi Dua (Aipda)',
+	AIPTU: 'Ajun Inspektur Polisi Satu (Aiptu)',
+	IPDA: 'Inspektur Polisi Dua (Ipda)',
+	IPTU: 'Inspektur Polisi Satu (Iptu)',
+	AKP: 'Ajun Komisaris Polisi (AKP)',
+	KOMPOL: 'Komisaris Polisi (Kompol)',
+	AKBP: 'Ajun Komisaris Besar Polisi (AKBP)',
+	'KOMBES POL': 'Komisaris Besar Polisi (Kombes Pol)',
+	'BRIGJEN POL': 'Brigadir Jenderal Polisi (Brigjen Pol)',
+	'IRJEN POL': 'Inspektur Jenderal Polisi (Irjen Pol)',
+	'KOMJEN POL': 'Komisaris Jenderal Polisi (Komjen Pol)',
+	'JENDERAL POL': 'Jenderal Polisi',
+	'JURU MUDA (I/A)': 'Juru Muda (Gol. I/a)',
+	'JURU MUDA TINGKAT I (I/B)': 'Juru Muda Tingkat I (Gol. I/b)',
+	'JURU (I/C)': 'Juru (Gol. I/c)',
+	'JURU TINGKAT I (I/D)': 'Juru Tingkat I (Gol. I/d)',
+	'PENGATUR MUDA (II/A)': 'Pengatur Muda (Gol. II/a)',
+	'PENGATUR MUDA TINGKAT I (II/B)': 'Pengatur Muda Tingkat I (Gol. II/b)',
+	'PENGATUR (II/C)': 'Pengatur (Gol. II/c)',
+	'PENGATUR TINGKAT I (II/D)': 'Pengatur Tingkat I (Gol. II/d)',
+	'PENATA MUDA (III/A)': 'Penata Muda (Gol. III/a)',
+	'PENATA MUDA TINGKAT I (III/B)': 'Penata Muda Tingkat I (Gol. III/b)',
+	'PENATA (III/C)': 'Penata (Gol. III/c)',
+	'PENATA TINGKAT I (III/D)': 'Penata Tingkat I (Gol. III/d)',
+	'PEMBINA (IV/A)': 'Pembina (Gol. IV/a)',
+	'PEMBINA TINGKAT I (IV/B)': 'Pembina Tingkat I (Gol. IV/b)',
+	'PEMBINA UTAMA MUDA (IV/C)': 'Pembina Utama Muda (Gol. IV/c)',
+	'PEMBINA UTAMA MADYA (IV/D)': 'Pembina Utama Madya (Gol. IV/d)',
+	'PEMBINA UTAMA (IV/E)': 'Pembina Utama (Gol. IV/e)'
+};
+
+export function labelPangkat(pangkat: string): string {
+	return LABEL_PANGKAT[pangkat] ?? pangkat;
+}

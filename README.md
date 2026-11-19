@@ -292,7 +292,8 @@ Catatan penting:
 - **Akun admin terpisah**: admin memakai username (tanpa NRP), hanya login dashboard web,
   dan dikelola di halaman **Akun Admin**; personel (termasuk pimpinan) memakai NRP dan
   dikelola di halaman **Data Personel**. Form personel meminta NRP, nama, pangkat (combobox
-  21 tingkat Polri), jabatan, satker, dan atasan — tanpa unit/email.
+  22 tingkat Polri termasuk Brigpol, atau 17 pangkat ASN/PNS), jabatan, satker, dan atasan —
+  tanpa unit/email.
 - **Pagination seragam**: semua tabel daftar di dashboard memakai komponen `Pagination`
   (10 baris per halaman); modul besar memakai pagination server-side.
 - **Master & jam kerja**: tambah/ubah satker, zona waktu (WIB/WITA/WIT), jam masuk/pulang,
@@ -346,8 +347,9 @@ Catatan penting:
 - **Hasil kerja & output**: realisasi + progres (slider 0–100), wizard 3 langkah dengan simpan
   draf dan kirim ke atasan, verifikasi berskor (slider 0–100), 8 jenis output, berkas bukti atau
   tautan, serta layar verifikasi untuk atasan langsung.
-- **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 21 tingkat
-  Polri)/jabatan/telepon/email, ganti password, pengaturan alamat server, dan antrean offline.
+- **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 22 tingkat
+  Polri termasuk Brigpol + 17 pangkat ASN/PNS)/jabatan/telepon/email, ganti password, pengaturan
+  alamat server, dan antrean offline.
 - **Profil Saya di dashboard**: halaman `/profil` untuk admin & pimpinan dengan unggah foto profil
   (JPG/PNG maks. 5 MB) dan ganti password; setiap kolom password punya ikon mata
   tampil/sembunyikan. Avatar tampil di sidebar dan header, dan ganti password mencabut seluruh

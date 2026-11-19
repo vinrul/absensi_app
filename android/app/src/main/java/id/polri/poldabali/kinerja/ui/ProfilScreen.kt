@@ -240,7 +240,7 @@ private fun DialogEditProfil(
         val jabatanBersih = jabatan.trim()
         val pesan = when {
             namaBersih.length < 3 -> "Nama minimal 3 karakter"
-            PANGKAT_POLRI.none { it.first == pangkat } -> "Pilih pangkat dari daftar"
+            PANGKAT_SEMUA.none { it.first == pangkat } -> "Pilih pangkat dari daftar"
             jabatanBersih.length < 3 -> "Jabatan minimal 3 karakter"
             email.isNotBlank() && !email.contains('@') -> "Alamat email tidak valid"
             else -> null
@@ -305,6 +305,27 @@ private fun DialogEditProfil(
                         modifier = Modifier.heightIn(max = 400.dp)
                     ) {
                         PANGKAT_POLRI.forEach { (nilai, label) ->
+                            DropdownMenuItem(
+                                text = { Text(label) },
+                                onClick = {
+                                    pangkat = nilai
+                                    pilihPangkat = false
+                                }
+                            )
+                        }
+                        HorizontalDivider(color = Warna.NavySoft)
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "ASN (PNS)",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Warna.TeksLembut
+                                )
+                            },
+                            onClick = {},
+                            enabled = false
+                        )
+                        PANGKAT_ASN.forEach { (nilai, label) ->
                             DropdownMenuItem(
                                 text = { Text(label) },
                                 onClick = {

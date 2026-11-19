@@ -224,7 +224,7 @@ const NAMA_BELAKANG: &[&str] = &[
 ];
 const GELAR: &[&str] = &["S.H.", "S.T.", "S.Kom.", "S.Sos.", "S.H., M.H.", "A.Md."];
 const PANGKAT: &[&str] = &[
-    "BRIPDA", "BRIPTU", "BRIPKA", "AIPDA", "AIPTU", "IPDA", "IPTU", "AKP",
+    "BRIPDA", "BRIPTU", "BRIGPOL", "BRIPKA", "AIPDA", "AIPTU", "IPDA", "IPTU", "AKP",
 ];
 
 const JUMLAH_PERSONEL: usize = 120;

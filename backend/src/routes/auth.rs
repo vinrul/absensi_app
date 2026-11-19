@@ -29,6 +29,7 @@ const PANGKAT_POLRI: &[&str] = &[
     "ABRIPKA",
     "BRIPDA",
     "BRIPTU",
+    "BRIGPOL",
     "BRIPKA",
     "AIPDA",
     "AIPTU",
@@ -42,6 +43,27 @@ const PANGKAT_POLRI: &[&str] = &[
     "IRJEN POL",
     "KOMJEN POL",
     "JENDERAL POL",
+];
+
+/// Pangkat PNS/ASN dari golongan terendah (I/a) sampai tertinggi (IV/e).
+const PANGKAT_ASN: &[&str] = &[
+    "JURU MUDA (I/A)",
+    "JURU MUDA TINGKAT I (I/B)",
+    "JURU (I/C)",
+    "JURU TINGKAT I (I/D)",
+    "PENGATUR MUDA (II/A)",
+    "PENGATUR MUDA TINGKAT I (II/B)",
+    "PENGATUR (II/C)",
+    "PENGATUR TINGKAT I (II/D)",
+    "PENATA MUDA (III/A)",
+    "PENATA MUDA TINGKAT I (III/B)",
+    "PENATA (III/C)",
+    "PENATA TINGKAT I (III/D)",
+    "PEMBINA (IV/A)",
+    "PEMBINA TINGKAT I (IV/B)",
+    "PEMBINA UTAMA MUDA (IV/C)",
+    "PEMBINA UTAMA MADYA (IV/D)",
+    "PEMBINA UTAMA (IV/E)",
 ];
 
 pub fn routes() -> Router<AppState> {
@@ -428,9 +450,10 @@ pub async fn update_profile(
         .filter(|v| !v.is_empty());
     if let Some(pangkat) = pangkat
         && !PANGKAT_POLRI.contains(&pangkat)
+        && !PANGKAT_ASN.contains(&pangkat)
     {
         return Err(AppError::Unprocessable(
-            "Pangkat tidak termasuk tingkatan Polri".into(),
+            "Pangkat tidak termasuk tingkatan Polri atau ASN".into(),
         ));
     }
 

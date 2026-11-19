@@ -315,7 +315,7 @@
                   "pangkat": {
                     "type": "string",
                     "nullable": true,
-                    "description": "Salah satu pangkat Polri (BHARADA … JENDERAL POL)"
+                    "description": "Salah satu pangkat Polri (BHARADA … JENDERAL POL, termasuk BRIGPOL) atau pangkat ASN/PNS (JURU MUDA (I/A) … PEMBINA UTAMA (IV/E))"
                   },
                   "jabatan": { "type": "string", "nullable": true },
                   "phone": { "type": "string", "nullable": true },

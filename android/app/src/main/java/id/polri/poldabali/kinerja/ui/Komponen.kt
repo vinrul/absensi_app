@@ -323,7 +323,7 @@ val JENIS_OUTPUT: List<Pair<String, String>> = listOf(
 fun labelJenisOutput(jenis: String): String =
     JENIS_OUTPUT.firstOrNull { it.first == jenis }?.second ?: jenis
 
-/** Pangkat Polri dari terendah ke tertinggi (sama dengan combobox dashboard). */
+/** Pangkat Polri dari terendah ke tertinggi (termasuk Brigpol). */
 val PANGKAT_POLRI: List<Pair<String, String>> = listOf(
     "BHARADA" to "Bhayangkara Dua (Bharada)",
     "BHARATU" to "Bhayangkara Satu (Bharatu)",
@@ -333,6 +333,7 @@ val PANGKAT_POLRI: List<Pair<String, String>> = listOf(
     "ABRIPKA" to "Ajun Brigadir Polisi Kepala (Abripka)",
     "BRIPDA" to "Brigadir Polisi Dua (Bripda)",
     "BRIPTU" to "Brigadir Polisi Satu (Briptu)",
+    "BRIGPOL" to "Brigadir Polisi (Brigpol)",
     "BRIPKA" to "Brigadir Polisi Kepala (Bripka)",
     "AIPDA" to "Ajun Inspektur Polisi Dua (Aipda)",
     "AIPTU" to "Ajun Inspektur Polisi Satu (Aiptu)",
@@ -348,8 +349,31 @@ val PANGKAT_POLRI: List<Pair<String, String>> = listOf(
     "JENDERAL POL" to "Jenderal Polisi"
 )
 
+/** Pangkat PNS/ASN dari golongan terendah (I/a) sampai tertinggi (IV/e). */
+val PANGKAT_ASN: List<Pair<String, String>> = listOf(
+    "JURU MUDA (I/A)" to "Juru Muda (Gol. I/a)",
+    "JURU MUDA TINGKAT I (I/B)" to "Juru Muda Tingkat I (Gol. I/b)",
+    "JURU (I/C)" to "Juru (Gol. I/c)",
+    "JURU TINGKAT I (I/D)" to "Juru Tingkat I (Gol. I/d)",
+    "PENGATUR MUDA (II/A)" to "Pengatur Muda (Gol. II/a)",
+    "PENGATUR MUDA TINGKAT I (II/B)" to "Pengatur Muda Tingkat I (Gol. II/b)",
+    "PENGATUR (II/C)" to "Pengatur (Gol. II/c)",
+    "PENGATUR TINGKAT I (II/D)" to "Pengatur Tingkat I (Gol. II/d)",
+    "PENATA MUDA (III/A)" to "Penata Muda (Gol. III/a)",
+    "PENATA MUDA TINGKAT I (III/B)" to "Penata Muda Tingkat I (Gol. III/b)",
+    "PENATA (III/C)" to "Penata (Gol. III/c)",
+    "PENATA TINGKAT I (III/D)" to "Penata Tingkat I (Gol. III/d)",
+    "PEMBINA (IV/A)" to "Pembina (Gol. IV/a)",
+    "PEMBINA TINGKAT I (IV/B)" to "Pembina Tingkat I (Gol. IV/b)",
+    "PEMBINA UTAMA MUDA (IV/C)" to "Pembina Utama Muda (Gol. IV/c)",
+    "PEMBINA UTAMA MADYA (IV/D)" to "Pembina Utama Madya (Gol. IV/d)",
+    "PEMBINA UTAMA (IV/E)" to "Pembina Utama (Gol. IV/e)"
+)
+
+val PANGKAT_SEMUA: List<Pair<String, String>> = PANGKAT_POLRI + PANGKAT_ASN
+
 fun labelPangkat(pangkat: String): String =
-    PANGKAT_POLRI.firstOrNull { it.first == pangkat }?.second ?: pangkat
+    PANGKAT_SEMUA.firstOrNull { it.first == pangkat }?.second ?: pangkat
 
 fun labelStatusHasil(status: String): String = when (status) {
     "draft" -> "Draft"

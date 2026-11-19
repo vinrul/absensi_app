@@ -52,6 +52,7 @@
 		{ value: 'ABRIPKA', label: 'Ajun Brigadir Polisi Kepala (Abripka)' },
 		{ value: 'BRIPDA', label: 'Brigadir Polisi Dua (Bripda)' },
 		{ value: 'BRIPTU', label: 'Brigadir Polisi Satu (Briptu)' },
+		{ value: 'BRIGPOL', label: 'Brigadir Polisi (Brigpol)' },
 		{ value: 'BRIPKA', label: 'Brigadir Polisi Kepala (Bripka)' },
 		{ value: 'AIPDA', label: 'Ajun Inspektur Polisi Dua (Aipda)' },
 		{ value: 'AIPTU', label: 'Ajun Inspektur Polisi Satu (Aiptu)' },
@@ -65,6 +66,26 @@
 		{ value: 'IRJEN POL', label: 'Inspektur Jenderal Polisi (Irjen Pol)' },
 		{ value: 'KOMJEN POL', label: 'Komisaris Jenderal Polisi (Komjen Pol)' },
 		{ value: 'JENDERAL POL', label: 'Jenderal Polisi' }
+	];
+
+	const PANGKAT_ASN = [
+		{ value: 'JURU MUDA (I/A)', label: 'Juru Muda (Gol. I/a)' },
+		{ value: 'JURU MUDA TINGKAT I (I/B)', label: 'Juru Muda Tingkat I (Gol. I/b)' },
+		{ value: 'JURU (I/C)', label: 'Juru (Gol. I/c)' },
+		{ value: 'JURU TINGKAT I (I/D)', label: 'Juru Tingkat I (Gol. I/d)' },
+		{ value: 'PENGATUR MUDA (II/A)', label: 'Pengatur Muda (Gol. II/a)' },
+		{ value: 'PENGATUR MUDA TINGKAT I (II/B)', label: 'Pengatur Muda Tingkat I (Gol. II/b)' },
+		{ value: 'PENGATUR (II/C)', label: 'Pengatur (Gol. II/c)' },
+		{ value: 'PENGATUR TINGKAT I (II/D)', label: 'Pengatur Tingkat I (Gol. II/d)' },
+		{ value: 'PENATA MUDA (III/A)', label: 'Penata Muda (Gol. III/a)' },
+		{ value: 'PENATA MUDA TINGKAT I (III/B)', label: 'Penata Muda Tingkat I (Gol. III/b)' },
+		{ value: 'PENATA (III/C)', label: 'Penata (Gol. III/c)' },
+		{ value: 'PENATA TINGKAT I (III/D)', label: 'Penata Tingkat I (Gol. III/d)' },
+		{ value: 'PEMBINA (IV/A)', label: 'Pembina (Gol. IV/a)' },
+		{ value: 'PEMBINA TINGKAT I (IV/B)', label: 'Pembina Tingkat I (Gol. IV/b)' },
+		{ value: 'PEMBINA UTAMA MUDA (IV/C)', label: 'Pembina Utama Muda (Gol. IV/c)' },
+		{ value: 'PEMBINA UTAMA MADYA (IV/D)', label: 'Pembina Utama Madya (Gol. IV/d)' },
+		{ value: 'PEMBINA UTAMA (IV/E)', label: 'Pembina Utama (Gol. IV/e)' }
 	];
 
 	let data = $state<Personel[]>([]);
@@ -473,10 +494,17 @@
 		<div><label class="label" for="nama">Nama</label><input id="nama" class="input" bind:value={form.nama} /></div>
 		<div><label class="label" for="pangkat">Pangkat</label>
 			<select id="pangkat" class="input" bind:value={form.pangkat}>
-				{#each PANGKAT_POLRI as p}
-					<option value={p.value}>{p.label}</option>
-				{/each}
-				{#if !PANGKAT_POLRI.some((p) => p.value === form.pangkat)}
+				<optgroup label="Polri">
+					{#each PANGKAT_POLRI as p}
+						<option value={p.value}>{p.label}</option>
+					{/each}
+				</optgroup>
+				<optgroup label="ASN (PNS)">
+					{#each PANGKAT_ASN as p}
+						<option value={p.value}>{p.label}</option>
+					{/each}
+				</optgroup>
+				{#if !PANGKAT_POLRI.some((p) => p.value === form.pangkat) && !PANGKAT_ASN.some((p) => p.value === form.pangkat)}
 					<option value={form.pangkat}>{form.pangkat} (data lama)</option>
 				{/if}
 			</select>

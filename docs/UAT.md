@@ -148,7 +148,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C40 | Tab Output → **+ Baru** → pilih hasil terverifikasi → data output | Jenis 8 pilihan, judul/uraian/tanggal/URL; tombol **Simpan Draf** dan **Kirim ke Atasan** tersedia | ✅ | emulator |
 | C41 | Simpan draf output → Ubah → tambah PDF → **Kirim ke Atasan** | Berkas terunggah, status menjadi Dalam Verifikasi, pesan sukses tampil | ✅ | emulator + API |
 | C42 | Profil → **Ganti Foto Profil** → pilih gambar | Avatar bulat berubah sesuai gambar; foto disimpan ke `upload_dir/foto/<id>/` | ✅ | emulator + API |
-| C43 | Profil → **Edit Profil** → ubah pangkat lewat combobox & jabatan → Simpan | Combobox berisi 21 pangkat dari Bharada sampai Jenderal Pol; pilihan baru tampil di kartu profil (`BRIPTU · … Madya`), telepon/email tetap tersimpan | ✅ | emulator + API |
+| C43 | Profil → **Edit Profil** → ubah pangkat lewat combobox & jabatan → Simpan | Combobox berisi 22 pangkat Polri (termasuk Brigpol) + 17 pangkat ASN dari Juru Muda I/a sampai Pembina Utama IV/e; pilihan baru tampil di kartu profil (`BRIPTU · … Madya`), telepon/email tetap tersimpan | ✅ | emulator + API |
 | C44 | Profil → **Ganti Password** → kosongkan lalu Simpan | Validasi “Password lama wajib diisi”; konfirmasi tidak sama juga ditolak | ✅ | emulator |
 | C45 | Ganti password dengan data benar | Semua sesi dicabut, aplikasi kembali ke layar login; password lama tidak berlaku | ✅ | API |
 | C46 | Tekan ikon mata pada kolom password | Password berubah dari titik-titik menjadi teks biasa, lalu kembali tersembunyi saat ditekan lagi | ✅ | emulator |
@@ -252,5 +252,5 @@ Bukti: screenshot / log
 | W10 | Wizard Hasil 3 langkah & Output 3 langkah | Pilih rencana disetujui/hasil terverifikasi, isi data, unggah bukti, simpan draft/ajukan | ✅ | build + endpoint Android |
 | W11 | Atasan membuka Persetujuan Rencana | Dua rencana tampil; detail + lampiran; Setujui/Minta Revisi/Tolak dengan catatan wajib untuk non-setuju | ✅ | Chrome headless (daftar) + endpoint Android |
 | W12 | Atasan membuka Verifikasi Hasil/Output | Slider skor tampil; keputusan valid/revisi tersimpan | ✅ | build + endpoint Android |
-| W13 | Profil: unggah foto, edit profil, ganti password | Avatar berubah; pangkat dari 21 tingkat; tiga kolom password punya tombol mata; sukses ganti password kembali ke login | ✅ | build + endpoint Android |
+| W13 | Profil: unggah foto, edit profil, ganti password | Avatar berubah; pangkat dari 22 tingkat Polri + 17 pangkat ASN; tiga kolom password punya tombol mata; sukses ganti password kembali ke login | ✅ | build + endpoint Android |
 | W14 | Tampilan pada lebar 500 px | Tidak ada elemen terpotong; bottom navigation tetap terlihat; kartu responsif | ✅ | Chrome headless |

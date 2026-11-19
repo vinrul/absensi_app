@@ -53,7 +53,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.4 | Jam masuk & jam pulang per satker | ✅ | format `HH:MM`, divalidasi server |
 | 3.5 | Hari kerja per satker | ✅ | checkbox 1–7 (Senin–Minggu) |
 | 3.6 | Menu & halaman **Data Personel** | ✅ | `(app)/personel/+page.svelte`, hanya akun personel |
-| 3.7 | Tambah personel (NRP, nama, pangkat, jabatan, satker, atasan) | ✅ | pangkat memakai combobox 21 tingkat Polri (terendah→tertinggi); unit & email tidak lagi diminta |
+| 3.7 | Tambah personel (NRP, nama, pangkat, jabatan, satker, atasan) | ✅ | pangkat memakai combobox 22 tingkat Polri (termasuk Brigpol) + 17 pangkat ASN/PNS (terendah→tertinggi); unit & email tidak lagi diminta |
 | 3.8 | Ubah personel & nonaktifkan | ✅ | |
 | 3.9 | Atur peran + cakupan satker dari UI | ✅ | `GET|POST /personel/{id}/roles` |
 | 3.10 | Reset password personel | ✅ | `POST /personel/{id}/reset-password` |
@@ -103,7 +103,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.52 | Login web personel `personel_web` | ✅ | Hanya akun personel (termasuk atasan/pimpinan); admin 403; access token di memori + refresh cookie httpOnly `device_id=web-personel`; API 200 |
 | 3.53 | Absensi & Strong Point web personel | ✅ | Peta OSM, radius/titik dinas, 8 status, foto via kamera/file, antrean offline browser; strong point marker hijau tanpa titik dinas, geocode, aturan 2 jam, dokumentasi hanya check-in |
 | 3.54 | Wizard & persetujuan web personel | ✅ | Rencana 4 langkah, hasil/output 3 langkah, draft/ajukan, persetujuan rencana, verifikasi hasil/output berslider; endpoint sama dengan Android |
-| 3.55 | Profil & nilai web personel | ✅ | Foto, edit nama/pangkat 21 tingkat/jabatan/telepon/email, ganti password dengan tombol mata; nilai periode tampil di Beranda |
+| 3.55 | Profil & nilai web personel | ✅ | Foto, edit nama/pangkat 22 tingkat Polri + 17 pangkat ASN/jabatan/telepon/email, ganti password dengan tombol mata; nilai periode tampil di Beranda |
 | 3.56 | Kebijakan lokasi tiruan server | ✅ | `APP__MOCK_LOCATION_POLICY=flag|reject`; `flag` menyimpan + `perlu_verifikasi`, `reject` HTTP 422 untuk absensi dan strong point |
 | 3.57 | Deteksi & antrean fake GPS Android | ✅ | `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/aplikasi mock; antrean menghitung item `ditolak` saat 422 mock |
 | 3.58 | Dokumentasi fake GPS | ✅ | `docs/fake-gps.md`: policy, ADB/Fake GPS, uji endpoint, antrean, batasan, matriks uji |
@@ -241,7 +241,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.19 | Verifikasi hasil kerja Android | ✅ | emulator `000100`: kartu Beranda + tab Hasil, detail lampiran, Terverifikasi (skor kualitas) dan Perlu Revisi (catatan wajib) |
 | 9.20 | Wizard output Android + verifikasi atasan | ✅ | emulator: draf tanpa berkas, mode ubah menambah PDF, kirim ke atasan; atasan melihat 3 output, detail + PDF viewer, tolak tanpa catatan 422, setujui dengan skor 90/92 |
 | 9.21 | Data demo output | ✅ | seed: draft, dalam verifikasi (PDF+PNG), perlu revisi (catatan + PDF), dan disetujui untuk `85000001`/`85210022` |
-| 9.22 | Profil Android: foto, edit, ganti password | ✅ | emulator: avatar seed tampil, unggah PNG baru berhasil, edit nama/pangkat (combobox 21 tingkat)/jabatan/telepon/email tersimpan, validasi password wajib; API: ganti password mencabut sesi lama |
+| 9.22 | Profil Android: foto, edit, ganti password | ✅ | emulator: avatar seed tampil, unggah PNG baru berhasil, edit nama/pangkat (combobox 22 tingkat Polri + 17 pangkat ASN)/jabatan/telepon/email tersimpan, validasi password wajib; API: ganti password mencabut sesi lama |
 | 9.23 | Slider skor verifikasi | ✅ | emulator: skor kualitas 85→62, kesesuaian 90→54 dan keabsahan 92→82 pada dialog output |
 | 9.24 | Tampil/sembunyi password & avatar Beranda | ✅ | emulator: ikon mata mengubah titik-titik menjadi `Polri#2026` dan kembali; avatar tampil di Beranda `85000001`, tidak tampil untuk `000100` |
 | 9.25 | Validasi pangkat/jabatan profil | ✅ | API: pangkat `BRIPKA`/`JENDERAL POL` diterima, `KOLONEL` ditolak 422, jabatan <3 karakter ditolak 422 |

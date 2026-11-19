@@ -15,7 +15,7 @@
 		simpanPengguna,
 		session
 	} from '#lib/stores/session.svelte';
-	import { PANGKAT_POLRI, type Pengguna } from '#lib/types';
+	import { PANGKAT_ASN, PANGKAT_POLRI, PANGKAT_SEMUA, labelPangkat, type Pengguna } from '#lib/types';
 
 	let versiAvatar = $state(0);
 	let memproses = $state(false);
@@ -251,9 +251,19 @@
 			<div>
 				<label class="label" for="p-pangkat">Pangkat</label>
 				<select id="p-pangkat" class="input" bind:value={pangkat}>
-					{#each PANGKAT_POLRI as item (item)}
-						<option value={item}>{item}</option>
-					{/each}
+					<optgroup label="Polri">
+						{#each PANGKAT_POLRI as item (item)}
+							<option value={item}>{labelPangkat(item)}</option>
+						{/each}
+					</optgroup>
+					<optgroup label="ASN (PNS)">
+						{#each PANGKAT_ASN as item (item)}
+							<option value={item}>{labelPangkat(item)}</option>
+						{/each}
+					</optgroup>
+					{#if !PANGKAT_SEMUA.includes(pangkat)}
+						<option value={pangkat}>{pangkat} (data lama)</option>
+					{/if}
 				</select>
 			</div>
 			<div>

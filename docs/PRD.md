@@ -102,7 +102,8 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Password minimal 8 karakter, kombinasi huruf & angka; `must_change_password` diset saat akun dibuat.
 - Pembatasan 5 percobaan login/menit/IP → HTTP 429 + `Retry-After`.
 - Profil personel dapat memuat **foto** (JPG/PNG maks. 5 MB) dan diubah sendiri untuk nama,
-  **pangkat** (combobox 21 tingkat Polri dari Bharada sampai Jenderal Pol), **jabatan**, telepon,
+  **pangkat** (combobox 22 tingkat Polri termasuk Brigpol, atau 17 pangkat ASN/PNS dari
+  Juru Muda I/a sampai Pembina Utama IV/e), **jabatan**, telepon,
   serta email. Satker, NRP, jenis akun, dan peran tetap hanya dapat diubah admin.
 - Halaman **Profil & Pengaturan** Android menyediakan ganti foto, edit profil, dan ganti password.
   Kolom password memiliki ikon mata untuk menampilkan/menyembunyikan isian. Ganti password
@@ -336,7 +337,8 @@ aktif dan dapat diaktifkan kembali.
 
 ### FR-16 Data personel
 - Admin mengisi NRP, nama, pangkat, jabatan, satker, atasan langsung, telepon, dan kata sandi awal.
-- Pangkat dipilih dari combobox 21 tingkat Polri, urut dari Bharada sampai Jenderal Pol.
+- Pangkat dipilih dari combobox 22 tingkat Polri (Bharada sampai Jenderal Pol, termasuk Brigpol)
+  atau 17 pangkat ASN/PNS (Juru Muda I/a sampai Pembina Utama IV/e).
 - Unit dan email tidak lagi diminta pada form personel; data lama tetap ditampilkan bila ada.
 - Atasan langsung wajib berada pada satker yang sama dan berstatus aktif.
 - Peran admin tidak dapat diberikan lewat halaman Data Personel; gunakan halaman Akun Admin.

@@ -177,6 +177,20 @@
 		return 'Penilaian Kinerja';
 	});
 
+	/** Konteks satker: admin global melihat semua satker, bukan satker asalnya. */
+	const konteksSatker = $derived.by(() => {
+		const user = session.user;
+		if (!user) return '';
+		if (user.roles.includes('admin_sistem')) return 'Semua Satker';
+		for (const level of ['polda', 'polres', 'satker'] as const) {
+			const scope = user.role_scopes.find(
+				(item) => item.scope_level === level && item.scope_satker_nama
+			);
+			if (scope?.scope_satker_nama) return scope.scope_satker_nama;
+		}
+		return user.satker_nama;
+	});
+
 	onMount(async () => {
 		const masuk = session.user ? true : await pulihkanSesi();
 		if (!masuk) {
@@ -348,7 +362,7 @@
 					<img src="/logo-polda-bali.png" alt="Logo Polda Bali" class="h-8 w-auto lg:hidden" />
 					<div>
 						<h1 class="text-sm font-semibold text-slate-800">{judulHalaman}</h1>
-						<p class="text-[11px] text-slate-500">{session.user?.satker_nama}</p>
+						<p class="text-[11px] text-slate-500">{konteksSatker}</p>
 					</div>
 				</div>
 
