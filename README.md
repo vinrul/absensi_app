@@ -356,8 +356,9 @@ Catatan penting:
   **Detail per Orang** dengan filter `dari`–`sampai`. Tab Rekap Kehadiran memiliki **Matriks
   Harian** (maks. 31 hari, status + jam + telat/pulang cepat per tanggal, klik sel untuk alamat &
   peta) dan **Ringkasan**; tersedia **PDF Ringkasan** serta **PDF Matriks Harian** (dibagi per
-  minggu). Sel hari kerja tanpa absensi ditandai **TA**, check-in tanpa check-out **TC**, dan
-  check-out tanpa check-in **TM**. Absen masuk/pulang pada tanggal yang sama digabung satu baris.
+  minggu). Badge status dan penanda **TA/TC/TM** tampil terpisah (mis. **DK TC**); sesi strong
+  point pagi/sore ditampilkan beserta realisasinya, dan jadwal PH tanpa absensi tampil **PH +
+  TA**. Absen masuk/pulang pada tanggal yang sama digabung satu baris.
 - **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 22 tingkat
   Polri termasuk Brigpol + 17 pangkat ASN/PNS)/jabatan/telepon/email, ganti password, pengaturan
   alamat server, dan antrean offline. Form personel dashboard memakai **Combobox ber-pencarian**
@@ -400,14 +401,14 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 
 ## Verifikasi yang sudah dilakukan
 
-- `cargo test` → **38 test lulus** (geofence, scoring, deteksi berkas, kanal login, policy mock GPS, penanda matriks TA/TC/TM).
-- `bun tools/uji/api-smoke.js` → **87/87 cek lulus** pada database uji `kinerja_test`:
+- `cargo test` → **40 test lulus** (geofence, scoring, deteksi berkas, kanal login, policy mock GPS, penanda matriks TA/TC/TM dan sesi strong point).
+- `bun tools/uji/api-smoke.js` → **89/89 cek lulus** pada database uji `kinerja_test`:
   RBAC ber-scope, pembatasan login dashboard (pimpinan/admin vs atasan/personel), kanal
   `personel_web` (personel & atasan 200, admin 403), CRUD satker/personel/admin, titik dinas
   (termasuk ubah jenis & koordinat), zona waktu & jam Sabtu, kanal login Android, tutup/buka
   periode, kesiapan satker, kalender libur, jadwal & absensi PH, jam server palsu, verifikasi,
-  foto dokumentasi, rekap, penandaan **TA/TC** pada matriks kehadiran, dan penandaan mock GPS
-  pada policy `flag`.
+  foto dokumentasi, rekap, penandaan **TA/TC** dan sesi strong point pagi/sore pada matriks
+  kehadiran, jadwal mendatang yang tidak ditandai TA, dan penandaan mock GPS pada policy `flag`.
 - `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (96 path).
 - `bun run check` → 0 error · `bun run build` → sukses (dashboard dan `personel/`).
 - Login `personel_web` diuji pada API: atasan & personel 200, admin 403, refresh cookie 200.

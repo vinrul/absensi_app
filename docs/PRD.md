@@ -411,10 +411,17 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 - Tab **Rekap Kehadiran** menampilkan matriks: satu baris per personel dan satu kolom per tanggal.
 - Rentang tanggal maksimal **31 hari**; rentang lebih panjang ditolak di klien dan server.
 - Setiap sel memuat status, jam check-in/check-out, menit telat, dan menit pulang cepat.
-- Sel hari kerja efektif tanpa catatan absensi ditandai **TA** (tidak absen). Sel dengan
-  check-in tanpa check-out ditandai **TC**, dan check-out tanpa check-in **TM**. Penanda ini
-  muncul di tabel, legenda, modal detail, dan PDF matriks; hari ini, hari libur/akhir pekan,
-  serta tanggal mendatang tidak ditandai TA.
+- Badge status dan penanda ketidaklengkapan ditampilkan terpisah, misalnya **DK TC** atau
+  **PH TC**. **TC** hanya muncul setelah tanggal berganti (check-out masih dapat dilakukan
+  sampai 23.59); shift Piket/Operasi memakai toleransi 25 jam. Pada hari berjalan, check-in
+  tanpa check-out cukup menampilkan status dan jam check-in.
+- Sel hari kerja efektif tanpa catatan absensi ditandai **TA** (tidak absen), termasuk hari
+  ini sebelum check-in. Hari libur, akhir pekan di luar hari kerja, dan tanggal mendatang
+  tidak ditandai TA.
+- Sesi strong point **pagi dan sore** ditampilkan terpisah beserta jam jadwal dan realisasi
+  check-in/check-out. Bila ada jadwal strong point tetapi tidak ada check-in/check-out,
+  sel menampilkan badge **PH** + **TA**. Bila status absensi Izin/Sakit/Dinas Luar/Cuti,
+  badge status tetap tampil bersama penanda **Jadwal PH**.
 - Sel yang memiliki absensi dapat diklik untuk membuka modal detail berisi status, jam,
   telat/pulang cepat, foto (jika ada), alamat hasil reverse geocode, dan peta lokasi.
 - Hari strong point memakai jam dan koordinat PH.

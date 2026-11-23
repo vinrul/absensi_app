@@ -96,9 +96,10 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A64 | Buka **Profil Saya** lewat avatar/nama di sidebar atau header | Halaman `/profil` menampilkan nama, pangkat, jabatan, NRP/username, satker, dan badge peran; judul header menjadi **Profil Saya** | ✅ | build + API |
 | A65 | Profil → unggah foto JPG/PNG ≤ 5 MB | Pratinjau tampil, unggahan berhasil, avatar berubah di profil, sidebar, dan header; berkas PDF atau > 5 MB ditolak dengan pesan | ✅ | build + endpoint (Android) |
 | A66 | Profil → **Ganti Password** dengan ikon mata | Ketiga kolom dapat ditampilkan/disembunyikan; validasi minimal 8 karakter, huruf + angka, dan konfirmasi sama; setelah sukses semua sesi dicabut dan pengguna diarahkan ke `/login` | ✅ | build + endpoint (Android) |
-| A67 | Hari kerja lampau tanpa absensi | Sel matriks menampilkan **TA** “Tidak absen” tanpa jam; hari ini, akhir pekan, hari libur, tanggal mendatang, dan personel nonaktif tidak ditandai | ✅ | API + build |
-| A68 | Check-in tanpa check-out / check-out tanpa check-in | Sel menampilkan **TC** / **TM** beserta jam yang ada dan keterangan; Dinas Luar/Cuti/Izin/Sakit yang hanya check-in tidak dianggap TC | ✅ | API + build |
-| A69 | Legenda dan PDF matriks | Tabel, modal detail, dan PDF memuat penanda TA/TC/TM beserta keterangannya | ✅ | build + PDF |
+| A67 | Hari kerja tanpa absensi | Sel matriks menampilkan **TA** “Tidak absen”, termasuk hari ini sebelum check-in; hari libur, akhir pekan di luar hari kerja, jadwal mendatang, dan personel nonaktif tidak ditandai | ✅ | API + build |
+| A68 | Check-in tanpa check-out / check-out tanpa check-in | Badge status dan **TC** tampil terpisah (mis. **DK TC**, **PH TC**); **TM** untuk check-out tanpa check-in; pada hari berjalan check-in tanpa check-out hanya menampilkan status dan jam masuk sampai tanggal berganti | ✅ | API + build |
+| A69 | Legenda dan PDF matriks | Tabel, modal detail, dan PDF memuat penanda TA/TC/TM, sesi strong point, dan keterangannya | ✅ | build + PDF |
+| A70 | Jadwal strong point pagi/sore | Sel menampilkan sesi Pagi dan Sore beserta jam jadwal/realisasi; jadwal tanpa absensi tampil **PH + TA**; jadwal dengan status Izin/Sakit/Dinas Luar/Cuti tetap menampilkan status tersebut bersama penanda **Jadwal PH** | ✅ | API + Chrome headless |
 
 ## B. Admin ber-scope
 
@@ -226,12 +227,12 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| F1 | `cargo test` | 38 unit test lulus | ✅ | |
+| F1 | `cargo test` | 40 unit test lulus | ✅ | |
 | F2 | `cargo fmt --check` + clippy `-D warnings` | Bersih | ✅ | |
 | F3 | `bun run check` | 0 error, 0 warning (dashboard & personel) | ✅ | |
 | F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` dan `personel/build` | ✅ | |
 | F5 | `.gradlew :app:assembleDebug` | APK debug terbentuk | ✅ | |
-| F6 | `bun tools/uji/api-smoke.js` | 87/87 cek lulus (DB `kinerja_test`) | ✅ | |
+| F6 | `bun tools/uji/api-smoke.js` | 89/89 cek lulus (DB `kinerja_test`) | ✅ | |
 | F7 | `bun tools/uji/openapi-check.js` | JSON valid, semua `$ref` ada | ✅ | |
 | F8 | Restore backup di lingkungan uji | Data & berkas kembali utuh | ⬜ | |
 | F9 | Uji 1 bulan data riil | Hitung periode < 60 detik | ⬜ | |

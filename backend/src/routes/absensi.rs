@@ -873,6 +873,23 @@ pub struct MatriksQuery {
 }
 
 #[derive(Debug, Serialize)]
+pub struct MatriksSesiStrongDto {
+    pub jadwal_ph_id: Uuid,
+    pub sesi: Option<String>,
+    pub strong_point_nama: String,
+    pub jam_mulai: String,
+    pub jam_selesai: String,
+    pub masuk_jam: Option<String>,
+    pub pulang_jam: Option<String>,
+    pub menit_telat: i64,
+    pub menit_pulang_cepat: i64,
+    /// Check-in tercatat tanpa check-out pada tanggal yang sudah lewat.
+    pub tc: bool,
+    /// Sesi sudah lewat tanpa check-in sama sekali.
+    pub tidak_absen: bool,
+}
+
+#[derive(Debug, Serialize)]
 pub struct MatriksHariDto {
     pub status: Option<StatusKehadiran>,
     pub status_masuk: Option<StatusKehadiran>,
@@ -885,7 +902,14 @@ pub struct MatriksHariDto {
     pub masuk_longitude: Option<f64>,
     pub pulang_latitude: Option<f64>,
     pub pulang_longitude: Option<f64>,
+    /// Ada jadwal strong point pada tanggal ini (dulu bernama `ph_hadir`).
     pub ph_hadir: bool,
+    /// Ada jadwal strong point pada tanggal ini.
+    pub jadwal_strong: bool,
+    /// Setidaknya satu sesi strong point sudah check-in.
+    pub ph_absen: bool,
+    /// Rincian sesi strong point (pagi/sore) beserta realisasinya.
+    pub sesi_strong: Vec<MatriksSesiStrongDto>,
     pub luar_radius: bool,
     pub is_offline: bool,
     pub is_mock_suspect: bool,
@@ -894,6 +918,8 @@ pub struct MatriksHariDto {
     pub foto_pulang_url: Option<String>,
     /// Hari kerja efektif tanpa catatan absensi sama sekali.
     pub tidak_absen: bool,
+    /// Check-in tanpa check-out pada tanggal yang sudah lewat.
+    pub tc: bool,
 }
 
 impl MatriksHariDto {
@@ -911,6 +937,9 @@ impl MatriksHariDto {
             pulang_latitude: None,
             pulang_longitude: None,
             ph_hadir: false,
+            jadwal_strong: false,
+            ph_absen: false,
+            sesi_strong: Vec::new(),
             luar_radius: false,
             is_offline: false,
             is_mock_suspect: false,
@@ -918,6 +947,7 @@ impl MatriksHariDto {
             foto_masuk_url: None,
             foto_pulang_url: None,
             tidak_absen: true,
+            tc: false,
         }
     }
 }
@@ -1005,6 +1035,7 @@ async fn muat_data_matriks(
         personel::list(&state.pool, &scope, None, None, personel_id, 10_000, 0).await?;
     let satker_rows = satker::list_by_ids(&state.pool, &scope).await?;
     let libur_rows = libur::list(&state.pool, dari, sampai, &scope).await?;
+    let jadwal_rows = ph::jadwal_matriks(&state.pool, &scope, dari, sampai, personel_id).await?;
     let (absensi_rows, _) = absensi::list_harian(
         &state.pool,
         &ListHarianFilter {
@@ -1018,6 +1049,7 @@ async fn muat_data_matriks(
         },
     )
     .await?;
+    let hari_ini = waktu::hari_ini_wita();
 
     let hari_kerja_per_satker: HashMap<Uuid, Vec<i16>> = satker_rows
         .into_iter()
@@ -1058,6 +1090,9 @@ async fn muat_data_matriks(
             pulang_latitude: row.pulang_latitude,
             pulang_longitude: row.pulang_longitude,
             ph_hadir: row.ph_hadir,
+            jadwal_strong: false,
+            ph_absen: false,
+            sesi_strong: Vec::new(),
             luar_radius: row.luar_radius,
             is_offline: row.is_offline,
             is_mock_suspect: row.is_mock_suspect,
@@ -1069,11 +1104,43 @@ async fn muat_data_matriks(
                 .foto_pulang_path
                 .map(|key| format!("/api/v1/files/{key}")),
             tidak_absen: false,
+            tc: false,
         };
         hari_per_personel
             .entry(row.personel_id)
             .or_default()
             .insert(row.tanggal, hari);
+    }
+
+    // Gabungkan jadwal strong point (pagi/sore) ke sel tanggal yang sama.
+    // Jadwal tanpa absensi menghasilkan sel TA dengan penanda jadwal PH.
+    for row in jadwal_rows {
+        let sesi_tc = row.masuk_jam.is_some() && row.pulang_jam.is_none() && row.tanggal < hari_ini;
+        let sesi_ta = row.masuk_jam.is_none() && row.tanggal < hari_ini;
+        let sesi = MatriksSesiStrongDto {
+            jadwal_ph_id: row.jadwal_ph_id,
+            sesi: row.sesi,
+            strong_point_nama: row.strong_point_nama,
+            jam_mulai: row.jam_mulai.format("%H:%M").to_string(),
+            jam_selesai: row.jam_selesai.format("%H:%M").to_string(),
+            masuk_jam: row.masuk_jam.map(|jam| jam.format("%H:%M").to_string()),
+            pulang_jam: row.pulang_jam.map(|jam| jam.format("%H:%M").to_string()),
+            menit_telat: row.menit_telat,
+            menit_pulang_cepat: row.menit_pulang_cepat,
+            tc: sesi_tc,
+            tidak_absen: sesi_ta,
+        };
+        let hari = hari_per_personel
+            .entry(row.personel_id)
+            .or_default()
+            .entry(row.tanggal)
+            .or_insert_with(MatriksHariDto::tanpa_absensi);
+        hari.ph_hadir = true;
+        hari.jadwal_strong = true;
+        if sesi.masuk_jam.is_some() {
+            hari.ph_absen = true;
+        }
+        hari.sesi_strong.push(sesi);
     }
 
     // Tampilkan semua personel aktif, ditambah personel nonaktif yang punya data.
@@ -1097,14 +1164,9 @@ async fn muat_data_matriks(
     }
 
     // Tandai hari kerja efektif yang tidak memiliki catatan absensi (TA).
-    // Hari ini belum ditandai karena absensi masih berjalan; hari libur, akhir pekan,
-    // tanggal mendatang, dan personel nonaktif juga tidak ditandai.
-    let hari_ini = waktu::hari_ini_wita();
-    let batas = if sampai < hari_ini {
-        sampai
-    } else {
-        hari_ini - Duration::days(1)
-    };
+    // Hari ini ikut ditandai agar laporan harian real-time menampilkan yang belum check-in;
+    // hari libur, akhir pekan, tanggal mendatang, dan personel nonaktif tidak ditandai.
+    let batas = if sampai < hari_ini { sampai } else { hari_ini };
     for orang in &mut data {
         if !orang.is_active {
             continue;
@@ -1128,44 +1190,91 @@ async fn muat_data_matriks(
         }
     }
 
+    // Tandai TC: check-in tanpa check-out yang sudah lewat hari. Hari ini belum
+    // dianggap TC karena check-out masih dapat dilakukan sampai pukul 23.59.
+    // Piket/Operasi memakai toleransi 25 jam karena shift dapat lintas hari.
+    let sekarang = waktu::sekarang_wita().naive_local();
+    for orang in &mut data {
+        for (tanggal, hari) in &mut orang.hari {
+            let ada_absensi =
+                hari.status.is_some() || hari.masuk_jam.is_some() || hari.pulang_jam.is_some();
+            if !ada_absensi {
+                // Sel yang hanya berisi jadwal strong point: TA hanya untuk tanggal
+                // yang sudah berjalan, bukan jadwal mendatang.
+                hari.tidak_absen = *tanggal <= hari_ini;
+            }
+            let status = hari.status.or(hari.status_masuk).or(hari.status_pulang);
+            let wajib_checkout = matches!(
+                status,
+                Some(
+                    StatusKehadiran::DinasKantor
+                        | StatusKehadiran::Ph
+                        | StatusKehadiran::Piket
+                        | StatusKehadiran::Operasi
+                )
+            );
+            let tc_generic =
+                if wajib_checkout && hari.masuk_jam.is_some() && hari.pulang_jam.is_none() {
+                    match status {
+                        Some(StatusKehadiran::Piket | StatusKehadiran::Operasi) => {
+                            let masuk = hari
+                                .masuk_jam
+                                .as_deref()
+                                .and_then(|jam| NaiveTime::parse_from_str(jam, "%H:%M").ok());
+                            masuk.is_some_and(|jam| {
+                                sekarang > tanggal.and_time(jam) + Duration::hours(25)
+                            })
+                        }
+                        _ => *tanggal < hari_ini,
+                    }
+                } else {
+                    false
+                };
+            hari.tc = tc_generic || hari.sesi_strong.iter().any(|sesi| sesi.tc);
+        }
+    }
+
     Ok(data)
 }
 
-fn label_matriks_pdf(hari: &MatriksHariDto) -> (&'static str, &'static str) {
-    if hari.tidak_absen {
-        return ("TA", "s-ta");
-    }
-    if hari.masuk_jam.is_none() && hari.pulang_jam.is_some() {
-        return ("TM", "s-tc");
-    }
+fn status_matriks_pdf(hari: &MatriksHariDto) -> Option<(&'static str, &'static str)> {
     let status = hari.status.or(hari.status_masuk).or(hari.status_pulang);
-    let wajib_checkout = matches!(
-        status,
-        Some(
-            StatusKehadiran::DinasKantor
-                | StatusKehadiran::Ph
-                | StatusKehadiran::Piket
-                | StatusKehadiran::Operasi
-        )
-    );
-    if hari.masuk_jam.is_some() && hari.pulang_jam.is_none() && wajib_checkout {
-        return ("TC", "s-tc");
-    }
-    if hari.ph_hadir {
-        return ("PH", "s-hadir");
-    }
+    let status =
+        if hari.ph_absen && (status.is_none() || status == Some(StatusKehadiran::DinasKantor)) {
+            Some(StatusKehadiran::Ph)
+        } else {
+            status
+        };
     match status {
-        Some(StatusKehadiran::DinasKantor) => ("DK", "s-hadir"),
-        Some(StatusKehadiran::DinasLuar) => ("DL", "s-luar"),
-        Some(StatusKehadiran::Ph) => ("PH", "s-hadir"),
-        Some(StatusKehadiran::Piket) => ("Piket", "s-hadir"),
-        Some(StatusKehadiran::Operasi) => ("Ops", "s-hadir"),
-        Some(StatusKehadiran::Cuti) => ("Cuti", "s-izin"),
-        Some(StatusKehadiran::Izin) => ("Izin", "s-izin"),
-        Some(StatusKehadiran::Sakit) => ("Sakit", "s-izin"),
-        Some(StatusKehadiran::LiburNasional) => ("Libur", "s-libur"),
-        Some(StatusKehadiran::TanpaKeterangan) => ("TK", "s-tk"),
-        None => ("-", "s-libur"),
+        Some(StatusKehadiran::DinasKantor) => Some(("DK", "s-hadir")),
+        Some(StatusKehadiran::DinasLuar) => Some(("DL", "s-luar")),
+        Some(StatusKehadiran::Ph) => Some(("PH", "s-hadir")),
+        Some(StatusKehadiran::Piket) => Some(("Piket", "s-hadir")),
+        Some(StatusKehadiran::Operasi) => Some(("Ops", "s-hadir")),
+        Some(StatusKehadiran::Cuti) => Some(("Cuti", "s-izin")),
+        Some(StatusKehadiran::Izin) => Some(("Izin", "s-izin")),
+        Some(StatusKehadiran::Sakit) => Some(("Sakit", "s-izin")),
+        Some(StatusKehadiran::LiburNasional) => Some(("Libur", "s-libur")),
+        Some(StatusKehadiran::TanpaKeterangan) => Some(("TK", "s-tk")),
+        None if hari.jadwal_strong => Some(("PH", "s-hadir")),
+        None => None,
+    }
+}
+
+fn label_sesi(sesi: Option<&str>) -> &'static str {
+    match sesi {
+        Some("pagi") => "Pagi",
+        Some("sore") => "Sore",
+        _ => "Sesi",
+    }
+}
+
+fn jam_sesi_pdf(sesi: &MatriksSesiStrongDto) -> String {
+    match (&sesi.masuk_jam, &sesi.pulang_jam) {
+        (Some(masuk), Some(pulang)) => format!("{masuk}–{pulang}"),
+        (Some(masuk), None) => format!("{masuk}–"),
+        (None, Some(pulang)) => format!("–{pulang}"),
+        (None, None) => format!("{}–{}", sesi.jam_mulai, sesi.jam_selesai),
     }
 }
 
@@ -1210,6 +1319,7 @@ table.matriks td.nama .sub { display: block; font-size: 6.2pt; color: #64748b; }
 table.matriks td.tanggal { text-align: center; font-size: 6.8pt; }
 table.matriks td.tanggal .status { display: block; font-weight: 600; }
 table.matriks td.tanggal .jam { display: block; font-family: Consolas, monospace; font-size: 6.2pt; }
+table.matriks td.tanggal .jam.jadwal { color: #94a3b8; }
 table.matriks td.tanggal .menit { display: block; color: #b45309; font-size: 6pt; }
 table.matriks td.kosong { color: #cbd5e1; text-align: center; }
 .s-hadir { color: #047857; }
@@ -1218,6 +1328,7 @@ table.matriks td.kosong { color: #cbd5e1; text-align: center; }
 .s-tk { color: #be123c; }
 .s-ta { color: #94a3b8; }
 .s-tc { color: #be123c; }
+.s-jadwal { color: #0369a1; }
 .s-libur { color: #64748b; }
 .halaman { page-break-after: always; }
 .halaman:last-of-type { page-break-after: auto; }
@@ -1294,31 +1405,74 @@ fn html_matriks(
 
                 for tgl in potongan {
                     if let Some(hari) = orang.hari.get(tgl) {
+                        isi.push_str("<td class=\"tanggal\">");
+                        let status = status_matriks_pdf(hari);
+                        if let Some((label, kelas)) = status {
+                            isi.push_str(&format!("<span class=\"status {kelas}\">{label}</span>"));
+                        }
+                        if hari.jadwal_strong && !matches!(status, Some(("PH", _))) {
+                            isi.push_str("<span class=\"status s-jadwal\">PH</span>");
+                        }
+                        if hari.tc {
+                            isi.push_str("<span class=\"status s-tc\">TC</span>");
+                        }
+                        if hari.masuk_jam.is_none() && hari.pulang_jam.is_some() {
+                            isi.push_str("<span class=\"status s-tc\">TM</span>");
+                        }
                         if hari.tidak_absen {
                             isi.push_str(
-                                "<td class=\"tanggal\"><span class=\"status s-ta\">TA</span><span class=\"jam\">tidak absen</span></td>",
+                                "<span class=\"status s-ta\">TA</span><span class=\"jam\">tidak absen</span>",
                             );
-                            continue;
                         }
-                        let (label, kelas) = label_matriks_pdf(hari);
-                        isi.push_str(&format!(
-                            "<td class=\"tanggal\"><span class=\"status {kelas}\">{label}</span><span class=\"jam\">{}</span>",
-                            laporan::esc(&jam_matriks_pdf(hari))
-                        ));
-                        if label == "TC" {
-                            isi.push_str("<span class=\"menit\">tanpa check-out</span>");
-                        } else if label == "TM" {
-                            isi.push_str("<span class=\"menit\">tanpa check-in</span>");
+                        if hari.sesi_strong.is_empty() {
+                            if !hari.tidak_absen {
+                                isi.push_str(&format!(
+                                    "<span class=\"jam\">{}</span>",
+                                    laporan::esc(&jam_matriks_pdf(hari))
+                                ));
+                            }
+                        } else {
+                            for sesi in &hari.sesi_strong {
+                                let mut teks = format!(
+                                    "{} {}",
+                                    label_sesi(sesi.sesi.as_deref()),
+                                    jam_sesi_pdf(sesi)
+                                );
+                                if sesi.menit_telat > 0 {
+                                    teks.push_str(&format!(" T {}m", sesi.menit_telat));
+                                }
+                                if sesi.menit_pulang_cepat > 0 {
+                                    teks.push_str(&format!(" PC {}m", sesi.menit_pulang_cepat));
+                                }
+                                if sesi.tc {
+                                    teks.push_str(" TC");
+                                }
+                                if sesi.tidak_absen {
+                                    teks.push_str(" TA");
+                                }
+                                let kelas = if sesi.masuk_jam.is_some() || sesi.pulang_jam.is_some()
+                                {
+                                    "jam"
+                                } else {
+                                    "jam jadwal"
+                                };
+                                isi.push_str(&format!(
+                                    "<span class=\"{kelas}\">{}</span>",
+                                    laporan::esc(&teks)
+                                ));
+                            }
                         }
                         let mut menit = String::new();
-                        if hari.menit_telat > 0 {
-                            menit.push_str(&format!("T {}m", hari.menit_telat));
-                        }
-                        if hari.menit_pulang_cepat > 0 {
-                            if !menit.is_empty() {
-                                menit.push_str(" · ");
+                        if hari.sesi_strong.is_empty() {
+                            if hari.menit_telat > 0 {
+                                menit.push_str(&format!("T {}m", hari.menit_telat));
                             }
-                            menit.push_str(&format!("PC {}m", hari.menit_pulang_cepat));
+                            if hari.menit_pulang_cepat > 0 {
+                                if !menit.is_empty() {
+                                    menit.push_str(" · ");
+                                }
+                                menit.push_str(&format!("PC {}m", hari.menit_pulang_cepat));
+                            }
                         }
                         if !menit.is_empty() {
                             isi.push_str(&format!(
@@ -2315,10 +2469,9 @@ mod tests {
         ];
         let mut hari = BTreeMap::new();
         hari.insert(tanggal[0], MatriksHariDto::tanpa_absensi());
-        hari.insert(
-            tanggal[1],
-            hari_dengan(Some("07:30"), None, StatusKehadiran::DinasKantor),
-        );
+        let mut tc_hari = hari_dengan(Some("07:30"), None, StatusKehadiran::DinasKantor);
+        tc_hari.tc = true;
+        hari.insert(tanggal[1], tc_hari);
         hari.insert(
             tanggal[2],
             hari_dengan(None, Some("15:00"), StatusKehadiran::DinasKantor),
@@ -2351,5 +2504,114 @@ mod tests {
         assert!(html.contains("tanpa check-out"));
         assert!(html.contains("tanpa check-in"));
         assert!(html.contains("<b>TA</b> tidak absen"));
+    }
+
+    #[test]
+    fn matriks_menampilkan_dua_sesi_dan_status_strong_point() {
+        let tanggal = vec![NaiveDate::from_ymd_opt(2026, 11, 3).unwrap()];
+        let mut hari = hari_dengan(Some("07:05"), Some("18:10"), StatusKehadiran::Ph);
+        hari.ph_hadir = true;
+        hari.jadwal_strong = true;
+        hari.ph_absen = true;
+        hari.sesi_strong = vec![
+            MatriksSesiStrongDto {
+                jadwal_ph_id: Uuid::nil(),
+                sesi: Some("pagi".into()),
+                strong_point_nama: "Titik Uji".into(),
+                jam_mulai: "07:00".into(),
+                jam_selesai: "09:00".into(),
+                masuk_jam: Some("07:05".into()),
+                pulang_jam: None,
+                menit_telat: 5,
+                menit_pulang_cepat: 0,
+                tc: true,
+                tidak_absen: false,
+            },
+            MatriksSesiStrongDto {
+                jadwal_ph_id: Uuid::nil(),
+                sesi: Some("sore".into()),
+                strong_point_nama: "Titik Uji".into(),
+                jam_mulai: "16:00".into(),
+                jam_selesai: "18:00".into(),
+                masuk_jam: Some("16:05".into()),
+                pulang_jam: Some("18:10".into()),
+                menit_telat: 5,
+                menit_pulang_cepat: 0,
+                tc: false,
+                tidak_absen: false,
+            },
+        ];
+        hari.tc = true;
+        let orang = MatriksPersonelDto {
+            personel_id: Uuid::nil(),
+            nama: "Personel Uji".into(),
+            nrp: "85000002".into(),
+            pangkat: "BRIPKA".into(),
+            satker_id: Uuid::nil(),
+            satker_nama: "Satker Uji".into(),
+            unit: None,
+            is_active: true,
+            hari: BTreeMap::from([(tanggal[0], hari)]),
+        };
+
+        let html = html_matriks(
+            &[orang],
+            &tanggal,
+            "3 November 2026",
+            "Semua satker",
+            "Semua personel",
+            "Admin Uji",
+            "23 November 2026",
+        );
+
+        assert!(html.contains("s-hadir\">PH"));
+        assert!(html.contains("s-tc\">TC"));
+        assert!(html.contains("Pagi 07:05– T 5m TC"));
+        assert!(html.contains("Sore 16:05–18:10 T 5m"));
+    }
+
+    #[test]
+    fn matriks_menampilkan_jadwal_strong_point_dengan_status_izin() {
+        let tanggal = vec![NaiveDate::from_ymd_opt(2026, 11, 4).unwrap()];
+        let mut hari = hari_dengan(Some("07:30"), None, StatusKehadiran::Izin);
+        hari.jadwal_strong = true;
+        hari.sesi_strong = vec![MatriksSesiStrongDto {
+            jadwal_ph_id: Uuid::nil(),
+            sesi: Some("pagi".into()),
+            strong_point_nama: "Titik Uji".into(),
+            jam_mulai: "07:00".into(),
+            jam_selesai: "09:00".into(),
+            masuk_jam: None,
+            pulang_jam: None,
+            menit_telat: 0,
+            menit_pulang_cepat: 0,
+            tc: false,
+            tidak_absen: true,
+        }];
+        let orang = MatriksPersonelDto {
+            personel_id: Uuid::nil(),
+            nama: "Personel Uji".into(),
+            nrp: "85000003".into(),
+            pangkat: "BRIPKA".into(),
+            satker_id: Uuid::nil(),
+            satker_nama: "Satker Uji".into(),
+            unit: None,
+            is_active: true,
+            hari: BTreeMap::from([(tanggal[0], hari)]),
+        };
+
+        let html = html_matriks(
+            &[orang],
+            &tanggal,
+            "4 November 2026",
+            "Semua satker",
+            "Semua personel",
+            "Admin Uji",
+            "23 November 2026",
+        );
+
+        assert!(html.contains("s-izin\">Izin"));
+        assert!(html.contains("s-jadwal\">PH"));
+        assert!(html.contains("Pagi 07:00–09:00 TA"));
     }
 }

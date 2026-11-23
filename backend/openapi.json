@@ -284,12 +284,35 @@
           "pulang_latitude": { "type": "number", "nullable": true },
           "pulang_longitude": { "type": "number", "nullable": true },
           "ph_hadir": { "type": "boolean" },
+          "jadwal_strong": { "type": "boolean" },
+          "ph_absen": { "type": "boolean" },
+          "sesi_strong": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AbsensiMatriksSesiStrong" }
+          },
           "luar_radius": { "type": "boolean" },
           "is_offline": { "type": "boolean" },
           "is_mock_suspect": { "type": "boolean" },
           "perlu_verifikasi": { "type": "boolean" },
           "foto_masuk_url": { "type": "string", "nullable": true },
           "foto_pulang_url": { "type": "string", "nullable": true },
+          "tidak_absen": { "type": "boolean" },
+          "tc": { "type": "boolean" }
+        }
+      },
+      "AbsensiMatriksSesiStrong": {
+        "type": "object",
+        "properties": {
+          "jadwal_ph_id": { "type": "string", "format": "uuid" },
+          "sesi": { "type": "string", "nullable": true },
+          "strong_point_nama": { "type": "string" },
+          "jam_mulai": { "type": "string" },
+          "jam_selesai": { "type": "string" },
+          "masuk_jam": { "type": "string", "nullable": true },
+          "pulang_jam": { "type": "string", "nullable": true },
+          "menit_telat": { "type": "integer" },
+          "menit_pulang_cepat": { "type": "integer" },
+          "tc": { "type": "boolean" },
           "tidak_absen": { "type": "boolean" }
         }
       },

@@ -166,6 +166,20 @@ export interface AbsensiHarian {
 }
 
 /** Detail satu hari pada matriks rekap kehadiran. */
+export interface AbsensiMatriksSesiStrong {
+	jadwal_ph_id: string;
+	sesi: string | null;
+	strong_point_nama: string;
+	jam_mulai: string;
+	jam_selesai: string;
+	masuk_jam: string | null;
+	pulang_jam: string | null;
+	menit_telat: number;
+	menit_pulang_cepat: number;
+	tc: boolean;
+	tidak_absen: boolean;
+}
+
 export interface AbsensiMatriksHari {
 	status: StatusKehadiran | null;
 	status_masuk: StatusKehadiran | null;
@@ -179,6 +193,9 @@ export interface AbsensiMatriksHari {
 	pulang_latitude: number | null;
 	pulang_longitude: number | null;
 	ph_hadir: boolean;
+	jadwal_strong: boolean;
+	ph_absen: boolean;
+	sesi_strong: AbsensiMatriksSesiStrong[];
 	luar_radius: boolean;
 	is_offline: boolean;
 	is_mock_suspect: boolean;
@@ -187,6 +204,8 @@ export interface AbsensiMatriksHari {
 	foto_pulang_url: string | null;
 	/** Hari kerja efektif tanpa catatan absensi sama sekali. */
 	tidak_absen: boolean;
+	/** Check-in tanpa check-out pada tanggal yang sudah lewat. */
+	tc: boolean;
 }
 
 export interface AbsensiMatriksPersonel {

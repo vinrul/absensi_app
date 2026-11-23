@@ -157,7 +157,7 @@ try {
 		return (
 			hari !== 0 &&
 			hari !== 6 &&
-			h.tanggal < waktu.tanggal &&
+			h.tanggal <= waktu.tanggal &&
 			h.masuk_jam === null &&
 			h.pulang_jam === null
 		);
@@ -564,7 +564,7 @@ try {
 				return (
 					hari !== 0 &&
 					hari !== 6 &&
-					tanggal < waktu.tanggal &&
+					tanggal <= waktu.tanggal &&
 					h.masuk_jam === null &&
 					h.pulang_jam === null
 				);
@@ -652,6 +652,20 @@ try {
 			statusDes.data.jumlah_jadwal > 0 &&
 			statusDes.data.disalin_dari_bulan === null,
 		JSON.stringify(statusDes.data)
+	);
+	const matriksDepan = await panggil(
+		adminToken,
+		`/absensi/matriks?dari=2026-12-01&sampai=2026-12-31&satker_id=${satkerPh}`
+	);
+	const selDepan = (matriksDepan.data?.data ?? []).flatMap((p) =>
+		Object.values(p.hari ?? {})
+	);
+	cek(
+		"jadwal strong point mendatang tidak ditandai TA",
+		matriksDepan.status === 200 &&
+			selDepan.length > 0 &&
+			selDepan.every((h) => h.jadwal_strong === true && h.tidak_absen === false),
+		`${selDepan.length} sel jadwal mendatang`
 	);
 
 	const jadwalRentang = await panggil(adminToken, "/ph/jadwal?dari=2026-11-01&sampai=2026-11-30");
@@ -770,6 +784,23 @@ try {
 	});
 	cek("check-out PH di dalam radius berhasil", pulang.status === 200, JSON.stringify(pulang.data));
 	cek("check-out PH mencatat pulang cepat 30 menit", pulang.data?.menit_pulang_cepat === 30, JSON.stringify(pulang.data?.menit_pulang_cepat));
+	const matriksPh = await panggil(
+		adminToken,
+		`/absensi/matriks?dari=${hariIni}&sampai=${hariIni}&personel_id=${personel.user.id}`
+	);
+	const selPh = matriksPh.data?.data?.find((p) => p.personel_id === personel.user.id)
+		?.hari?.[hariIni];
+	cek(
+		"matriks menampilkan sesi strong point dan realisasinya",
+		matriksPh.status === 200 &&
+			selPh?.jadwal_strong === true &&
+			selPh?.ph_absen === true &&
+			selPh?.sesi_strong?.length === 1 &&
+			selPh.sesi_strong[0].sesi === "pagi" &&
+			selPh.sesi_strong[0].masuk_jam === "09:10" &&
+			selPh.sesi_strong[0].pulang_jam === "09:30",
+		JSON.stringify(selPh?.sesi_strong)
+	);
 	const pulangUlang = await panggil(personel.access_token, "/ph/absensi", {
 		method: "POST",
 		body: {

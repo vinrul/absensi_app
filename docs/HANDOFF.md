@@ -3,7 +3,7 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 23 November 2026 (38 unit test backend; 87 cek API pada DB uji;
+Terakhir diverifikasi: 23 November 2026 (40 unit test backend; 89 cek API pada DB uji;
 seed `--reset` development menghasilkan 145 personel, 102 jadwal PH, penempatan tetap, dan
 fallback jadwal bulan sebelumnya; dashboard & web personel `bun run check`/`build`; APK debug;
 `openapi.json` 96 path).
@@ -52,7 +52,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | Dashboard baru fokus kehadiran & strong point hari ini (filter tanggal + satker); laporan kinerja tetap ada di kode tetapi tidak dijangkau UI |
-| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; hari kerja tanpa absensi ditandai **TA**, check-in tanpa check-out **TC**, check-out tanpa check-in **TM**; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet. Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
+| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; badge status dan **TA/TC/TM** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet dan rincian sesi. Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
 | Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (daftar sesi hari ini + wizard), riwayat; halaman kinerja masih ada di disk tetapi tidak dijangkau navigasi; login memakai kanal `personel_web` |
 | Deteksi lokasi tiruan (fake GPS) | Android memeriksa `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/mock app; server `APP__MOCK_LOCATION_POLICY=flag|reject` (default `flag`, produksi `reject`); antrean mencatat penolakan; panduan `docs/fake-gps.md` |
@@ -306,11 +306,16 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     ditambah personel nonaktif yang masih punya data. PDF `/absensi/matriks/ekspor` membagi
     tanggal menjadi blok 7 hari per bagian dengan kop/tabel berulang agar tetap terbaca; karena
     bisa panjang saat seluruh satker dipilih, filter satker/personel disarankan untuk cetak.
-    Hari kerja efektif tanpa catatan absensi diberi flag `tidak_absen` (TA) — hanya untuk
-    personel aktif, tanggal sebelum hari ini (WITA), dan bukan hari libur/akhir pekan di luar
-    `satker.hari_kerja`. Check-in tanpa check-out ditandai **TC**, check-out tanpa check-in
-    **TM** hanya untuk status yang mewajibkan keduanya (Dinas Kantor/PH/Piket/Operasi);
-    status sekali absen (Dinas Luar/Cuti/Izin/Sakit) tidak dianggap TC.
+    Hari kerja efektif tanpa catatan absensi diberi flag `tidak_absen` (TA), termasuk hari
+    ini sebelum check-in; hari libur, akhir pekan di luar hari kerja, dan tanggal mendatang
+    tidak ditandai. Badge status dan penanda ditampilkan terpisah (mis. **DK TC**), sehingga
+    status DK/PH tetap terbaca meski check-out belum ada. TC hanya aktif setelah tanggal
+    berganti (toleransi check-out sampai 23.59; Piket/Operasi 25 jam), jadi pada hari
+    berjalan check-in tanpa check-out hanya menampilkan status + jam masuk.
+    Jadwal strong point dimuat per sesi (`sesi_strong`): pagi/sore, jam jadwal, realisasi
+    check-in/check-out, telat/pulang cepat, serta flag TC/TA per sesi. Jika ada jadwal tetapi
+    tidak ada absensi, sel menampilkan PH + TA; jika statusnya Izin/Sakit/Dinas Luar/Cuti,
+    status tersebut tetap tampil bersama penanda Jadwal PH.
 
 ---
 

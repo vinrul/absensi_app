@@ -377,7 +377,7 @@ pub struct AbsensiHarianRow {
     pub perlu_verifikasi: bool,
     /// ID absensi (masuk/pulang) yang masih perlu diverifikasi.
     pub perlu_verifikasi_ids: Vec<Uuid>,
-    /// Ada check-in strong point pada tanggal ini (telat kantor diabaikan).
+    /// Ada jadwal strong point pada tanggal ini (bukan penanda check-in).
     pub ph_hadir: bool,
     pub verified_at: Option<DateTime<Utc>>,
     pub catatan_verifikator: Option<String>,

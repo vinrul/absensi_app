@@ -8,6 +8,7 @@
 		AbsensiMatriksHari,
 		AbsensiMatriksPersonel,
 		AbsensiMatriksResponse,
+		AbsensiMatriksSesiStrong,
 		FotoAbsensi,
 		ListResponse,
 		Personel,
@@ -173,36 +174,9 @@
 	    }
 
 	    function statusEfektif(hari: AbsensiMatriksHari): StatusKehadiran | null {
-	        if (hari.ph_hadir) return 'ph';
-	        return hari.status ?? hari.status_masuk ?? hari.status_pulang;
-	    }
-
-	    type PenandaMatriks = StatusKehadiran | 'ta' | 'tc' | 'tm';
-
-	    function wajibCheckout(status: StatusKehadiran) {
-	        return (
-	            status === 'dinas_kantor' ||
-	            status === 'ph' ||
-	            status === 'piket' ||
-	            status === 'operasi'
-	        );
-	    }
-
-	    function penandaMatriks(hari: AbsensiMatriksHari): PenandaMatriks | null {
-	        if (hari.tidak_absen) return 'ta';
-	        const status = statusEfektif(hari);
-	        if (!status) return null;
-	        if (!hari.masuk_jam && hari.pulang_jam) return 'tm';
-	        if (hari.masuk_jam && !hari.pulang_jam && wajibCheckout(status)) return 'tc';
+	        const status = hari.status ?? hari.status_masuk ?? hari.status_pulang;
+	        if (hari.ph_absen && (status === null || status === 'dinas_kantor')) return 'ph';
 	        return status;
-	    }
-
-	    function labelPanjangMatriks(penanda: PenandaMatriks | null) {
-	        if (penanda === 'ta') return 'Tidak absen';
-	        if (penanda === 'tc') return 'Check-in tanpa check-out';
-	        if (penanda === 'tm') return 'Check-out tanpa check-in';
-	        if (penanda) return LABEL_STATUS_KEHADIRAN[penanda];
-	        return '-';
 	    }
 
 	    const LABEL_MATRIKS: Record<StatusKehadiran, string> = {
@@ -218,27 +192,38 @@
 	        tanpa_keterangan: 'TK'
 	    };
 
-	    function labelMatriks(penanda: PenandaMatriks | null) {
-	        if (!penanda) return '-';
-	        if (penanda === 'ta' || penanda === 'tc' || penanda === 'tm') {
-	            return penanda.toUpperCase();
-	        }
-	        return LABEL_MATRIKS[penanda];
+	    function labelMatriks(status: StatusKehadiran | null) {
+	        return status ? LABEL_MATRIKS[status] : '-';
 	    }
 
-	    function kelasMatriks(penanda: PenandaMatriks | null) {
-	        if (penanda === 'ta') return 'bg-slate-100 text-slate-400 ring-slate-200';
-	        if (penanda === 'tc' || penanda === 'tm') {
-	            return 'bg-rose-50 text-rose-700 ring-rose-200';
-	        }
-	        if (!penanda) return 'bg-slate-100 text-slate-500 ring-slate-200';
-	        if (penanda === 'dinas_luar') return 'bg-sky-50 text-sky-700 ring-sky-200';
-	        if (penanda === 'cuti' || penanda === 'izin' || penanda === 'sakit') {
+	    function kelasMatriks(status: StatusKehadiran | null) {
+	        if (!status) return 'bg-slate-100 text-slate-500 ring-slate-200';
+	        if (status === 'dinas_luar') return 'bg-sky-50 text-sky-700 ring-sky-200';
+	        if (status === 'cuti' || status === 'izin' || status === 'sakit') {
 	            return 'bg-amber-50 text-amber-700 ring-amber-200';
 	        }
-	        if (penanda === 'tanpa_keterangan') return 'bg-rose-50 text-rose-700 ring-rose-200';
-	        if (penanda === 'libur_nasional') return 'bg-slate-100 text-slate-500 ring-slate-200';
+	        if (status === 'tanpa_keterangan') return 'bg-rose-50 text-rose-700 ring-rose-200';
+	        if (status === 'libur_nasional') return 'bg-slate-100 text-slate-500 ring-slate-200';
 	        return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+	    }
+
+	    function labelSesi(sesi: AbsensiMatriksSesiStrong) {
+	        if (!sesi.sesi) return 'Sesi';
+	        return sesi.sesi.charAt(0).toUpperCase() + sesi.sesi.slice(1);
+	    }
+
+	    function waktuSesi(sesi: AbsensiMatriksSesiStrong) {
+	        if (sesi.masuk_jam || sesi.pulang_jam) {
+	            return `${sesi.masuk_jam ?? '–'}–${sesi.pulang_jam ?? ''}`;
+	        }
+	        return `${sesi.jam_mulai}–${sesi.jam_selesai}`;
+	    }
+
+	    function menitSesi(sesi: AbsensiMatriksSesiStrong) {
+	        const bagian: string[] = [];
+	        if (sesi.menit_telat > 0) bagian.push(`T ${sesi.menit_telat}m`);
+	        if (sesi.menit_pulang_cepat > 0) bagian.push(`PC ${sesi.menit_pulang_cepat}m`);
+	        return bagian.join(' · ');
 	    }
 
 	    function waktuMatriks(hari: AbsensiMatriksHari) {
@@ -258,9 +243,26 @@
 	        tanggal: string,
 	        hari: AbsensiMatriksHari
 	    ) {
-	        const penanda = penandaMatriks(hari);
-	        const bagian = [orang.nama, tanggalSingkat(tanggal), labelPanjangMatriks(penanda)];
-	        if (!hari.tidak_absen) bagian.push(waktuMatriks(hari));
+	        const status = statusEfektif(hari);
+	        const bagian = [orang.nama, tanggalSingkat(tanggal)];
+	        if (hari.tidak_absen) bagian.push('Tidak absen');
+	        if (status) bagian.push(LABEL_STATUS_KEHADIRAN[status]);
+	        if (hari.jadwal_strong && status !== 'ph') bagian.push('ada jadwal strong point');
+	        if (hari.tc) bagian.push('check-in tanpa check-out');
+	        if (hari.masuk_jam === null && hari.pulang_jam) bagian.push('check-out tanpa check-in');
+	        if (hari.sesi_strong.length > 0) {
+	            for (const sesi of hari.sesi_strong) {
+	                let teks = `${labelSesi(sesi)} ${sesi.jam_mulai}–${sesi.jam_selesai}`;
+	                if (sesi.masuk_jam || sesi.pulang_jam) {
+	                    teks += ` (${sesi.masuk_jam ?? '–'}–${sesi.pulang_jam ?? ''})`;
+	                }
+	                if (sesi.tc) teks += ' TC';
+	                if (sesi.tidak_absen) teks += ' TA';
+	                bagian.push(teks);
+	            }
+	        } else if (!hari.tidak_absen) {
+	            bagian.push(waktuMatriks(hari));
+	        }
 	        if (hari.menit_telat > 0) bagian.push(`telat ${hari.menit_telat} menit`);
 	        if (hari.menit_pulang_cepat > 0) bagian.push(`pulang cepat ${hari.menit_pulang_cepat} menit`);
 	        return bagian.join(' · ');
@@ -956,49 +958,103 @@
 								</td>
 								{#each matriks?.tanggal ?? [] as tgl}
 									{@const hari = orang.hari[tgl]}
-									{@const penanda = hari ? penandaMatriks(hari) : null}
+									{@const status = hari ? statusEfektif(hari) : null}
 									<td
 										class="border-r border-slate-100 p-1 align-top {akhirPekan(tgl)
 											? 'bg-slate-50/40'
 											: ''}"
 									>
-										{#if hari?.tidak_absen}
-											<span class="block px-1.5 py-1">
-												<span
-													class="inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 ring-1 ring-inset ring-slate-200"
-												>
-													TA
-												</span>
-												<span class="mt-0.5 block text-[9px] leading-tight text-slate-400"
-													>Tidak absen</span
-												>
-											</span>
-										{:else if hari}
+										{#if hari}
 											<button
 												type="button"
 												class="block w-full rounded-lg px-1.5 py-1 text-left ring-1 ring-transparent transition hover:ring-navy-200 focus:outline-none focus:ring-2 focus:ring-navy-400"
 												title={judulMatriks(orang, tgl, hari)}
 												onclick={() => bukaDetailMatriks(orang, tgl, hari)}
 											>
-												<span
-													class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset {kelasMatriks(
-														penanda
-													)}"
-												>
-													{labelMatriks(penanda)}
+												<span class="flex flex-wrap gap-0.5">
+													{#if status}
+														<span
+															class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset {kelasMatriks(
+																status
+															)}"
+														>
+															{labelMatriks(status)}
+														</span>
+													{/if}
+													{#if hari.jadwal_strong && status !== 'ph'}
+														<span
+															class="inline-flex rounded-full bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200"
+															title="Ada jadwal strong point"
+														>
+															PH
+														</span>
+													{/if}
+													{#if hari.tc}
+														<span
+															class="inline-flex rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200"
+															title="Check-in tanpa check-out"
+														>
+															TC
+														</span>
+													{/if}
+													{#if hari.masuk_jam === null && hari.pulang_jam}
+														<span
+															class="inline-flex rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200"
+															title="Check-out tanpa check-in"
+														>
+															TM
+														</span>
+													{/if}
+													{#if hari.tidak_absen}
+														<span
+															class="inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 ring-1 ring-inset ring-slate-200"
+														>
+															TA
+														</span>
+													{/if}
 												</span>
-												<span
-													class="mt-0.5 block font-mono text-[10px] leading-tight text-slate-700"
-													>{waktuMatriks(hari)}</span
-												>
-												{#if penanda === 'tc' || penanda === 'tm'}
+												{#if hari.tidak_absen}
+													<span
+														class="mt-0.5 block text-[9px] leading-tight text-slate-400"
+														>Tidak absen</span
+													>
+												{/if}
+												{#if hari.jadwal_strong && status && status !== 'ph'}
+													<span
+														class="mt-0.5 block text-[9px] font-medium leading-tight text-sky-700"
+														>Jadwal PH</span
+													>
+												{/if}
+												{#if hari.sesi_strong.length > 0}
+													{#each hari.sesi_strong as item}
+														<span
+															class="mt-0.5 block text-[9px] leading-tight {item.masuk_jam ||
+															item.pulang_jam
+																? 'text-slate-700'
+																: 'text-slate-400'}"
+														>
+															{labelSesi(item)} {waktuSesi(item)}{#if item.tc}<span
+																	class="font-semibold text-rose-600">&nbsp;TC</span
+																>{/if}{#if item.tidak_absen}<span
+																	class="font-semibold text-slate-400">&nbsp;TA</span
+																>{/if}{#if menitSesi(item)}<span class="text-amber-700"
+																	>&nbsp;· {menitSesi(item)}</span
+																>{/if}
+														</span>
+													{/each}
+												{:else if !hari.tidak_absen}
+													<span
+														class="mt-0.5 block font-mono text-[10px] leading-tight text-slate-700"
+														>{waktuMatriks(hari)}</span
+													>
+												{/if}
+												{#if hari.tc}
 													<span
 														class="block text-[9px] font-medium leading-tight text-rose-600"
+														>tanpa check-out</span
 													>
-														{penanda === 'tc' ? 'tanpa check-out' : 'tanpa check-in'}
-													</span>
 												{/if}
-												{#if menitMatriks(hari)}
+												{#if hari.sesi_strong.length === 0 && menitMatriks(hari)}
 													<span
 														class="block text-[9px] font-medium leading-tight text-amber-700"
 														>{menitMatriks(hari)}</span
@@ -1525,7 +1581,6 @@
 		{@const orang = pilihMatriks.personel}
 		{@const hari = pilihMatriks.hari}
 		{@const status = statusEfektif(hari)}
-		{@const penanda = penandaMatriks(hari)}
 		{@const lat = hari.masuk_latitude ?? hari.pulang_latitude}
 		{@const lng = hari.masuk_longitude ?? hari.pulang_longitude}
 		<div class="space-y-4 text-sm">
@@ -1546,14 +1601,14 @@
 					{#if status}
 						<Badge tone={nadaStatus(status)}>{LABEL_STATUS_KEHADIRAN[status]}</Badge>
 					{/if}
-					{#if penanda === 'ta'}
-						<Badge tone="slate">Tidak absen</Badge>
-					{:else if penanda === 'tc'}
-						<Badge tone="red">Belum check-out</Badge>
-					{:else if penanda === 'tm'}
-						<Badge tone="red">Tanpa check-in</Badge>
+					{#if hari.tidak_absen}<Badge tone="slate">Tidak absen</Badge>{/if}
+					{#if hari.tc}<Badge tone="red">TC · tanpa check-out</Badge>{/if}
+					{#if hari.masuk_jam === null && hari.pulang_jam}
+						<Badge tone="red">TM · tanpa check-in</Badge>
 					{/if}
-					{#if hari.ph_hadir}<Badge tone="blue">Strong Point</Badge>{/if}
+					{#if hari.jadwal_strong && status !== 'ph'}
+						<Badge tone="blue">Jadwal Strong Point</Badge>
+					{/if}
 					{#if hari.luar_radius}<Badge tone="red">Di luar radius</Badge>{/if}
 					{#if hari.is_mock_suspect}<Badge tone="red">Mock GPS</Badge>{/if}
 					{#if hari.is_offline}<Badge tone="amber">Offline</Badge>{/if}
@@ -1595,6 +1650,44 @@
 					{/if}
 				</div>
 			</div>
+
+			{#if hari.sesi_strong.length > 0}
+				<div class="space-y-2">
+					<p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+						Sesi Strong Point
+					</p>
+					<div class="divide-y divide-slate-100 rounded-lg border border-slate-200">
+						{#each hari.sesi_strong as sesi}
+							<div class="flex flex-wrap items-start justify-between gap-2 p-3 text-xs">
+								<div>
+									<p class="font-semibold text-slate-700">
+										{labelSesi(sesi)} · {sesi.jam_mulai}–{sesi.jam_selesai}
+									</p>
+									<p class="text-slate-500">{sesi.strong_point_nama}</p>
+								</div>
+								<div class="text-right">
+									{#if sesi.masuk_jam || sesi.pulang_jam}
+										<p class="font-mono text-slate-700">
+											{sesi.masuk_jam ?? '–'}–{sesi.pulang_jam ?? ''}
+										</p>
+									{:else}
+										<p class="text-slate-400">Belum check-in</p>
+									{/if}
+									<div class="mt-1 flex flex-wrap justify-end gap-1">
+										{#if sesi.tc}<Badge tone="red">TC</Badge>{/if}
+										{#if sesi.tidak_absen}<Badge tone="slate">TA</Badge>{/if}
+										{#if menitSesi(sesi)}
+											<span class="text-[10px] font-medium text-amber-700"
+												>{menitSesi(sesi)}</span
+											>
+										{/if}
+									</div>
+								</div>
+							</div>
+						{/each}
+					</div>
+				</div>
+			{/if}
 
 			{#if lat !== null && lng !== null}
 				<div class="space-y-2">

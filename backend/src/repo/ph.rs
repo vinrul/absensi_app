@@ -58,6 +58,21 @@ pub struct JadwalPhSayaRow {
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+pub struct JadwalMatriksRow {
+    pub personel_id: Uuid,
+    pub jadwal_ph_id: Uuid,
+    pub tanggal: NaiveDate,
+    pub sesi: Option<String>,
+    pub jam_mulai: NaiveTime,
+    pub jam_selesai: NaiveTime,
+    pub strong_point_nama: String,
+    pub masuk_jam: Option<NaiveTime>,
+    pub pulang_jam: Option<NaiveTime>,
+    pub menit_telat: i64,
+    pub menit_pulang_cepat: i64,
+}
+
+#[derive(Debug, Clone, sqlx::FromRow)]
 pub struct PersonelJadwalRow {
     pub personel_id: Uuid,
     pub nama: String,
@@ -686,6 +701,52 @@ pub async fn jadwal_saya(
         .bind(personel_id)
         .bind(dari)
         .bind(sampai)
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn jadwal_matriks(
+    pool: &PgPool,
+    satker_ids: &[Uuid],
+    dari: NaiveDate,
+    sampai: NaiveDate,
+    personel_id: Option<Uuid>,
+) -> AppResult<Vec<JadwalMatriksRow>> {
+    const SQL: &str = r#"
+        SELECT jp.personel_id,
+               j.id AS jadwal_ph_id,
+               j.tanggal,
+               j.sesi,
+               j.jam_mulai,
+               j.jam_selesai,
+               sp.nama AS strong_point_nama,
+               max(ap.jam) FILTER (WHERE ap.jenis = 'masuk') AS masuk_jam,
+               max(ap.jam) FILTER (WHERE ap.jenis = 'pulang') AS pulang_jam,
+               coalesce(
+                   max(ap.menit_telat) FILTER (WHERE ap.jenis = 'masuk'),
+                   0
+               )::bigint AS menit_telat,
+               coalesce(
+                   max(ap.menit_pulang_cepat) FILTER (WHERE ap.jenis = 'pulang'),
+                   0
+               )::bigint AS menit_pulang_cepat
+          FROM jadwal_ph j
+          JOIN jadwal_ph_personel jp ON jp.jadwal_ph_id = j.id
+          JOIN strong_point sp ON sp.id = j.strong_point_id
+          LEFT JOIN absensi_ph ap
+                 ON ap.jadwal_ph_id = j.id AND ap.personel_id = jp.personel_id
+         WHERE j.tanggal BETWEEN $1 AND $2
+           AND NOT j.is_arsip
+           AND j.satker_id = ANY($3::uuid[])
+           AND ($4::uuid IS NULL OR jp.personel_id = $4)
+         GROUP BY jp.personel_id, j.id, j.tanggal, j.sesi, j.jam_mulai, j.jam_selesai, sp.nama
+         ORDER BY j.tanggal, j.jam_mulai
+    "#;
+    Ok(sqlx::query_as::<_, JadwalMatriksRow>(SQL)
+        .bind(dari)
+        .bind(sampai)
+        .bind(satker_ids)
+        .bind(personel_id)
         .fetch_all(pool)
         .await?)
 }
