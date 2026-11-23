@@ -524,8 +524,8 @@ seed `--reset` pada database produksi.
 
 ## 12. Aplikasi Android
 
-- Alamat server: `https://absensi.jagradewata.id/api/v1/` (isi lewat **Profil → Server** pada
-  build debug, atau ubah `ALAMAT_BAWAAN` di `android/app/src/main/java/id/polri/poldabali/kinerja/data/Api.kt`
+- Alamat server: `https://absensi.jagradewata.id/api/v1/` (isi lewat **layar login → Ubah alamat
+  server** pada build debug, atau ubah `ALAMAT_BAWAAN` di `android/app/src/main/java/id/polri/poldabali/kinerja/data/Api.kt`
   untuk build rilis).
 - Konfigurasi jaringan sudah dipisah: `src/main/res/xml/network_security_config.xml` menetapkan
   `cleartextTrafficPermitted="false"` untuk rilis, sedangkan `src/debug/res/xml/` mengizinkan

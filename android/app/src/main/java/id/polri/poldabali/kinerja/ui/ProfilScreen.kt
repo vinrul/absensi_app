@@ -53,7 +53,6 @@ import id.polri.poldabali.kinerja.ui.theme.Warna
 fun ProfilScreen(vm: KinerjaViewModel, onKeluar: () -> Unit) {
     val pengguna = vm.pengguna
     val konteks = LocalContext.current
-    var server by remember { mutableStateOf(vm.alamatServer) }
     var editProfil by remember { mutableStateOf(false) }
     var ubahPassword by remember { mutableStateOf(false) }
 
@@ -158,30 +157,6 @@ fun ProfilScreen(vm: KinerjaViewModel, onKeluar: () -> Unit) {
             HorizontalDivider(color = Warna.NavySoft)
             Spacer(Modifier.height(10.dp))
             TombolKedua(teks = "Muat ulang profil", onClick = { vm.segarkanProfil() })
-        }
-
-        Kartu {
-            JudulBagian("Server", "Alamat API backend (berakhir dengan /api/v1/)")
-            Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = server,
-                onValueChange = { server = it },
-                label = { Text("Alamat server") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Contoh emulator: http://10.0.2.2:8080/api/v1/\nContoh perangkat: http://192.168.1.10:8080/api/v1/",
-                style = MaterialTheme.typography.bodySmall,
-                color = Warna.TeksLembut
-            )
-            Spacer(Modifier.height(8.dp))
-            TombolKedua(
-                teks = "Simpan Alamat",
-                aktif = server.isNotBlank(),
-                onClick = { vm.ubahAlamatServer(server) }
-            )
         }
 
         Kartu {
