@@ -156,7 +156,7 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                         ) {
                             Image(
                                 painter = painterResource(R.drawable.logo_polda_bali),
-                                contentDescription = "Logo Polda Bali",
+                                contentDescription = "Logo SIAP Bali",
                                 modifier = Modifier
                                     .height(30.dp)
                                     .padding(horizontal = 3.dp, vertical = 2.dp),

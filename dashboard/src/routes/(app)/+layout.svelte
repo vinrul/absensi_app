@@ -243,7 +243,7 @@
 				>
 					<img
 						src="/logo-polda-bali.png"
-						alt="Logo Polda Bali"
+						alt="Logo SIAP Bali"
 						class="h-full w-auto"
 					/>
 				</div>
@@ -362,7 +362,7 @@
 					>
 						<Icon name="menu" size={20} />
 					</button>
-					<img src="/logo-polda-bali.png" alt="Logo Polda Bali" class="h-8 w-auto lg:hidden" />
+					<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-8 w-auto lg:hidden" />
 					<div>
 						<h1 class="text-sm font-semibold text-slate-800">{judulHalaman}</h1>
 						<p class="text-[11px] text-slate-500">{konteksSatker}</p>

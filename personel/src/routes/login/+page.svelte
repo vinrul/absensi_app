@@ -55,7 +55,7 @@
 	<main class="relative z-10 mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-8">
 		<div class="flex flex-col items-center text-center text-white">
 			<div class="rounded-2xl bg-white p-2 shadow-lg">
-				<img src="/logo-polda-bali.png" alt="Logo Polda Bali" class="h-16 w-auto" />
+				<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-16 w-auto" />
 			</div>
 			<h1 class="mt-4 text-2xl font-bold tracking-tight">Absensi Kinerja</h1>
 			<p class="mt-1 text-sm text-brand-100">Personel Polda Bali dan Polres jajaran</p>

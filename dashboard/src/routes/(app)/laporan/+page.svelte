@@ -107,7 +107,7 @@
 			<div class="flex items-center gap-4 border-b-2 border-slate-800 pb-4">
 				<img
 					src="/logo-polda-bali.png"
-					alt="Logo Polda Bali"
+					alt="Logo SIAP Bali"
 					class="h-16 w-auto shrink-0"
 				/>
 				<div class="text-center">

@@ -167,7 +167,7 @@ fun WizardIzinScreen(onSelesai: () -> Unit) {
             ) {
                 Image(
                     painter = painterResource(R.drawable.logo_polda_bali),
-                    contentDescription = "Logo Polda Bali",
+                    contentDescription = "Logo SIAP Bali",
                     modifier = Modifier
                         .height(88.dp)
                         .padding(horizontal = 12.dp, vertical = 8.dp),

@@ -14,14 +14,15 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 1.1 | Logo Polda Bali di halaman login dashboard | ✅ | `dashboard/static/logo-polda-bali.png` |
+| 1.1 | Logo **SIAP Bali** di halaman login dashboard | ✅ | `dashboard/static/logo-polda-bali.png` |
 | 1.2 | Logo di sidebar & header mobile dashboard | ✅ | `(app)/+layout.svelte` |
-| 1.3 | Logo pada kop cetak laporan | ✅ | `laporan/+page.svelte` |
+| 1.3 | Logo pada kop cetak laporan | ✅ | `laporan/+page.svelte` + PDF backend |
 | 1.4 | Logo di layar login Android | ✅ | `LoginScreen.kt` → `R.drawable.logo_polda_bali` |
 | 1.5 | Logo di top bar Android | ✅ | `MainActivity.kt` |
-| 1.6 | Ikon launcher Android memakai logo Polda Bali | ✅ | `mipmap-*/ic_launcher_foreground.png` |
+| 1.6 | Ikon launcher Android memakai logo SIAP Bali | ✅ | `mipmap-*/ic_launcher*.png` + adaptive foreground/background navy |
 | 1.7 | Logo & header halaman login Android terpusat | ✅ | `LoginScreen.kt` |
 | 1.8 | Tampil/sembunyikan password dengan ikon mata | ✅ | `IkonMata.kt`, `trailingIcon` pada field password |
+| 1.9 | Favicon & apple-touch-icon web | ✅ | `dashboard/static` dan `personel/static` memakai logo SIAP Bali |
 
 ## 2. Struktur organisasi & peran
 

@@ -776,7 +776,7 @@ fn html_laporan_rencana(
 <head><meta charset="utf-8"><style>{css}</style></head>
 <body>
   <table class="kop"><tr>
-    <td class="logo"><img src="data:image/png;base64,{logo}" alt="Logo Polda Bali"></td>
+    <td class="logo"><img src="data:image/png;base64,{logo}" alt="Logo SIAP Bali"></td>
     <td class="identitas">
       <div class="instansi">Kepolisian Negara Republik Indonesia</div>
       <div class="instansi">Daerah Bali · Direktorat Reserse Kriminal Khusus</div>

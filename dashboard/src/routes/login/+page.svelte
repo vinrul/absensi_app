@@ -64,7 +64,7 @@
 				<div
 					class="flex h-20 items-center justify-center rounded-2xl bg-white px-3 py-2 shadow-lg shadow-navy-900/30"
 				>
-					<img src="/logo-polda-bali.png" alt="Logo Polda Bali" class="h-full w-auto" />
+					<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-full w-auto" />
 				</div>
 				<div>
 					<p class="text-sm font-semibold tracking-widest text-gold-400 uppercase">Polda Bali</p>

@@ -211,7 +211,7 @@
 		<div class="mx-auto flex w-full max-w-md flex-1 flex-col px-5 py-8">
 			<div class="flex flex-col items-center text-center text-white">
 				<div class="rounded-2xl bg-white p-2 shadow-lg">
-					<img src="/logo-polda-bali.png" alt="Logo Polda Bali" class="h-14 w-auto" />
+					<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-14 w-auto" />
 				</div>
 				<h1 class="mt-4 text-xl font-bold">Izin Aplikasi</h1>
 				<p class="text-sm text-brand-100">Penjelasan sebelum Anda masuk</p>
@@ -271,7 +271,7 @@
 			class="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-white/60 bg-ink-50/85 px-4 backdrop-blur-md"
 		>
 			<div class="flex min-w-0 items-center gap-2.5">
-				<img src="/logo-polda-bali.png" alt="Polda Bali" class="h-8 w-auto" />
+				<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-8 w-auto" />
 				<div class="min-w-0">
 					<p class="truncate text-sm font-bold text-ink-900">{judulHalaman()}</p>
 					<p class="truncate text-[10px] text-ink-400">{session.user?.satker_nama}</p>
