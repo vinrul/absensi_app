@@ -20,3 +20,4 @@ pub mod ph;
 pub mod rencana;
 pub mod satker;
 pub mod titik_dinas;
+pub mod waktu;

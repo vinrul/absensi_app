@@ -112,6 +112,9 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.61 | Dashboard fokus absensi + strong point | ✅ | filter tanggal + satker; kartu total/hadir/belum/telat/sesi strong point/cuti-izin-sakit; tabel strong point & absensi hari itu |
 | 3.62 | Rekap absensi berbasis rentang tanggal | ✅ | filter `dari`/`sampai` per tab; tidak lagi bergantung pada periode bulan |
 | 3.63 | Modul kinerja dinonaktifkan dari UI | ✅ | menu & route diarahkan ke `/dashboard`; API/tabel tetap (lihat HANDOFF §3.30) |
+| 3.64 | Jam server realtime di dashboard, web personel, Android | ✅ | `GET /api/v1/waktu` tanpa DB; offset + detak lokal tiap detik; resync 5 menit (15 detik saat jam palsu) dan saat tab/aplikasi aktif; badge **PALSU** di development |
+| 3.65 | Rekap kehadiran matriks per tanggal | ✅ | `GET /absensi/matriks`: satu baris per personel, satu kolom per tanggal, maks. 31 hari (422 bila lebih); sel memuat status, check-in/out, telat, pulang cepat; klik sel membuka modal alamat Nominatim + peta Leaflet, foto, dan koordinat; hari PH memakai jam/koordinat PH; hari kerja tanpa absensi ditandai **TA**, check-in tanpa check-out **TC**, check-out tanpa check-in **TM** |
+| 3.66 | Export PDF Ringkasan & Matriks Harian | ✅ | Dua tombol di tab Rekap Kehadiran: `/absensi/rekap/ekspor` (ringkasan) dan `/absensi/matriks/ekspor` (matriks per minggu, maks. 31 hari; 422 bila lebih); legenda PDF memuat TA/TC/TM |
 
 ## 4. Modul Strong Point v2 (terpisah dari absensi harian)
 
@@ -148,6 +151,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.29 | Strong point menggantikan absensi kantor | ✅ | Dinas Kantor ditolak bila ada jadwal; absensi PH dicerminkan ke `absensi` status `ph` sehingga hadir/telat/pulang cepat masuk rekap kehadiran |
 | 4.30 | Android satu tab Absensi | ✅ | Tab Strong dihapus; wizard status → GPS → foto → kirim; check-out berikutnya tidak memilih status |
 | 4.31 | Riwayat absensi Android per tanggal | ✅ | `riwayatHarian()` menggabungkan absensi + jadwal/absensi PH: satu baris per tanggal, status berpasangan dengan check-in/check-out, sesi strong point pagi/sore beserta realisasi; rentang mengikuti tanggal server (mendukung fake time) |
+| 4.32 | Filter tanggal riwayat Android | ✅ | `FieldTanggal` Dari/Sampai + tombol **Tampilkan** dan **Bulan Ini**; default tanggal 1 s.d. akhir bulan berjalan; validasi mulai ≤ selesai; data riwayat & sesi PH dimuat ulang sesuai rentang |
 
 ## 5. Pengingat jadwal tanpa FCM
 
@@ -171,7 +175,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 6.3 | Data contoh jadwal PH | ✅ | seed development: 102 jadwal (sesi pagi/sore) + penempatan tetap seluruh personel |
 | 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–17 |
 | 6.5 | Database uji terpisah `kinerja_test` | ✅ | jangan dicampur dengan data demo |
-| 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (73 cek) |
+| 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (87 cek) |
 | 6.7 | Validator OpenAPI | ✅ | `bun tools/uji/openapi-check.js` |
 | 6.8 | Pembuatan periode otomatis diuji | ✅ | `bun tools/uji/periode-auto-check.js` (menghapus periode DB uji dahulu) |
 | 6.9 | Contoh rencana draft, diajukan, dan perlu revisi untuk akun Android | ✅ | seed `--reset`: 3 dokumen + tahapan rincian + catatan revisi untuk NRP `85000001` |
@@ -214,7 +218,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 93 path; termasuk `/absensi/konteks`, `/ph/penempatan`, `/ph/jadwal/salin`, `/ph/jadwal/status`, `/dashboard/kehadiran`, filter `dari`/`sampai` |
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 96 path; termasuk `/absensi/konteks`, `/absensi/matriks`, `/absensi/matriks/ekspor`, `/ph/penempatan`, `/ph/jadwal/salin`, `/ph/jadwal/status`, `/dashboard/kehadiran`, filter `dari`/`sampai` |
 | 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
 | 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
 | 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
@@ -229,13 +233,13 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 |---|---|---|---|
 | 9.1 | `cargo fmt --check` | ✅ | bersih |
 | 9.2 | `cargo clippy --all-targets -- -D warnings` | ✅ | tanpa peringatan |
-| 9.3 | `cargo test` | ✅ | 37 test lulus |
+| 9.3 | `cargo test` | ✅ | 38 test lulus |
 | 9.4 | `bun run check` (dashboard) | ✅ | 0 error |
 | 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
 | 9.6 | `bun run check` + `bun run build` (personel) | ✅ | 0 error; build statis terbentuk |
 | 9.7 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
-| 9.8 | `bun tools/uji/api-smoke.js` | ✅ | 79/79 cek lulus |
-| 9.9 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (93 path) |
+| 9.8 | `bun tools/uji/api-smoke.js` | ✅ | 87/87 cek lulus |
+| 9.9 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (96 path) |
 | 9.10 | Migrasi `0018_strong_point_bulanan.sql`, `0019_absensi_operasi_dan_grup.sql`, `0020_absensi_ph_link.sql` | ✅ | terpasang di `kinerja_db` & `kinerja_test` |
 | 9.11 | Uji E2E strong point v2 | ✅ | penempatan tetap (upsert), salin bulan sebelumnya, status/pengingat, fallback otomatis (fake time Desember), check-in telat 25 menit, pulang cepat 30 menit, jendela sesi, radius, PDF |
 | 9.12 | Uji API titik dinas | ✅ | tambah/ubah jenis & koordinat/hapus |
@@ -251,6 +255,10 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.22 | Mock GPS policy `reject` | ✅ | Instance sementara `APP__MOCK_LOCATION_POLICY=reject` → absensi mock 422 tanpa menyimpan data |
 | 9.23 | Android deteksi mock + build | ✅ | `:app:assembleDebug` sukses; peringatan Developer Options/mock app dan hitungan `ditolak` terkompilasi |
 | 9.24 | Riwayat absensi Android per tanggal | ✅ | emulator: 15 tanggal tampil satu baris masing-masing; 13 Nov memuat Dinas Kantor + sesi PH pagi/sore beserta jam realisasi; jam server dimundurkan ke 18 Nov → riwayat menjadi 13 tanggal sesuai rentang server |
+| 9.25 | Filter tanggal riwayat Android | ✅ | emulator: default 1–30 Nov 2026; rentang 17–30 Nov menampilkan 2 tanggal; tombol **Bulan Ini** kembali ke 3 tanggal |
+| 9.26 | Jam server realtime | ✅ | `GET /waktu` 200 tanpa token; Android menampilkan `16:30:03 WITA · PALSU` lalu berdetak; reset fake time kembali ke `14:35:30 WITA` tanpa restart; dashboard & personel `bun run check`/`build` 0 error |
+| 9.27 | Rekap matriks kehadiran | ✅ | API: 146 personel × 30 tanggal, koordinat terisi, rentang 61 hari ditolak 422; personel baru tanpa absensi memperoleh sel **TA** pada hari kerja lampau; check-in tanpa check-out terbaca **TC**; Chrome headless 1600×1000: matriks tampil, sel PH 03 Nov menunjukkan `07:05–09:05 · T 5m · PC 25m`, modal menampilkan alamat Nominatim + peta Leaflet |
+| 9.28 | PDF matriks harian | ✅ | `GET /absensi/matriks/ekspor` 7 hari → 702 KB/10 halaman; 30 hari → 2,6 MB/46 halaman dengan 5 bagian mingguan; 32 hari → 422; legenda PDF memuat TA/TC/TM |
 
 ## 10. Yang belum dikerjakan (backlog)
 

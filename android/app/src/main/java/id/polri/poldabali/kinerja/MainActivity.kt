@@ -10,6 +10,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -23,6 +24,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
@@ -43,6 +45,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -160,10 +163,24 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                                 contentScale = ContentScale.Fit
                             )
                         }
-                        Text(
-                            DAFTAR_TAB[tabAktif].judul,
-                            modifier = Modifier.padding(start = 10.dp)
-                        )
+                        Column(Modifier.weight(1f).padding(start = 10.dp)) {
+                            Text(
+                                DAFTAR_TAB[tabAktif].judul,
+                                style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                buildString {
+                                    append(vm.jamServerTeks)
+                                    append(" WITA")
+                                    if (vm.jamServerPalsu) append(" · PALSU")
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.78f),
+                                maxLines = 1
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

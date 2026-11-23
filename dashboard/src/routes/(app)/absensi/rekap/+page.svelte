@@ -5,6 +5,9 @@
 	import { api, apiBlob, apiBlobUrl, ApiError } from '#lib/api/client';
 	import type {
 		AbsensiHarian,
+		AbsensiMatriksHari,
+		AbsensiMatriksPersonel,
+		AbsensiMatriksResponse,
 		FotoAbsensi,
 		ListResponse,
 		Personel,
@@ -18,6 +21,8 @@
 	import Icon from '#lib/components/Icon.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
+	import PetaLokasi from '#lib/components/PetaLokasi.svelte';
+	import { alamatDariKoordinat } from '#lib/geocode';
 
 	type TabId = 'rekap' | 'verifikasi' | 'detail';
 
@@ -25,7 +30,8 @@
 		{
 			id: 'rekap',
 			label: 'Rekap Kehadiran',
-			keterangan: 'Jumlah kehadiran, keterlambatan, dan ketidakhadiran per personel.'
+			keterangan:
+				'Matriks status, jam, telat, dan pulang cepat per tanggal (maks. 31 hari) atau ringkasan per personel.'
 		},
 		{
 			id: 'verifikasi',
@@ -73,9 +79,24 @@
 		detail: { ...rentangBawaan(), satker_id: '', personel_id: '' }
 	});
 
-	let rekap = $state<RekapAbsensi[]>([]);
-	let rekapRentang = $state('');
-	let halamanRekap = $state(1);
+	    let rekap = $state<RekapAbsensi[]>([]);
+	    let rekapRentang = $state('');
+	    let halamanRekap = $state(1);
+
+	    let modeRekap = $state<'matriks' | 'ringkasan'>('matriks');
+	    let matriks = $state<AbsensiMatriksResponse | null>(null);
+
+	    type PilihanMatriks = {
+	        personel: AbsensiMatriksPersonel;
+	        tanggal: string;
+	        hari: AbsensiMatriksHari;
+	    };
+	    let pilihMatriks = $state<PilihanMatriks | null>(null);
+	    let alamatMatriks = $state<string | null>(null);
+	    let memuatAlamat = $state(false);
+	    let fotoMasukMatriks = $state<string | null>(null);
+	    let fotoPulangMatriks = $state<string | null>(null);
+	    let tokenMatriks = 0;
 
 	let daftarVerifikasi = $state<ListResponse<AbsensiHarian> | null>(null);
 	let halamanVerifikasi = $state(1);
@@ -124,9 +145,183 @@
 		return satkerMap.get(row.satker_id) ?? row.unit ?? '-';
 	}
 
-	function statusHarian(row: AbsensiHarian): StatusKehadiran | null {
-		return row.status_masuk ?? row.status_pulang;
-	}
+	    function statusHarian(row: AbsensiHarian): StatusKehadiran | null {
+	        return row.status_masuk ?? row.status_pulang;
+	    }
+
+	    function selisihHari(dari: string, sampai: string) {
+	        const a = new Date(`${dari}T00:00:00Z`).getTime();
+	        const b = new Date(`${sampai}T00:00:00Z`).getTime();
+	        if (!Number.isFinite(a) || !Number.isFinite(b)) return 0;
+	        return Math.floor((b - a) / 86_400_000) + 1;
+	    }
+
+	    function validasiRentangRekap() {
+	        const hari = selisihHari(filter.rekap.dari, filter.rekap.sampai);
+	        if (hari <= 0) return 'Tanggal selesai harus setelah tanggal mulai.';
+	        if (hari > 31) return 'Rentang rekap maksimal 31 hari.';
+	        return null;
+	    }
+
+	    function namaHariSingkat(tanggal: string) {
+	        return new Date(`${tanggal}T00:00:00`).toLocaleDateString('id-ID', { weekday: 'short' });
+	    }
+
+	    function akhirPekan(tanggal: string) {
+	        const hari = new Date(`${tanggal}T00:00:00`).getDay();
+	        return hari === 0 || hari === 6;
+	    }
+
+	    function statusEfektif(hari: AbsensiMatriksHari): StatusKehadiran | null {
+	        if (hari.ph_hadir) return 'ph';
+	        return hari.status ?? hari.status_masuk ?? hari.status_pulang;
+	    }
+
+	    type PenandaMatriks = StatusKehadiran | 'ta' | 'tc' | 'tm';
+
+	    function wajibCheckout(status: StatusKehadiran) {
+	        return (
+	            status === 'dinas_kantor' ||
+	            status === 'ph' ||
+	            status === 'piket' ||
+	            status === 'operasi'
+	        );
+	    }
+
+	    function penandaMatriks(hari: AbsensiMatriksHari): PenandaMatriks | null {
+	        if (hari.tidak_absen) return 'ta';
+	        const status = statusEfektif(hari);
+	        if (!status) return null;
+	        if (!hari.masuk_jam && hari.pulang_jam) return 'tm';
+	        if (hari.masuk_jam && !hari.pulang_jam && wajibCheckout(status)) return 'tc';
+	        return status;
+	    }
+
+	    function labelPanjangMatriks(penanda: PenandaMatriks | null) {
+	        if (penanda === 'ta') return 'Tidak absen';
+	        if (penanda === 'tc') return 'Check-in tanpa check-out';
+	        if (penanda === 'tm') return 'Check-out tanpa check-in';
+	        if (penanda) return LABEL_STATUS_KEHADIRAN[penanda];
+	        return '-';
+	    }
+
+	    const LABEL_MATRIKS: Record<StatusKehadiran, string> = {
+	        dinas_kantor: 'DK',
+	        dinas_luar: 'DL',
+	        ph: 'PH',
+	        piket: 'Piket',
+	        operasi: 'Ops',
+	        libur_nasional: 'Libur',
+	        cuti: 'Cuti',
+	        izin: 'Izin',
+	        sakit: 'Sakit',
+	        tanpa_keterangan: 'TK'
+	    };
+
+	    function labelMatriks(penanda: PenandaMatriks | null) {
+	        if (!penanda) return '-';
+	        if (penanda === 'ta' || penanda === 'tc' || penanda === 'tm') {
+	            return penanda.toUpperCase();
+	        }
+	        return LABEL_MATRIKS[penanda];
+	    }
+
+	    function kelasMatriks(penanda: PenandaMatriks | null) {
+	        if (penanda === 'ta') return 'bg-slate-100 text-slate-400 ring-slate-200';
+	        if (penanda === 'tc' || penanda === 'tm') {
+	            return 'bg-rose-50 text-rose-700 ring-rose-200';
+	        }
+	        if (!penanda) return 'bg-slate-100 text-slate-500 ring-slate-200';
+	        if (penanda === 'dinas_luar') return 'bg-sky-50 text-sky-700 ring-sky-200';
+	        if (penanda === 'cuti' || penanda === 'izin' || penanda === 'sakit') {
+	            return 'bg-amber-50 text-amber-700 ring-amber-200';
+	        }
+	        if (penanda === 'tanpa_keterangan') return 'bg-rose-50 text-rose-700 ring-rose-200';
+	        if (penanda === 'libur_nasional') return 'bg-slate-100 text-slate-500 ring-slate-200';
+	        return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+	    }
+
+	    function waktuMatriks(hari: AbsensiMatriksHari) {
+	        if (hari.masuk_jam && hari.pulang_jam) return `${hari.masuk_jam}–${hari.pulang_jam}`;
+	        return hari.masuk_jam ?? hari.pulang_jam ?? '-';
+	    }
+
+	    function menitMatriks(hari: AbsensiMatriksHari) {
+	        const bagian: string[] = [];
+	        if (hari.menit_telat > 0) bagian.push(`T ${hari.menit_telat}m`);
+	        if (hari.menit_pulang_cepat > 0) bagian.push(`PC ${hari.menit_pulang_cepat}m`);
+	        return bagian.join(' · ');
+	    }
+
+	    function judulMatriks(
+	        orang: AbsensiMatriksPersonel,
+	        tanggal: string,
+	        hari: AbsensiMatriksHari
+	    ) {
+	        const penanda = penandaMatriks(hari);
+	        const bagian = [orang.nama, tanggalSingkat(tanggal), labelPanjangMatriks(penanda)];
+	        if (!hari.tidak_absen) bagian.push(waktuMatriks(hari));
+	        if (hari.menit_telat > 0) bagian.push(`telat ${hari.menit_telat} menit`);
+	        if (hari.menit_pulang_cepat > 0) bagian.push(`pulang cepat ${hari.menit_pulang_cepat} menit`);
+	        return bagian.join(' · ');
+	    }
+
+	    function ubahModeRekap(mode: 'matriks' | 'ringkasan') {
+	        if (mode === modeRekap) return;
+	        modeRekap = mode;
+	        void muatRekap();
+	    }
+
+	    async function bukaDetailMatriks(
+	        orang: AbsensiMatriksPersonel,
+	        tanggal: string,
+	        hari: AbsensiMatriksHari
+	    ) {
+	        tutupDetailMatriks();
+	        const token = ++tokenMatriks;
+	        pilihMatriks = { personel: orang, tanggal, hari };
+
+	        const lat = hari.masuk_latitude ?? hari.pulang_latitude;
+	        const lng = hari.masuk_longitude ?? hari.pulang_longitude;
+	        if (lat !== null && lng !== null) {
+	            memuatAlamat = true;
+	            const hasil = await alamatDariKoordinat(lat, lng);
+	            if (token === tokenMatriks) {
+	                alamatMatriks = hasil;
+	                memuatAlamat = false;
+	            }
+	        }
+
+	        if (hari.foto_masuk_url) {
+	            try {
+	                const url = await apiBlobUrl(hari.foto_masuk_url);
+	                if (token === tokenMatriks) fotoMasukMatriks = url;
+	                else URL.revokeObjectURL(url);
+	            } catch {
+	                // abaikan foto yang gagal dimuat
+	            }
+	        }
+	        if (hari.foto_pulang_url) {
+	            try {
+	                const url = await apiBlobUrl(hari.foto_pulang_url);
+	                if (token === tokenMatriks) fotoPulangMatriks = url;
+	                else URL.revokeObjectURL(url);
+	            } catch {
+	                // abaikan foto yang gagal dimuat
+	            }
+	        }
+	    }
+
+	    function tutupDetailMatriks() {
+	        tokenMatriks += 1;
+	        if (fotoMasukMatriks) URL.revokeObjectURL(fotoMasukMatriks);
+	        if (fotoPulangMatriks) URL.revokeObjectURL(fotoPulangMatriks);
+	        fotoMasukMatriks = null;
+	        fotoPulangMatriks = null;
+	        alamatMatriks = null;
+	        memuatAlamat = false;
+	        pilihMatriks = null;
+	    }
 
 	function telatHarian(row: AbsensiHarian) {
 		return row.menit_telat > 0 ? `${row.menit_telat} mnt` : '-';
@@ -142,47 +337,66 @@
 		});
 	}
 
-	function nadaStatus(status: StatusKehadiran) {
-		if (
-			status === 'dinas_kantor' ||
-			status === 'dinas_luar' ||
-			status === 'piket' ||
-			status === 'ph'
-		) {
-			return 'green';
-		}
-		if (status === 'tanpa_keterangan') return 'red';
-		if (status === 'cuti' || status === 'izin' || status === 'sakit') return 'amber';
-		return 'blue';
-	}
+	    function nadaStatus(status: StatusKehadiran) {
+	        if (
+	            status === 'dinas_kantor' ||
+	            status === 'dinas_luar' ||
+	            status === 'piket' ||
+	            status === 'operasi' ||
+	            status === 'ph'
+	        ) {
+	            return 'green';
+	        }
+	        if (status === 'tanpa_keterangan') return 'red';
+	        if (status === 'cuti' || status === 'izin' || status === 'sakit') return 'amber';
+	        return 'blue';
+	    }
 
 	function rentangTeks(dari: string, sampai: string) {
 		return `${tanggalSingkat(dari)} – ${tanggalSingkat(sampai)}`;
 	}
 
-	async function muatRekap() {
-		memuat = true;
-		error = null;
-		try {
-			const params = new URLSearchParams({
-				dari: filter.rekap.dari,
-				sampai: filter.rekap.sampai
-			});
-			if (filter.rekap.satker_id) params.set('satker_id', filter.rekap.satker_id);
+	    async function muatRekap() {
+	        const masalah = validasiRentangRekap();
+	        if (masalah) {
+	            error = masalah;
+	            return;
+	        }
 
-			const hasil = await api<{
-				rentang: { dari: string; sampai: string };
-				data: RekapAbsensi[];
-			}>(`/absensi/rekap?${params}`);
-			rekap = hasil.data;
-			rekapRentang = rentangTeks(hasil.rentang.dari, hasil.rentang.sampai);
-			halamanRekap = 1;
-		} catch (err) {
-			error = err instanceof ApiError ? err.message : 'Gagal memuat rekap kehadiran';
-		} finally {
-			memuat = false;
-		}
+	        memuat = true;
+	        error = null;
+	        try {
+	            const params = new URLSearchParams({
+	                dari: filter.rekap.dari,
+	                sampai: filter.rekap.sampai
+	            });
+	if (filter.rekap.satker_id) params.set('satker_id', filter.rekap.satker_id);
+	if (modeRekap === 'matriks' && filter.rekap.personel_id) {
+		params.set('personel_id', filter.rekap.personel_id);
 	}
+
+	            if (modeRekap === 'matriks') {
+	                const hasil = await api<AbsensiMatriksResponse>(`/absensi/matriks?${params}`);
+	                matriks = hasil;
+	                rekapRentang = rentangTeks(hasil.rentang.dari, hasil.rentang.sampai);
+	            } else {
+	                const hasil = await api<{
+	                    rentang: { dari: string; sampai: string };
+	                    data: RekapAbsensi[];
+	                }>(`/absensi/rekap?${params}`);
+	                rekap = hasil.data;
+	                rekapRentang = rentangTeks(hasil.rentang.dari, hasil.rentang.sampai);
+	                halamanRekap = 1;
+	            }
+	        } catch (err) {
+	            error =
+	                err instanceof ApiError
+	                    ? err.message
+	                    : `Gagal memuat ${modeRekap === 'matriks' ? 'matriks kehadiran' : 'rekap kehadiran'}`;
+	        } finally {
+	            memuat = false;
+	        }
+	    }
 
 	async function muatVerifikasi(page = 1) {
 		memuat = true;
@@ -281,8 +495,15 @@
 		muatTab(id);
 	}
 
-	async function eksporPdf() {
+	async function eksporPdf(tampilan: 'ringkasan' | 'matriks' = modeRekap) {
 		const aktif = filter[tab];
+		if (tab === 'rekap' && tampilan === 'matriks') {
+			const masalah = validasiRentangRekap();
+			if (masalah) {
+				error = masalah;
+				return;
+			}
+		}
 		if (tab === 'detail' && !aktif.personel_id) {
 			error = 'Pilih personel terlebih dahulu sebelum mengekspor detail absensi.';
 			return;
@@ -297,10 +518,15 @@
 			});
 			if (aktif.satker_id) params.set('satker_id', aktif.satker_id);
 			if (tab !== 'rekap' && aktif.personel_id) params.set('personel_id', aktif.personel_id);
+			if (tab === 'rekap' && tampilan === 'matriks' && aktif.personel_id) {
+				params.set('personel_id', aktif.personel_id);
+			}
 
 			const jalur =
 				tab === 'rekap'
-					? '/absensi/rekap/ekspor'
+					? tampilan === 'matriks'
+						? '/absensi/matriks/ekspor'
+						: '/absensi/rekap/ekspor'
 					: tab === 'verifikasi'
 						? '/absensi/verifikasi/ekspor'
 						: '/absensi/detail/ekspor';
@@ -309,7 +535,8 @@
 			const url = URL.createObjectURL(blob);
 			const tautan = document.createElement('a');
 			tautan.href = url;
-			tautan.download = `${tab}-absensi-${new Date().toISOString().slice(0, 10)}.pdf`;
+			const label = tab === 'rekap' && tampilan === 'matriks' ? 'matriks-harian' : `${tab}-absensi`;
+			tautan.download = `${label}-${new Date().toISOString().slice(0, 10)}.pdf`;
 			tautan.click();
 			URL.revokeObjectURL(url);
 		} catch (err) {
@@ -435,14 +662,35 @@
 				<h2 class="text-sm font-semibold text-slate-800">Rekap Absensi</h2>
 				<p class="text-xs text-slate-500">{tabAktif.keterangan}</p>
 			</div>
-			<button
-				class="btn btn-ghost border border-slate-300"
-				disabled={mengekspor}
-				onclick={eksporPdf}
-			>
-				<Icon name="download" size={16} />
-				{mengekspor ? 'Menyiapkan PDF…' : 'Export PDF'}
-			</button>
+			{#if tab === 'rekap'}
+				<div class="flex flex-wrap gap-2">
+					<button
+						class="btn btn-ghost border border-slate-300"
+						disabled={mengekspor}
+						onclick={() => eksporPdf('ringkasan')}
+					>
+						<Icon name="download" size={16} />
+						{mengekspor ? 'Menyiapkan…' : 'PDF Ringkasan'}
+					</button>
+					<button
+						class="btn btn-ghost border border-slate-300"
+						disabled={mengekspor}
+						onclick={() => eksporPdf('matriks')}
+					>
+						<Icon name="download" size={16} />
+						{mengekspor ? 'Menyiapkan…' : 'PDF Matriks Harian'}
+					</button>
+				</div>
+			{:else}
+				<button
+					class="btn btn-ghost border border-slate-300"
+					disabled={mengekspor}
+					onclick={() => eksporPdf()}
+				>
+					<Icon name="download" size={16} />
+					{mengekspor ? 'Menyiapkan PDF…' : 'Export PDF'}
+				</button>
+			{/if}
 		</div>
 
 		<div class="flex flex-wrap gap-1 border-b border-slate-200 pb-2">
@@ -459,38 +707,84 @@
 		</div>
 
 		{#if tab === 'rekap'}
-			<div class="flex flex-wrap items-end gap-3">
-				<div>
-					<label class="label" for="rekap-dari">Dari Tanggal</label>
-					<input
-						id="rekap-dari"
-						type="date"
-						class="input"
-						bind:value={filter.rekap.dari}
-						onchange={() => muatRekap()}
-					/>
+			<div class="space-y-3">
+				<div class="flex flex-wrap items-center gap-2">
+					<span class="text-xs font-medium text-slate-600">Tampilan</span>
+					<div class="flex overflow-hidden rounded-lg border border-slate-200">
+						<button
+							type="button"
+							class="px-3 py-1.5 text-xs font-medium transition"
+							class:bg-navy-800={modeRekap === 'matriks'}
+							class:text-white={modeRekap === 'matriks'}
+							class:text-slate-600={modeRekap !== 'matriks'}
+							aria-pressed={modeRekap === 'matriks'}
+							onclick={() => ubahModeRekap('matriks')}
+						>
+							Matriks Harian
+						</button>
+						<button
+							type="button"
+							class="border-l border-slate-200 px-3 py-1.5 text-xs font-medium transition"
+							class:bg-navy-800={modeRekap === 'ringkasan'}
+							class:text-white={modeRekap === 'ringkasan'}
+							class:text-slate-600={modeRekap !== 'ringkasan'}
+							aria-pressed={modeRekap === 'ringkasan'}
+							onclick={() => ubahModeRekap('ringkasan')}
+						>
+							Ringkasan
+						</button>
+					</div>
 				</div>
-				<div>
-					<label class="label" for="rekap-sampai">Sampai Tanggal</label>
-					<input
-						id="rekap-sampai"
-						type="date"
-						class="input"
-						bind:value={filter.rekap.sampai}
-						onchange={() => muatRekap()}
-					/>
-				</div>
-				<div class="min-w-48">
-					<label class="label" for="rekap-satker">Satker</label>
-					<select
-						id="rekap-satker"
-						class="input"
-						bind:value={filter.rekap.satker_id}
-						onchange={() => muatRekap()}
-					>
-						<option value="">Semua Satker</option>
-						{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
-					</select>
+				<div class="flex flex-wrap items-end gap-3">
+					<div>
+						<label class="label" for="rekap-dari">Dari Tanggal</label>
+						<input
+							id="rekap-dari"
+							type="date"
+							class="input"
+							bind:value={filter.rekap.dari}
+							onchange={() => muatRekap()}
+						/>
+					</div>
+					<div>
+						<label class="label" for="rekap-sampai">Sampai Tanggal</label>
+						<input
+							id="rekap-sampai"
+							type="date"
+							class="input"
+							bind:value={filter.rekap.sampai}
+							onchange={() => muatRekap()}
+						/>
+					</div>
+					<div class="min-w-48">
+						<label class="label" for="rekap-satker">Satker</label>
+						<select
+							id="rekap-satker"
+							class="input"
+							bind:value={filter.rekap.satker_id}
+							onchange={() => ubahSatker('rekap')}
+						>
+							<option value="">Semua Satker</option>
+							{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
+						</select>
+					</div>
+					{#if modeRekap === 'matriks'}
+						<div class="min-w-56">
+							<label class="label" for="rekap-personel">Personel</label>
+							<select
+								id="rekap-personel"
+								class="input"
+								bind:value={filter.rekap.personel_id}
+								onchange={() => muatRekap()}
+							>
+								<option value="">Semua Personel</option>
+								{#each personelUntuk(filter.rekap.satker_id) as orang}
+									<option value={orang.id}>{orang.nama} ({orang.nrp})</option>
+								{/each}
+							</select>
+						</div>
+					{/if}
+					<p class="pb-2 text-[11px] text-slate-500">Maksimal rentang 31 hari.</p>
 				</div>
 			</div>
 		{:else if tab === 'verifikasi'}
@@ -598,7 +892,140 @@
 		<p class="rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-700 ring-1 ring-rose-200">{error}</p>
 	{/if}
 
-	{#if tab === 'rekap'}
+	{#if tab === 'rekap' && modeRekap === 'matriks'}
+		<div class="card overflow-hidden">
+			<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+				<div>
+					<h2 class="text-sm font-semibold text-slate-700">
+						Rekap Harian {rekapRentang}
+					</h2>
+					<p class="text-[11px] text-slate-500">
+						{matriks?.data.length ?? 0} personel · {matriks?.tanggal.length ?? 0} hari · klik sel untuk detail lokasi
+					</p>
+				</div>
+				<div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-slate-500">
+					<span><b class="text-slate-700">DK</b> Dinas Kantor</span>
+					<span><b class="text-slate-700">DL</b> Dinas Luar</span>
+					<span><b class="text-slate-700">PH</b> Strong Point</span>
+					<span><b class="text-slate-700">Ops</b> Operasi/Pam</span>
+					<span><b class="text-slate-500">TA</b> tidak absen</span>
+					<span><b class="text-rose-700">TC</b> tanpa check-out</span>
+					<span><b class="text-rose-700">TM</b> tanpa check-in</span>
+					<span><b class="text-amber-700">T</b> telat</span>
+					<span><b class="text-amber-700">PC</b> pulang cepat</span>
+				</div>
+			</div>
+			<div class="max-h-[75vh] overflow-auto">
+				<table class="min-w-full border-collapse text-xs">
+					<thead class="sticky top-0 z-20 bg-slate-50">
+						<tr>
+							<th
+								class="sticky left-0 top-0 z-30 min-w-56 border-b border-r border-slate-200 bg-slate-50 px-3 py-2 text-left"
+							>
+								Personel
+							</th>
+							{#each matriks?.tanggal ?? [] as tgl}
+								<th
+									class="min-w-[106px] border-b border-r border-slate-200 px-1 py-2 text-center {akhirPekan(tgl)
+										? 'bg-slate-100 text-slate-500'
+										: ''} {tgl === tanggalHariIni()
+										? 'bg-amber-50 text-amber-800'
+										: ''}"
+								>
+									<span class="block text-xs font-semibold">
+										{new Date(`${tgl}T00:00:00`).getDate()}
+									</span>
+									<span class="block text-[10px] font-normal">{namaHariSingkat(tgl)}</span>
+								</th>
+							{/each}
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-100">
+						{#each matriks?.data ?? [] as orang (orang.personel_id)}
+							<tr class="hover:bg-slate-50/70">
+								<td
+									class="sticky left-0 z-10 min-w-56 border-r border-slate-200 bg-white px-3 py-2 align-top"
+								>
+									<p class="font-medium text-slate-800">{orang.nama}</p>
+									<p class="text-[10px] text-slate-500">
+										{orang.pangkat} · {orang.nrp}
+									</p>
+									<p class="text-[10px] text-slate-400">
+										{satkerMap.get(orang.satker_id) ?? orang.unit ?? '-'}
+									</p>
+								</td>
+								{#each matriks?.tanggal ?? [] as tgl}
+									{@const hari = orang.hari[tgl]}
+									{@const penanda = hari ? penandaMatriks(hari) : null}
+									<td
+										class="border-r border-slate-100 p-1 align-top {akhirPekan(tgl)
+											? 'bg-slate-50/40'
+											: ''}"
+									>
+										{#if hari?.tidak_absen}
+											<span class="block px-1.5 py-1">
+												<span
+													class="inline-flex rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 ring-1 ring-inset ring-slate-200"
+												>
+													TA
+												</span>
+												<span class="mt-0.5 block text-[9px] leading-tight text-slate-400"
+													>Tidak absen</span
+												>
+											</span>
+										{:else if hari}
+											<button
+												type="button"
+												class="block w-full rounded-lg px-1.5 py-1 text-left ring-1 ring-transparent transition hover:ring-navy-200 focus:outline-none focus:ring-2 focus:ring-navy-400"
+												title={judulMatriks(orang, tgl, hari)}
+												onclick={() => bukaDetailMatriks(orang, tgl, hari)}
+											>
+												<span
+													class="inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset {kelasMatriks(
+														penanda
+													)}"
+												>
+													{labelMatriks(penanda)}
+												</span>
+												<span
+													class="mt-0.5 block font-mono text-[10px] leading-tight text-slate-700"
+													>{waktuMatriks(hari)}</span
+												>
+												{#if penanda === 'tc' || penanda === 'tm'}
+													<span
+														class="block text-[9px] font-medium leading-tight text-rose-600"
+													>
+														{penanda === 'tc' ? 'tanpa check-out' : 'tanpa check-in'}
+													</span>
+												{/if}
+												{#if menitMatriks(hari)}
+													<span
+														class="block text-[9px] font-medium leading-tight text-amber-700"
+														>{menitMatriks(hari)}</span
+													>
+												{/if}
+											</button>
+										{:else}
+											<span class="block py-2 text-center text-slate-200">·</span>
+										{/if}
+									</td>
+								{/each}
+							</tr>
+						{:else}
+							<tr>
+								<td
+									class="px-4 py-8 text-center text-xs text-slate-500"
+									colspan={(matriks?.tanggal.length ?? 0) + 1}
+								>
+									{memuat ? 'Memuat matriks kehadiran…' : 'Belum ada personel pada filter ini.'}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	{:else if tab === 'rekap'}
 		<div class="card overflow-hidden">
 			<div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
 				<h2 class="text-sm font-semibold text-slate-700">
@@ -1084,6 +1511,135 @@
 				class="max-h-[70vh] w-full rounded-lg object-contain ring-1 ring-slate-200"
 			/>
 			<p class="text-xs text-slate-500">{fotoDetail.caption}</p>
+		</div>
+	{/if}
+</Modal>
+
+<Modal
+	open={!!pilihMatriks}
+	title="Detail Absensi"
+	lebar="max-w-4xl"
+	onclose={tutupDetailMatriks}
+>
+	{#if pilihMatriks}
+		{@const orang = pilihMatriks.personel}
+		{@const hari = pilihMatriks.hari}
+		{@const status = statusEfektif(hari)}
+		{@const penanda = penandaMatriks(hari)}
+		{@const lat = hari.masuk_latitude ?? hari.pulang_latitude}
+		{@const lng = hari.masuk_longitude ?? hari.pulang_longitude}
+		<div class="space-y-4 text-sm">
+			<div class="rounded-lg bg-slate-50 p-3">
+				<div class="flex flex-wrap items-start justify-between gap-2">
+					<div>
+						<p class="font-semibold text-slate-800">{orang.nama}</p>
+						<p class="text-xs text-slate-500">{orang.pangkat} · {orang.nrp}</p>
+						<p class="text-xs text-slate-500">
+							{satkerMap.get(orang.satker_id) ?? orang.unit ?? '-'}
+						</p>
+					</div>
+					<p class="text-xs font-medium text-slate-600">
+						{tanggalSingkat(pilihMatriks.tanggal)}
+					</p>
+				</div>
+				<div class="mt-2 flex flex-wrap gap-1">
+					{#if status}
+						<Badge tone={nadaStatus(status)}>{LABEL_STATUS_KEHADIRAN[status]}</Badge>
+					{/if}
+					{#if penanda === 'ta'}
+						<Badge tone="slate">Tidak absen</Badge>
+					{:else if penanda === 'tc'}
+						<Badge tone="red">Belum check-out</Badge>
+					{:else if penanda === 'tm'}
+						<Badge tone="red">Tanpa check-in</Badge>
+					{/if}
+					{#if hari.ph_hadir}<Badge tone="blue">Strong Point</Badge>{/if}
+					{#if hari.luar_radius}<Badge tone="red">Di luar radius</Badge>{/if}
+					{#if hari.is_mock_suspect}<Badge tone="red">Mock GPS</Badge>{/if}
+					{#if hari.is_offline}<Badge tone="amber">Offline</Badge>{/if}
+					{#if hari.perlu_verifikasi}<Badge tone="amber">Perlu verifikasi</Badge>{/if}
+				</div>
+			</div>
+
+			<div class="grid gap-3 sm:grid-cols-2">
+				<div class="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+					<p class="text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
+						Check-in
+					</p>
+					<p class="mt-1 font-mono text-xl font-semibold text-slate-800">
+						{hari.masuk_jam ?? '-'}
+					</p>
+					{#if hari.menit_telat > 0}
+						<p class="text-xs font-medium text-amber-700">
+							Telat {hari.menit_telat} menit
+						</p>
+					{:else}
+						<p class="text-xs text-slate-400">Tidak telat</p>
+					{/if}
+				</div>
+				<div class="rounded-lg border border-sky-200 bg-sky-50/50 p-3">
+					<p class="text-[11px] font-semibold uppercase tracking-wide text-sky-700">
+						Check-out
+					</p>
+					<p class="mt-1 font-mono text-xl font-semibold text-slate-800">
+						{hari.pulang_jam ?? '-'}
+					</p>
+					{#if hari.menit_pulang_cepat > 0}
+						<p class="text-xs font-medium text-amber-700">
+							Pulang cepat {hari.menit_pulang_cepat} menit
+						</p>
+					{:else}
+						<p class="text-xs text-slate-400">
+							{hari.pulang_jam ? 'Tidak pulang cepat' : 'Belum check-out'}
+						</p>
+					{/if}
+				</div>
+			</div>
+
+			{#if lat !== null && lng !== null}
+				<div class="space-y-2">
+					<p class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+						Lokasi absensi
+					</p>
+					<p class="text-xs text-slate-600">
+						{memuatAlamat ? 'Mencari alamat…' : alamatMatriks ?? 'Alamat tidak ditemukan.'}
+					</p>
+					{#key `${lat},${lng}`}
+						<PetaLokasi latitude={lat} longitude={lng} label={`Lokasi ${orang.nama}`} />
+					{/key}
+				</div>
+			{:else}
+				<div
+					class="rounded-lg border border-dashed border-slate-300 p-3 text-xs text-slate-500"
+				>
+					Lokasi tidak dicatat untuk status ini.
+				</div>
+			{/if}
+
+			{#if fotoMasukMatriks || fotoPulangMatriks}
+				<div class="grid gap-3 sm:grid-cols-2">
+					{#if fotoMasukMatriks}
+						<figure class="space-y-1">
+							<img
+								src={fotoMasukMatriks}
+								alt="Foto check-in {orang.nama}"
+								class="max-h-56 w-full rounded-lg object-contain ring-1 ring-slate-200"
+							/>
+							<figcaption class="text-[11px] text-slate-500">Foto check-in</figcaption>
+						</figure>
+					{/if}
+					{#if fotoPulangMatriks}
+						<figure class="space-y-1">
+							<img
+								src={fotoPulangMatriks}
+								alt="Foto check-out {orang.nama}"
+								class="max-h-56 w-full rounded-lg object-contain ring-1 ring-slate-200"
+							/>
+							<figcaption class="text-[11px] text-slate-500">Foto check-out</figcaption>
+						</figure>
+					{/if}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </Modal>

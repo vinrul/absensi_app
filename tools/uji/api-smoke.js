@@ -120,8 +120,64 @@ async function panggil(token, path, { method = "GET", body } = {}) {
 try {
 	await tungguSehat();
 
+	const waktuRes = await fetch(`${BASE}/waktu`);
+	const waktu = await waktuRes.json();
+	cek(
+		"jam server tersedia tanpa token",
+		waktuRes.status === 200 &&
+			typeof waktu.epoch_ms === "number" &&
+			waktu.zona === "Asia/Makassar",
+		`status ${waktuRes.status}`
+	);
+
 	const admin = await login("superuser", "Superuser#2026");
 	const adminToken = admin.access_token;
+
+	const matriks = await panggil(
+		adminToken,
+		"/absensi/matriks?dari=2026-11-01&sampai=2026-11-30"
+	);
+	const adaLokasi = (matriks.data?.data ?? []).some((p) =>
+		Object.values(p.hari ?? {}).some((h) => h.masuk_latitude !== null)
+	);
+	cek(
+		"matriks kehadiran 30 hari + koordinat",
+		matriks.status === 200 &&
+			matriks.data?.tanggal?.length === 30 &&
+			Array.isArray(matriks.data?.data) &&
+			adaLokasi,
+		`status ${matriks.status}`
+	);
+	const selMatriks = (matriks.data?.data ?? []).flatMap((p) =>
+		Object.entries(p.hari ?? {}).map(([tanggal, h]) => ({ tanggal, ...h }))
+	);
+	const selTa = selMatriks.filter((h) => h.tidak_absen === true);
+	const taRapi = selTa.every((h) => {
+		const hari = new Date(`${h.tanggal}T00:00:00`).getDay();
+		return (
+			hari !== 0 &&
+			hari !== 6 &&
+			h.tanggal < waktu.tanggal &&
+			h.masuk_jam === null &&
+			h.pulang_jam === null
+		);
+	});
+	cek(
+		"matriks memuat flag TA yang konsisten",
+		selMatriks.length > 0 &&
+			selMatriks.every((h) => typeof h.tidak_absen === "boolean") &&
+			taRapi,
+		`${selTa.length} sel TA dari ${selMatriks.length} sel`
+	);
+	const matriksPanjang = await panggil(
+		adminToken,
+		"/absensi/matriks?dari=2026-10-01&sampai=2026-11-30"
+	);
+	cek(
+		"matriks lebih dari 31 hari ditolak",
+		matriksPanjang.status === 422,
+		`status ${matriksPanjang.status}`
+	);
 	const adminViaAndroid = await cobaLogin("superuser", "Superuser#2026", "android");
 	cek(
 		"admin ditolak login lewat Android",
@@ -491,6 +547,31 @@ try {
 	});
 	cek("admin_polres tidak dapat membuat admin global", roleTerlarang.status === 403);
 
+	// Personel baru belum punya absensi: hari kerja lampau harus ditandai TA.
+	const matriksBaru = await panggil(
+		adminToken,
+		`/absensi/matriks?dari=2026-11-01&sampai=2026-11-30&personel_id=${personelBaru.data.id}`
+	);
+	const hariBaru = Object.entries(matriksBaru.data?.data?.[0]?.hari ?? {});
+	const taBaru = hariBaru.filter(([, h]) => h.tidak_absen === true);
+	cek(
+		"personel tanpa absensi ditandai TA pada hari kerja lampau",
+		matriksBaru.status === 200 &&
+			hariBaru.length > 0 &&
+			taBaru.length > 0 &&
+			taBaru.every(([tanggal, h]) => {
+				const hari = new Date(`${tanggal}T00:00:00`).getDay();
+				return (
+					hari !== 0 &&
+					hari !== 6 &&
+					tanggal < waktu.tanggal &&
+					h.masuk_jam === null &&
+					h.pulang_jam === null
+				);
+			}),
+		`${taBaru.length} hari TA dari ${hariBaru.length} sel`
+	);
+
 	// Penempatan tetap: satu anggota = satu titik, tanpa tanggal.
 	const satkerPh = personelBaru.data.satker_id;
 	const titikInduk = await panggil(adminToken, `/ph/strong-point?satker_id=${satkerPh}`);
@@ -832,6 +913,65 @@ try {
 		absenPh.status === 422 &&
 			String(absenPh.data?.error?.message ?? "").includes("strong point"),
 		JSON.stringify(absenPh.data)
+	);
+
+	// Check-in tanpa check-out: matriks harus menandai TC, bukan status biasa.
+	const masukTc = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "masuk",
+			status_kehadiran: "dinas_kantor",
+			captured_at: new Date().toISOString(),
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5,
+			is_offline: false,
+			is_mock_suspect: false,
+			device_id: "uji-tanpa-checkout"
+		}
+	});
+	cek(
+		"check-in tanpa check-out tercatat",
+		masukTc.status === 200 && masukTc.data.aksi === "checkin",
+		JSON.stringify(masukTc.data)
+	);
+	const matriksTc = await panggil(
+		adminToken,
+		`/absensi/matriks?dari=2026-11-01&sampai=2026-11-21&personel_id=${personel.user.id}`
+	);
+	const selTc = matriksTc.data?.data?.find((p) => p.personel_id === personel.user.id)
+		?.hari?.["2026-11-21"];
+	cek(
+		"matriks memuat check-in tanpa check-out (TC)",
+		matriksTc.status === 200 &&
+			selTc?.masuk_jam === "08:00" &&
+			selTc?.pulang_jam === null &&
+			selTc?.tidak_absen === false,
+		JSON.stringify(selTc)
+	);
+	// Tutup kembali catatan TC agar tidak mengganggu skenario piket lintas hari.
+	await fetch(`${BASE}/dev/waktu`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ tanggal: "2026-11-21", jam: "17:00" })
+	});
+	const keluarTc = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "pulang",
+			status_kehadiran: "dinas_kantor",
+			captured_at: new Date().toISOString(),
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5
+		}
+	});
+	cek(
+		"check-out penutup uji TC tercatat",
+		keluarTc.status === 200 && keluarTc.data.aksi === "checkout",
+		JSON.stringify(keluarTc.data)
 	);
 
 	// Piket lintas hari: check-in 23:00, scan besok 22:00 (23 jam) = check-out.

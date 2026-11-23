@@ -18,7 +18,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| A1 | Buka `/docs` | Daftar seluruh operasi (93 path) tampil, filter tag berfungsi | ✅ | |
+| A1 | Buka `/docs` | Daftar seluruh operasi (96 path) tampil, filter tag berfungsi | ✅ | |
 | A2 | Login memakai username `superuser` | Berhasil; `jenis_akun=admin`, `nrp=null` | ✅ | API |
 | A3 | Login memakai NRP `000001` | Gagal (admin tidak punya NRP) | ✅ | API |
 | A4 | Login `superuser` dengan `client=android` | 403 "Akun admin hanya dapat masuk melalui dashboard web" | ✅ | API |
@@ -86,12 +86,19 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A58 | Tombol **Lihat** dokumentasi di Rekap Strong Point | Galeri foto check-in strong point per personel tampil; foto tanpa token ditolak 401, di luar cakupan 403 | ✅ | API |
 | A59 | Login dashboard dengan akun **atasan langsung** atau **personel** saja | Ditolak 403 dengan pesan dashboard hanya untuk pimpinan/admin; diarahkan memakai Android | ✅ | API |
 | A60 | Login dashboard akun **pimpinan** yang juga atasan langsung + personel | Tetap berhasil karena memiliki role pimpinan; dashboard memakai gabungan kemampuan role | ✅ | API |
+| A61 | Jam server di dashboard & web personel | Jam WITA berdetak tiap detik, tanggal tampil di dashboard, indikator sinkron hijau; saat jam palsu aktif muncul badge **PALSU** | ✅ | build + API |
+| A62 | Rekap Kehadiran → **Matriks Harian** | Satu baris per personel, kolom per tanggal (maks. 31 hari); sel menampilkan status, jam check-in/out, telat (**T**), dan pulang cepat (**PC**); rentang >31 hari ditolak | ✅ | API + Chrome headless |
+| A63 | Klik sel **PH / Dinas Luar / Cuti / Izin / Sakit / Operasi** | Modal menampilkan personel, tanggal, status, jam, telat/pulang cepat, foto bila ada, alamat hasil reverse geocode, dan peta Leaflet bertanda lokasi; status tanpa koordinat menampilkan “Lokasi tidak dicatat” | ✅ | Chrome headless |
+| A64 | Tombol **PDF Ringkasan** dan **PDF Matriks Harian** | Masing-masing mengunduh PDF sesuai tampilan; PDF matriks dibagi per minggu, memuat status/jam/telat/pulang cepat, maks. 31 hari; rentang lebih panjang ditolak | ✅ | API + build |
 | A61 | Sidebar pimpinan murni | Grup **Master Data** tidak tampil; akses langsung `/satker`, `/personel`, `/libur`, `/absensi/titik-dinas` dialihkan ke dashboard | ✅ | UI build |
 | A62 | Aksi Kinerja pimpinan murni | Tombol **Buat Rencana**, **Tambah Hasil**, **Tambah Output**, dan **Ajukan** rencana tidak tampil; admin tetap melihat | ✅ | UI build |
 | A63 | Tab **Verifikasi Offline** pimpinan murni | Submenu **Verifikasi Offline** dan tab **Verifikasi** disembunyikan; akses `?tab=verifikasi` dialihkan ke Rekap Kehadiran | ✅ | UI build |
 | A64 | Buka **Profil Saya** lewat avatar/nama di sidebar atau header | Halaman `/profil` menampilkan nama, pangkat, jabatan, NRP/username, satker, dan badge peran; judul header menjadi **Profil Saya** | ✅ | build + API |
 | A65 | Profil → unggah foto JPG/PNG ≤ 5 MB | Pratinjau tampil, unggahan berhasil, avatar berubah di profil, sidebar, dan header; berkas PDF atau > 5 MB ditolak dengan pesan | ✅ | build + endpoint (Android) |
 | A66 | Profil → **Ganti Password** dengan ikon mata | Ketiga kolom dapat ditampilkan/disembunyikan; validasi minimal 8 karakter, huruf + angka, dan konfirmasi sama; setelah sukses semua sesi dicabut dan pengguna diarahkan ke `/login` | ✅ | build + endpoint (Android) |
+| A67 | Hari kerja lampau tanpa absensi | Sel matriks menampilkan **TA** “Tidak absen” tanpa jam; hari ini, akhir pekan, hari libur, tanggal mendatang, dan personel nonaktif tidak ditandai | ✅ | API + build |
+| A68 | Check-in tanpa check-out / check-out tanpa check-in | Sel menampilkan **TC** / **TM** beserta jam yang ada dan keterangan; Dinas Luar/Cuti/Izin/Sakit yang hanya check-in tidak dianggap TC | ✅ | API + build |
+| A69 | Legenda dan PDF matriks | Tabel, modal detail, dan PDF memuat penanda TA/TC/TM beserta keterangannya | ✅ | build + PDF |
 
 ## B. Admin ber-scope
 
@@ -144,7 +151,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C22 | Sudah absen masuk hari ini | Hanya tombol **Absen Pulang** yang tampil | ✅ | emulator |
 | C23 | Di dalam radius | Status Dinas Kantor otomatis terpilih; di luar radius tidak ada yang terpilih | ✅ | emulator |
 | C24 | Server tidak terjangkau saat cek absensi hari ini | Dua tombol tampil, mode offline aktif, absensi tersimpan di perangkat | ✅ | emulator |
-| C25 | Riwayat absensi per tanggal | Satu baris per tanggal: status, check-in, check-out; jadwal dan realisasi strong point tampil pada tanggal yang sama | ✅ | emulator |
+| C25 | Riwayat absensi per tanggal | Satu baris per tanggal: status, check-in, check-out; jadwal dan realisasi strong point tampil pada tanggal yang sama; filter **Dari/Sampai** default tanggal 1 s.d. akhir bulan berjalan | ✅ | emulator |
 | C26 | Jam server palsu `20-11-2026 07:45` | Absensi tercatat tanggal 20 Nov 2026 pukul 07:45; reset mengembalikan jam sistem | ✅ | API + emulator |
 | C27 | Pilih status **PH (Perintah Hadir)** | Tersimpan sebagai status `ph` dan dihitung hadir | ✅ | API |
 | C28 | Buka tab Rencana → **+ Baru** | Wizard langkah 1 (jenis rencana) tampil; bottom nav menampilkan 6 tab termasuk Strong | ✅ | emulator |
@@ -172,6 +179,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C50 | Developer Options aktif tanpa aplikasi mock; absensi memakai GPS asli | Absensi tetap 200; hanya muncul peringatan informatif | ⬜ | emulator |
 | C51 | Aplikasi mock dipilih tetapi tidak aktif | Peringatan “aplikasi lokasi tiruan terpilih”; absensi GPS asli tetap boleh dikirim | ⬜ | emulator |
 | C52 | Antrean offline berisi absensi/strong point mock, lalu dikirim saat server `reject` | Item dihapus dari antrean, jumlah “ditolak” tampil, tidak ada data baru di server | ✅ | build (logika) |
+| C53 | Jam server di header Android | Jam WITA berdetak tiap detik di bawah judul; badge **PALSU** saat fake time; reset fake time kembali ke jam sistem tanpa restart | ✅ | emulator |
 
 ## D. Atasan Langsung (`000100` / `Atasan#2026`)
 
@@ -218,12 +226,12 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| F1 | `cargo test` | 37 unit test lulus | ✅ | |
+| F1 | `cargo test` | 38 unit test lulus | ✅ | |
 | F2 | `cargo fmt --check` + clippy `-D warnings` | Bersih | ✅ | |
 | F3 | `bun run check` | 0 error, 0 warning (dashboard & personel) | ✅ | |
 | F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` dan `personel/build` | ✅ | |
 | F5 | `.gradlew :app:assembleDebug` | APK debug terbentuk | ✅ | |
-| F6 | `bun tools/uji/api-smoke.js` | 79/79 cek lulus (DB `kinerja_test`) | ✅ | |
+| F6 | `bun tools/uji/api-smoke.js` | 87/87 cek lulus (DB `kinerja_test`) | ✅ | |
 | F7 | `bun tools/uji/openapi-check.js` | JSON valid, semua `$ref` ada | ✅ | |
 | F8 | Restore backup di lingkungan uji | Data & berkas kembali utuh | ⬜ | |
 | F9 | Uji 1 bulan data riil | Hitung periode < 60 detik | ⬜ | |

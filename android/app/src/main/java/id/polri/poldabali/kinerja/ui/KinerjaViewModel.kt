@@ -35,14 +35,28 @@ import id.polri.poldabali.kinerja.data.VerifikasiHasilRequest
 import id.polri.poldabali.kinerja.data.VerifikasiOutputRequest
 import id.polri.poldabali.kinerja.sync.Pengingat
 import id.polri.poldabali.kinerja.sync.Sinkronisasi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import java.util.UUID
 
 class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
 
     private val repo = Graf.repositori
+
+    private var offsetJamServerMs = 0L
+    private var epochServerTerakhir: Long? = null
+    private var pekerjaanJamServer: Job? = null
+    private val formatJamServer = DateTimeFormatter.ofPattern("HH:mm:ss")
+    private val formatTanggalJamServer =
+        DateTimeFormatter.ofPattern("d MMM yyyy", Locale.forLanguageTag("id-ID"))
+    private val zonaWita: ZoneOffset = ZoneOffset.ofHours(8)
 
     var pengguna by mutableStateOf<Pengguna?>(null)
         private set
@@ -63,6 +77,20 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         private set
 
     var riwayat by mutableStateOf<List<Absensi>>(emptyList())
+        private set
+
+    /** Rentang tanggal riwayat yang sedang ditampilkan (YYYY-MM-DD). */
+    var riwayatDari by mutableStateOf("")
+        private set
+
+    var riwayatSampai by mutableStateOf("")
+        private set
+
+    /** Jadwal & absensi strong point khusus untuk layar riwayat. */
+    var jadwalPhRiwayat by mutableStateOf<List<JadwalPhSaya>>(emptyList())
+        private set
+
+    var absensiPhRiwayat by mutableStateOf<List<AbsensiPh>>(emptyList())
         private set
 
     var absensiHariIni by mutableStateOf<AbsensiHariIni?>(null)
@@ -139,7 +167,18 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     var alamatServer by mutableStateOf("")
         private set
 
+    /** Jam server WITA yang berdetak lokal; disinkronkan ulang berkala. */
+    var jamServerTeks by mutableStateOf("--:--:--")
+        private set
+
+    var jamServerTanggal by mutableStateOf("")
+        private set
+
+    var jamServerPalsu by mutableStateOf(false)
+        private set
+
     init {
+        mulaiJamServer()
         viewModelScope.launch {
             alamatServer = repo.alamatServer()
             pengguna = repo.penggunaTersimpan()
@@ -147,6 +186,51 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
             memuatSesi = false
             if (pengguna != null) muatSemua()
         }
+    }
+
+    /**
+     * Sinkronkan offset sekali, lalu berdetak lokal tiap detik. Resync 5 menit
+     * sekali (15 detik saat jam server palsu) agar beban server tetap ringan.
+     */
+    private fun mulaiJamServer() {
+        if (pekerjaanJamServer?.isActive == true) return
+        pekerjaanJamServer = viewModelScope.launch {
+            perbaruiJamServer()
+            var berikutnyaSinkron = 0L
+            while (isActive) {
+                val sekarang = System.currentTimeMillis()
+                if (sekarang >= berikutnyaSinkron) {
+                    runCatching { sinkronJamServer() }
+                    berikutnyaSinkron =
+                        sekarang + if (jamServerPalsu) 15_000L else 5 * 60_000L
+                }
+                perbaruiJamServer()
+                delay(1_000L)
+            }
+        }
+    }
+
+    private suspend fun sinkronJamServer() {
+        val mulai = System.currentTimeMillis()
+        val waktu = repo.waktuServer()
+        val selesai = System.currentTimeMillis()
+        // Saat jam palsu tidak berubah, pertahankan offset agar jam tetap berdetak
+        // alih-alih melompat kembali ke nilai fake yang dibekukan.
+        val epochBerubah = epochServerTerakhir == null || waktu.epochMs != epochServerTerakhir
+        if (!waktu.palsu || epochBerubah) {
+            // Asumsi latensi simetris: waktu server berada di tengah rentang permintaan.
+            offsetJamServerMs = waktu.epochMs - (mulai + selesai) / 2
+            epochServerTerakhir = waktu.epochMs
+        }
+        jamServerPalsu = waktu.palsu
+        perbaruiJamServer()
+    }
+
+    private fun perbaruiJamServer() {
+        val wita = Instant.ofEpochMilli(System.currentTimeMillis() + offsetJamServerMs)
+            .atOffset(zonaWita)
+        jamServerTeks = wita.format(formatJamServer)
+        jamServerTanggal = wita.format(formatTanggalJamServer)
     }
 
     // ------------------------------------------------------------------ util
@@ -205,6 +289,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     fun login(nrp: String, password: String, selesai: () -> Unit) {
         jalankan {
             pengguna = repo.login(nrp, password)
+            sinkronJamSekarang()
             muatSemuaLangsung()
             selesai()
         }
@@ -214,8 +299,14 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         jalankan {
             repo.ubahAlamatServer(url)
             alamatServer = repo.alamatServer()
+            sinkronJamSekarang()
             pesan = "Alamat server disimpan"
         }
+    }
+
+    /** Sinkronisasi jam segera setelah login atau alamat server berubah. */
+    private fun sinkronJamSekarang() {
+        viewModelScope.launch { runCatching { sinkronJamServer() } }
     }
 
     fun keluar(selesai: () -> Unit) {
@@ -230,6 +321,10 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         pengguna = null
         fotoProfil = null
         riwayat = emptyList()
+        riwayatDari = ""
+        riwayatSampai = ""
+        jadwalPhRiwayat = emptyList()
+        absensiPhRiwayat = emptyList()
         rencana = emptyList()
         persetujuan = emptyList()
         hasil = emptyList()
@@ -353,11 +448,11 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         periode = repo.periodeAktif()
         antrean = repo.daftarAntrean()
         antreanPh = repo.daftarAntreanPh()
-        riwayat = repo.riwayatAbsensiBulanIni()
         runCatching { absensiHariIni = repo.absensiHariIni() }
             .onSuccess { absensiHariIniOffline = false }
             .onFailure { absensiHariIniOffline = true }
         runCatching { konteksAbsensi = repo.konteksAbsensi() }
+        muatRiwayatRentangLangsung()
 
         // Ringkasan di Beranda butuh jumlah dokumen & nilai terbaru.
         runCatching { rencana = daftarRencanaSaya() }
@@ -383,18 +478,32 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     }
 
     fun muatRiwayat(dari: String, sampai: String) {
-        jalankan { riwayat = repo.riwayatAbsensi(dari, sampai) }
+        jalankan { muatRiwayatRentangLangsung(dari, sampai) }
     }
 
     fun muatRiwayatBulanIni() {
         jalankan {
             runCatching { konteksAbsensi = repo.konteksAbsensi() }
-            riwayat = repo.riwayatAbsensiBulanIni()
             val acuan = tanggalAcuan()
-            val dari = acuan.withDayOfMonth(1).toString()
-            jadwalPh = repo.jadwalPhSaya(dari, acuan.toString())
-            absensiPh = repo.absensiPhSaya(dari, acuan.toString())
+            muatRiwayatRentangLangsung(
+                dari = acuan.withDayOfMonth(1).toString(),
+                sampai = acuan.withDayOfMonth(acuan.lengthOfMonth()).toString()
+            )
         }
+    }
+
+    /** Memuat absensi dan sesi strong point untuk rentang yang sedang aktif. */
+    private suspend fun muatRiwayatRentangLangsung(dari: String? = null, sampai: String? = null) {
+        val acuan = tanggalAcuan()
+        val awal = dari ?: riwayatDari.ifBlank { acuan.withDayOfMonth(1).toString() }
+        val akhir = sampai ?: riwayatSampai.ifBlank {
+            acuan.withDayOfMonth(acuan.lengthOfMonth()).toString()
+        }
+        riwayatDari = awal
+        riwayatSampai = akhir
+        riwayat = repo.riwayatAbsensi(awal, akhir)
+        jadwalPhRiwayat = repo.jadwalPhSaya(awal, akhir)
+        absensiPhRiwayat = repo.absensiPhSaya(awal, akhir)
     }
 
     /** Tanggal server bila tersedia agar riwayat tetap benar saat jam server dipalsukan. */
@@ -436,7 +545,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
                 selesai("Absensi disimpan di perangkat dan akan dikirim otomatis")
             } else {
                 val hasilKirim = repo.kirimAbsensi(request)
-                riwayat = repo.riwayatAbsensiBulanIni()
+                muatRiwayatRentangLangsung()
                 runCatching { absensiHariIni = repo.absensiHariIni() }
                     .onSuccess { absensiHariIniOffline = false }
                 runCatching { konteksAbsensi = repo.konteksAbsensi() }
@@ -457,7 +566,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
             val hasilPh = repo.sinkronkanAntreanPh()
             antrean = repo.daftarAntrean()
             antreanPh = repo.daftarAntreanPh()
-            riwayat = repo.riwayatAbsensiBulanIni()
+            muatRiwayatRentangLangsung()
             runCatching { muatPhLangsung() }
             runCatching { absensiHariIni = repo.absensiHariIni() }
                 .onSuccess { absensiHariIniOffline = false }

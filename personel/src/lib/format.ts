@@ -100,6 +100,8 @@ export function warnaStatus(status: StatusKehadiran): string {
 			return 'bg-indigo-100 text-indigo-700';
 		case 'piket':
 			return 'bg-violet-100 text-violet-700';
+		case 'operasi':
+			return 'bg-sky-100 text-sky-700';
 		case 'cuti':
 		case 'izin':
 			return 'bg-amber-100 text-amber-800';

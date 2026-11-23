@@ -38,7 +38,8 @@ pub fn build(state: AppState) -> Router {
         .nest("/dashboard", routes::dashboard::routes())
         .nest("/laporan", routes::laporan::routes())
         .nest("/notifikasi", routes::notifikasi::routes())
-        .nest("/audit", routes::audit::routes());
+        .nest("/audit", routes::audit::routes())
+        .route("/waktu", get(routes::waktu::sekarang));
 
     let api = if state.settings.allow_fake_time {
         api.nest("/dev", routes::dev::routes())

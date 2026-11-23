@@ -7,9 +7,9 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Timelike, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Timelike, Utc, Weekday};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::auth::extractor::AuthUser;
@@ -18,6 +18,7 @@ use crate::error::{AppError, AppResult};
 use crate::repo::absensi::{
     self, AbsensiHarianRow, AbsensiRow, ListFilter, ListHarianFilter, NewAbsensi,
 };
+use crate::repo::libur;
 use crate::repo::personel;
 use crate::repo::ph;
 use crate::repo::satker;
@@ -36,6 +37,8 @@ pub fn routes() -> Router<AppState> {
         .route("/hari-ini", get(hari_ini))
         .route("/konteks", get(konteks_absensi))
         .route("/harian", get(list_harian))
+        .route("/matriks", get(matriks_absensi))
+        .route("/matriks/ekspor", get(ekspor_matriks_pdf))
         .route("/rekap", get(rekap_absensi))
         .route("/rekap/ekspor", get(ekspor_rekap_pdf))
         .route("/foto", get(list_foto))
@@ -759,6 +762,10 @@ pub struct AbsensiHarianDto {
     pub tanggal: NaiveDate,
     pub masuk_jam: Option<String>,
     pub pulang_jam: Option<String>,
+    pub masuk_latitude: Option<f64>,
+    pub masuk_longitude: Option<f64>,
+    pub pulang_latitude: Option<f64>,
+    pub pulang_longitude: Option<f64>,
     pub status_masuk: Option<StatusKehadiran>,
     pub status_pulang: Option<StatusKehadiran>,
     pub is_offline: bool,
@@ -770,6 +777,7 @@ pub struct AbsensiHarianDto {
     pub verified_at: Option<DateTime<Utc>>,
     pub catatan_verifikator: Option<String>,
     pub menit_telat: i64,
+    pub menit_pulang_cepat: i64,
     pub foto_url: Option<String>,
     pub foto_masuk_url: Option<String>,
     pub foto_pulang_url: Option<String>,
@@ -787,6 +795,10 @@ impl From<AbsensiHarianRow> for AbsensiHarianDto {
             tanggal: row.tanggal,
             masuk_jam: row.masuk_jam.map(|jam| jam.format("%H:%M").to_string()),
             pulang_jam: row.pulang_jam.map(|jam| jam.format("%H:%M").to_string()),
+            masuk_latitude: row.masuk_latitude,
+            masuk_longitude: row.masuk_longitude,
+            pulang_latitude: row.pulang_latitude,
+            pulang_longitude: row.pulang_longitude,
             status_masuk: row.status_masuk,
             status_pulang: row.status_pulang,
             is_offline: row.is_offline,
@@ -798,6 +810,7 @@ impl From<AbsensiHarianRow> for AbsensiHarianDto {
             verified_at: row.verified_at,
             catatan_verifikator: row.catatan_verifikator,
             menit_telat: row.menit_telat,
+            menit_pulang_cepat: row.menit_pulang_cepat,
             foto_url: row.foto_path.map(|key| format!("/api/v1/files/{key}")),
             foto_masuk_url: row
                 .foto_masuk_path
@@ -849,6 +862,544 @@ pub async fn list_harian(
 
     let data = rows.into_iter().map(AbsensiHarianDto::from).collect();
     Ok(Json(ListResponse::new(data, page, per_page, total)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MatriksQuery {
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
+    pub satker_id: Option<Uuid>,
+    pub personel_id: Option<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MatriksHariDto {
+    pub status: Option<StatusKehadiran>,
+    pub status_masuk: Option<StatusKehadiran>,
+    pub status_pulang: Option<StatusKehadiran>,
+    pub masuk_jam: Option<String>,
+    pub pulang_jam: Option<String>,
+    pub menit_telat: i64,
+    pub menit_pulang_cepat: i64,
+    pub masuk_latitude: Option<f64>,
+    pub masuk_longitude: Option<f64>,
+    pub pulang_latitude: Option<f64>,
+    pub pulang_longitude: Option<f64>,
+    pub ph_hadir: bool,
+    pub luar_radius: bool,
+    pub is_offline: bool,
+    pub is_mock_suspect: bool,
+    pub perlu_verifikasi: bool,
+    pub foto_masuk_url: Option<String>,
+    pub foto_pulang_url: Option<String>,
+    /// Hari kerja efektif tanpa catatan absensi sama sekali.
+    pub tidak_absen: bool,
+}
+
+impl MatriksHariDto {
+    fn tanpa_absensi() -> Self {
+        Self {
+            status: None,
+            status_masuk: None,
+            status_pulang: None,
+            masuk_jam: None,
+            pulang_jam: None,
+            menit_telat: 0,
+            menit_pulang_cepat: 0,
+            masuk_latitude: None,
+            masuk_longitude: None,
+            pulang_latitude: None,
+            pulang_longitude: None,
+            ph_hadir: false,
+            luar_radius: false,
+            is_offline: false,
+            is_mock_suspect: false,
+            perlu_verifikasi: false,
+            foto_masuk_url: None,
+            foto_pulang_url: None,
+            tidak_absen: true,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct MatriksPersonelDto {
+    pub personel_id: Uuid,
+    pub nama: String,
+    pub nrp: String,
+    pub pangkat: String,
+    pub satker_id: Uuid,
+    pub satker_nama: String,
+    pub unit: Option<String>,
+    pub is_active: bool,
+    /// Peta tanggal (YYYY-MM-DD) ke detail absensi hari itu.
+    pub hari: BTreeMap<NaiveDate, MatriksHariDto>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MatriksResponse {
+    pub rentang: MatriksRentangDto,
+    pub tanggal: Vec<NaiveDate>,
+    pub data: Vec<MatriksPersonelDto>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MatriksRentangDto {
+    pub dari: NaiveDate,
+    pub sampai: NaiveDate,
+}
+
+/// Matriks kehadiran: satu baris per personel, satu kolom per tanggal (maks. 31 hari).
+pub async fn matriks_absensi(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<MatriksQuery>,
+) -> AppResult<Json<MatriksResponse>> {
+    if !(user.is_admin_any() || user.is_pimpinan_any() || user.is_atasan()) {
+        return Err(AppError::Forbidden(
+            "Rekap absensi hanya untuk atasan/pimpinan/admin".into(),
+        ));
+    }
+
+    let (dari, sampai) = tentukan_rentang(query.dari, query.sampai)?;
+    validasi_rentang_matriks(dari, sampai)?;
+
+    let mut scope = crate::routes::personel::scope_for(&state, &user).await?;
+    if let Some(satker_id) = query.satker_id {
+        if !scope.contains(&satker_id) {
+            return Err(AppError::Forbidden(
+                "Anda tidak berhak melihat absensi satker tersebut".into(),
+            ));
+        }
+        scope = vec![satker_id];
+    }
+
+    let data = muat_data_matriks(&state, scope, dari, sampai, query.personel_id).await?;
+    let jumlah_hari = (sampai - dari).num_days() + 1;
+    let tanggal = dari.iter_days().take(jumlah_hari as usize).collect();
+
+    Ok(Json(MatriksResponse {
+        rentang: MatriksRentangDto { dari, sampai },
+        tanggal,
+        data,
+    }))
+}
+
+fn validasi_rentang_matriks(dari: NaiveDate, sampai: NaiveDate) -> AppResult<()> {
+    if (sampai - dari).num_days() + 1 > 31 {
+        return Err(AppError::Unprocessable(
+            "Rentang rekap maksimal 31 hari".into(),
+        ));
+    }
+    Ok(())
+}
+
+async fn muat_data_matriks(
+    state: &AppState,
+    scope: Vec<Uuid>,
+    dari: NaiveDate,
+    sampai: NaiveDate,
+    personel_id: Option<Uuid>,
+) -> AppResult<Vec<MatriksPersonelDto>> {
+    let (personel_rows, _) =
+        personel::list(&state.pool, &scope, None, None, personel_id, 10_000, 0).await?;
+    let satker_rows = satker::list_by_ids(&state.pool, &scope).await?;
+    let libur_rows = libur::list(&state.pool, dari, sampai, &scope).await?;
+    let (absensi_rows, _) = absensi::list_harian(
+        &state.pool,
+        &ListHarianFilter {
+            satker_ids: scope,
+            personel_id,
+            dari: Some(dari),
+            sampai: Some(sampai),
+            perlu_verifikasi: None,
+            limit: 100_000,
+            offset: 0,
+        },
+    )
+    .await?;
+
+    let hari_kerja_per_satker: HashMap<Uuid, Vec<i16>> = satker_rows
+        .into_iter()
+        .filter(|satker| satker.is_active)
+        .map(|satker| (satker.id, satker.hari_kerja))
+        .collect();
+    let mut libur_umum: HashSet<NaiveDate> = HashSet::new();
+    let mut libur_satker: HashMap<Uuid, HashSet<NaiveDate>> = HashMap::new();
+    for row in libur_rows {
+        if !row.is_active {
+            continue;
+        }
+        match row.satker_id {
+            Some(satker_id) => {
+                libur_satker
+                    .entry(satker_id)
+                    .or_default()
+                    .insert(row.tanggal);
+            }
+            None => {
+                libur_umum.insert(row.tanggal);
+            }
+        }
+    }
+
+    let mut hari_per_personel: HashMap<Uuid, BTreeMap<NaiveDate, MatriksHariDto>> = HashMap::new();
+    for row in absensi_rows {
+        let hari = MatriksHariDto {
+            status: row.status_masuk.or(row.status_pulang),
+            status_masuk: row.status_masuk,
+            status_pulang: row.status_pulang,
+            masuk_jam: row.masuk_jam.map(|jam| jam.format("%H:%M").to_string()),
+            pulang_jam: row.pulang_jam.map(|jam| jam.format("%H:%M").to_string()),
+            menit_telat: row.menit_telat,
+            menit_pulang_cepat: row.menit_pulang_cepat,
+            masuk_latitude: row.masuk_latitude,
+            masuk_longitude: row.masuk_longitude,
+            pulang_latitude: row.pulang_latitude,
+            pulang_longitude: row.pulang_longitude,
+            ph_hadir: row.ph_hadir,
+            luar_radius: row.luar_radius,
+            is_offline: row.is_offline,
+            is_mock_suspect: row.is_mock_suspect,
+            perlu_verifikasi: row.perlu_verifikasi,
+            foto_masuk_url: row
+                .foto_masuk_path
+                .map(|key| format!("/api/v1/files/{key}")),
+            foto_pulang_url: row
+                .foto_pulang_path
+                .map(|key| format!("/api/v1/files/{key}")),
+            tidak_absen: false,
+        };
+        hari_per_personel
+            .entry(row.personel_id)
+            .or_default()
+            .insert(row.tanggal, hari);
+    }
+
+    // Tampilkan semua personel aktif, ditambah personel nonaktif yang punya data.
+    let mut data = Vec::with_capacity(personel_rows.len());
+    for p in personel_rows {
+        let hari = hari_per_personel.remove(&p.id).unwrap_or_default();
+        if !p.is_active && hari.is_empty() {
+            continue;
+        }
+        data.push(MatriksPersonelDto {
+            personel_id: p.id,
+            nama: p.nama,
+            nrp: p.nrp,
+            pangkat: p.pangkat,
+            satker_id: p.satker_id,
+            satker_nama: p.satker_nama,
+            unit: p.unit,
+            is_active: p.is_active,
+            hari,
+        });
+    }
+
+    // Tandai hari kerja efektif yang tidak memiliki catatan absensi (TA).
+    // Hari ini belum ditandai karena absensi masih berjalan; hari libur, akhir pekan,
+    // tanggal mendatang, dan personel nonaktif juga tidak ditandai.
+    let hari_ini = waktu::hari_ini_wita();
+    let batas = if sampai < hari_ini {
+        sampai
+    } else {
+        hari_ini - Duration::days(1)
+    };
+    for orang in &mut data {
+        if !orang.is_active {
+            continue;
+        }
+        let Some(hari_kerja) = hari_kerja_per_satker.get(&orang.satker_id) else {
+            continue;
+        };
+        if hari_kerja.is_empty() {
+            continue;
+        }
+        let libur_khusus = libur_satker.get(&orang.satker_id);
+        let mut tanggal = dari;
+        while tanggal <= batas {
+            let libur = libur_umum.contains(&tanggal)
+                || libur_khusus.is_some_and(|set| set.contains(&tanggal));
+            let iso = tanggal.weekday().num_days_from_monday() as i16 + 1;
+            if !libur && hari_kerja.contains(&iso) && !orang.hari.contains_key(&tanggal) {
+                orang.hari.insert(tanggal, MatriksHariDto::tanpa_absensi());
+            }
+            tanggal += Duration::days(1);
+        }
+    }
+
+    Ok(data)
+}
+
+fn label_matriks_pdf(hari: &MatriksHariDto) -> (&'static str, &'static str) {
+    if hari.tidak_absen {
+        return ("TA", "s-ta");
+    }
+    if hari.masuk_jam.is_none() && hari.pulang_jam.is_some() {
+        return ("TM", "s-tc");
+    }
+    let status = hari.status.or(hari.status_masuk).or(hari.status_pulang);
+    let wajib_checkout = matches!(
+        status,
+        Some(
+            StatusKehadiran::DinasKantor
+                | StatusKehadiran::Ph
+                | StatusKehadiran::Piket
+                | StatusKehadiran::Operasi
+        )
+    );
+    if hari.masuk_jam.is_some() && hari.pulang_jam.is_none() && wajib_checkout {
+        return ("TC", "s-tc");
+    }
+    if hari.ph_hadir {
+        return ("PH", "s-hadir");
+    }
+    match status {
+        Some(StatusKehadiran::DinasKantor) => ("DK", "s-hadir"),
+        Some(StatusKehadiran::DinasLuar) => ("DL", "s-luar"),
+        Some(StatusKehadiran::Ph) => ("PH", "s-hadir"),
+        Some(StatusKehadiran::Piket) => ("Piket", "s-hadir"),
+        Some(StatusKehadiran::Operasi) => ("Ops", "s-hadir"),
+        Some(StatusKehadiran::Cuti) => ("Cuti", "s-izin"),
+        Some(StatusKehadiran::Izin) => ("Izin", "s-izin"),
+        Some(StatusKehadiran::Sakit) => ("Sakit", "s-izin"),
+        Some(StatusKehadiran::LiburNasional) => ("Libur", "s-libur"),
+        Some(StatusKehadiran::TanpaKeterangan) => ("TK", "s-tk"),
+        None => ("-", "s-libur"),
+    }
+}
+
+fn hari_singkat(tanggal: NaiveDate) -> &'static str {
+    match tanggal.weekday() {
+        Weekday::Mon => "Sen",
+        Weekday::Tue => "Sel",
+        Weekday::Wed => "Rab",
+        Weekday::Thu => "Kam",
+        Weekday::Fri => "Jum",
+        Weekday::Sat => "Sab",
+        Weekday::Sun => "Min",
+    }
+}
+
+fn jam_matriks_pdf(hari: &MatriksHariDto) -> String {
+    match (&hari.masuk_jam, &hari.pulang_jam) {
+        (Some(masuk), Some(pulang)) => format!("{masuk}–{pulang}"),
+        (Some(masuk), None) => masuk.clone(),
+        (None, Some(pulang)) => format!("–{pulang}"),
+        (None, None) => "-".into(),
+    }
+}
+
+const LEGENDA_MATRIKS_PDF: &str = r#"<div class="legenda"><b>DK</b> Dinas Kantor · <b>DL</b> Dinas Luar · <b>PH</b> Strong Point · <b>Piket</b> Piket/Shift · <b>Ops</b> Operasi/Pam · <b>Cuti</b> · <b>Izin</b> · <b>Sakit</b> · <b>TK</b> Tanpa Keterangan · <b>TA</b> tidak absen · <b>TC</b> check-in tanpa check-out · <b>TM</b> check-out tanpa check-in · <b>T</b> telat · <b>PC</b> pulang cepat</div>"#;
+
+const CSS_MATRIKS_PDF: &str = r#"
+@page { size: A4 landscape; margin: 8mm 8mm 10mm; }
+body { font-size: 7.5pt; }
+.judul-halaman { font-size: 10pt; margin: 0 0 4px; color: #0b2545; display: flex; justify-content: space-between; }
+.judul-halaman .halaman-ke { font-size: 8pt; color: #64748b; font-weight: normal; }
+.legenda { font-size: 6.8pt; color: #475569; margin-bottom: 4px; }
+table.matriks { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.matriks th, table.matriks td { border: 1px solid #94a3b8; padding: 2px 3px; vertical-align: top; }
+table.matriks thead th { background: #0b2545; color: #fff; font-size: 7pt; text-align: center; }
+table.matriks thead th span { font-weight: normal; font-size: 6pt; color: #cbd5e1; }
+table.matriks th.akhir-pekan { background: #334155; }
+table.matriks col.kolom-nama { width: 38mm; }
+table.matriks col.kolom-tanggal { width: 34mm; }
+table.matriks td.nama strong { display: block; font-size: 7.2pt; }
+table.matriks td.nama .sub { display: block; font-size: 6.2pt; color: #64748b; }
+table.matriks td.tanggal { text-align: center; font-size: 6.8pt; }
+table.matriks td.tanggal .status { display: block; font-weight: 600; }
+table.matriks td.tanggal .jam { display: block; font-family: Consolas, monospace; font-size: 6.2pt; }
+table.matriks td.tanggal .menit { display: block; color: #b45309; font-size: 6pt; }
+table.matriks td.kosong { color: #cbd5e1; text-align: center; }
+.s-hadir { color: #047857; }
+.s-luar { color: #0369a1; }
+.s-izin { color: #b45309; }
+.s-tk { color: #be123c; }
+.s-ta { color: #94a3b8; }
+.s-tc { color: #be123c; }
+.s-libur { color: #64748b; }
+.halaman { page-break-after: always; }
+.halaman:last-of-type { page-break-after: auto; }
+table.matriks thead { display: table-header-group; }
+table.matriks tr { page-break-inside: avoid; }
+"#;
+
+fn html_matriks(
+    data: &[MatriksPersonelDto],
+    tanggal: &[NaiveDate],
+    periode: &str,
+    nama_satker: &str,
+    nama_personel: &str,
+    dicetak_oleh: &str,
+    dicetak_pada: &str,
+) -> String {
+    let total_bagian = tanggal.chunks(7).count().max(1);
+    let mut isi = String::new();
+
+    if data.is_empty() {
+        isi.push_str("<p class=\"empty\">Tidak ada data sesuai filter.</p>");
+    } else {
+        for (indeks, potongan) in tanggal.chunks(7).enumerate() {
+            let label = if potongan.len() == 1 {
+                laporan::format_tanggal(potongan[0])
+            } else {
+                format!(
+                    "{} s.d. {}",
+                    laporan::format_tanggal(potongan[0]),
+                    laporan::format_tanggal(potongan[potongan.len() - 1])
+                )
+            };
+            isi.push_str("<section class=\"halaman\">");
+            isi.push_str(&format!(
+                "<h2 class=\"judul-halaman\">Matriks Harian {label}<span class=\"halaman-ke\">Bagian {}/{total_bagian}</span></h2>",
+                indeks + 1
+            ));
+            isi.push_str(LEGENDA_MATRIKS_PDF);
+            isi.push_str("<table class=\"matriks\"><colgroup><col class=\"kolom-nama\">");
+            for _ in potongan {
+                isi.push_str("<col class=\"kolom-tanggal\">");
+            }
+            isi.push_str("</colgroup><thead><tr><th class=\"nama\">Personel</th>");
+            for tgl in potongan {
+                let kelas = if matches!(tgl.weekday(), Weekday::Sat | Weekday::Sun) {
+                    " akhir-pekan"
+                } else {
+                    ""
+                };
+                isi.push_str(&format!(
+                    "<th class=\"tanggal{kelas}\">{}<br><span>{}</span></th>",
+                    tgl.format("%d-%m"),
+                    hari_singkat(*tgl)
+                ));
+            }
+            isi.push_str("</tr></thead><tbody>");
+
+            for orang in data {
+                isi.push_str("<tr><td class=\"nama\">");
+                isi.push_str(&format!(
+                    "<strong>{}</strong><span class=\"sub\">{} · {}</span><span class=\"sub\">{}</span>",
+                    laporan::esc(&orang.nama),
+                    laporan::esc(&orang.pangkat),
+                    laporan::esc(&orang.nrp),
+                    laporan::esc(
+                        orang
+                            .unit
+                            .as_deref()
+                            .filter(|unit| !unit.trim().is_empty())
+                            .unwrap_or(&orang.satker_nama)
+                    )
+                ));
+                isi.push_str("</td>");
+
+                for tgl in potongan {
+                    if let Some(hari) = orang.hari.get(tgl) {
+                        if hari.tidak_absen {
+                            isi.push_str(
+                                "<td class=\"tanggal\"><span class=\"status s-ta\">TA</span><span class=\"jam\">tidak absen</span></td>",
+                            );
+                            continue;
+                        }
+                        let (label, kelas) = label_matriks_pdf(hari);
+                        isi.push_str(&format!(
+                            "<td class=\"tanggal\"><span class=\"status {kelas}\">{label}</span><span class=\"jam\">{}</span>",
+                            laporan::esc(&jam_matriks_pdf(hari))
+                        ));
+                        if label == "TC" {
+                            isi.push_str("<span class=\"menit\">tanpa check-out</span>");
+                        } else if label == "TM" {
+                            isi.push_str("<span class=\"menit\">tanpa check-in</span>");
+                        }
+                        let mut menit = String::new();
+                        if hari.menit_telat > 0 {
+                            menit.push_str(&format!("T {}m", hari.menit_telat));
+                        }
+                        if hari.menit_pulang_cepat > 0 {
+                            if !menit.is_empty() {
+                                menit.push_str(" · ");
+                            }
+                            menit.push_str(&format!("PC {}m", hari.menit_pulang_cepat));
+                        }
+                        if !menit.is_empty() {
+                            isi.push_str(&format!(
+                                "<span class=\"menit\">{}</span>",
+                                laporan::esc(&menit)
+                            ));
+                        }
+                        isi.push_str("</td>");
+                    } else {
+                        isi.push_str("<td class=\"tanggal kosong\">·</td>");
+                    }
+                }
+                isi.push_str("</tr>");
+            }
+
+            isi.push_str("</tbody></table></section>");
+        }
+    }
+
+    laporan::html_kustom(&laporan::LaporanKustom {
+        judul: "Matriks Harian Kehadiran Personel",
+        periode,
+        satker: nama_satker,
+        personel: nama_personel,
+        status: "Semua status kehadiran",
+        dicetak_oleh,
+        dicetak_pada,
+        isi,
+        catatan: Some(format!(
+            "Matriks disusun per minggu agar mudah dibaca. Total {} personel; T = menit telat, PC = menit pulang cepat.",
+            data.len()
+        )),
+        css_tambahan: CSS_MATRIKS_PDF,
+    })
+}
+
+/// Ekspor matriks kehadiran harian (maks. 31 hari) menjadi PDF.
+pub async fn ekspor_matriks_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<EksporQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola_absensi(&user)?;
+    let (dari, sampai, scope) = rentang_dan_scope(
+        &state,
+        &user,
+        query.dari,
+        query.sampai,
+        query.satker_id,
+        "Anda tidak berhak mengekspor matriks satker tersebut",
+    )
+    .await?;
+    validasi_rentang_matriks(dari, sampai)?;
+
+    let data = muat_data_matriks(&state, scope, dari, sampai, query.personel_id).await?;
+    let jumlah_hari = (sampai - dari).num_days() + 1;
+    let tanggal: Vec<NaiveDate> = dari.iter_days().take(jumlah_hari as usize).collect();
+    let nama_satker = nama_satker_terpilih(&state, query.satker_id).await?;
+    let nama_personel = nama_personel_terpilih(&state, query.personel_id).await?;
+    let dicetak_oleh = nama_pencetak(&state, &user).await?;
+    let dicetak_pada = waktu_cetak();
+    let periode = label_rentang(dari, sampai);
+
+    let html = html_matriks(
+        &data,
+        &tanggal,
+        &periode,
+        &nama_satker,
+        &nama_personel,
+        &dicetak_oleh,
+        &dicetak_pada,
+    );
+    let isi_pdf = pdf::render_pdf(&html).await?;
+
+    Ok(respons_pdf(
+        isi_pdf,
+        format!(
+            "matriks-harian-{}.pdf",
+            waktu::hari_ini_wita().format("%Y%m%d")
+        ),
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -1735,4 +2286,70 @@ pub async fn verifikasi_absensi(
         .await?
         .ok_or_else(|| AppError::NotFound("Data absensi tidak ditemukan".into()))?;
     Ok(Json(row.into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hari_dengan(
+        masuk: Option<&str>,
+        pulang: Option<&str>,
+        status: StatusKehadiran,
+    ) -> MatriksHariDto {
+        let mut hari = MatriksHariDto::tanpa_absensi();
+        hari.tidak_absen = false;
+        hari.status = Some(status);
+        hari.status_masuk = Some(status);
+        hari.masuk_jam = masuk.map(str::to_string);
+        hari.pulang_jam = pulang.map(str::to_string);
+        hari
+    }
+
+    #[test]
+    fn matriks_menandai_ta_tc_tm_di_pdf() {
+        let tanggal = vec![
+            NaiveDate::from_ymd_opt(2026, 11, 2).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 11, 3).unwrap(),
+            NaiveDate::from_ymd_opt(2026, 11, 4).unwrap(),
+        ];
+        let mut hari = BTreeMap::new();
+        hari.insert(tanggal[0], MatriksHariDto::tanpa_absensi());
+        hari.insert(
+            tanggal[1],
+            hari_dengan(Some("07:30"), None, StatusKehadiran::DinasKantor),
+        );
+        hari.insert(
+            tanggal[2],
+            hari_dengan(None, Some("15:00"), StatusKehadiran::DinasKantor),
+        );
+        let orang = MatriksPersonelDto {
+            personel_id: Uuid::nil(),
+            nama: "Personel Uji".into(),
+            nrp: "85000001".into(),
+            pangkat: "BRIPKA".into(),
+            satker_id: Uuid::nil(),
+            satker_nama: "Satker Uji".into(),
+            unit: None,
+            is_active: true,
+            hari,
+        };
+
+        let html = html_matriks(
+            &[orang],
+            &tanggal,
+            "2–4 November 2026",
+            "Semua satker",
+            "Semua personel",
+            "Admin Uji",
+            "23 November 2026",
+        );
+
+        assert!(html.contains("s-ta\">TA"));
+        assert!(html.contains("s-tc\">TC"));
+        assert!(html.contains("s-tc\">TM"));
+        assert!(html.contains("tanpa check-out"));
+        assert!(html.contains("tanpa check-in"));
+        assert!(html.contains("<b>TA</b> tidak absen"));
+    }
 }

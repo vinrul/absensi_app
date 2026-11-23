@@ -198,6 +198,17 @@ data class AbsensiAntrean(
     val dibuatPada: Long = System.currentTimeMillis()
 )
 
+// ------------------------------------------------------------------ waktu server
+
+@Serializable
+data class WaktuServer(
+    val epochMs: Long,
+    val tanggal: String,
+    val jam: String,
+    val zona: String = "Asia/Makassar",
+    val palsu: Boolean = false
+)
+
 // --------------------------------------------------------------- rencana kerja
 
 @Serializable

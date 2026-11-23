@@ -104,6 +104,7 @@ export type StatusKehadiran =
 	| 'dinas_luar'
 	| 'ph'
 	| 'piket'
+	| 'operasi'
 	| 'libur_nasional'
 	| 'cuti'
 	| 'izin'
@@ -143,6 +144,10 @@ export interface AbsensiHarian {
 	tanggal: string;
 	masuk_jam: string | null;
 	pulang_jam: string | null;
+	masuk_latitude: number | null;
+	masuk_longitude: number | null;
+	pulang_latitude: number | null;
+	pulang_longitude: number | null;
 	status_masuk: StatusKehadiran | null;
 	status_pulang: StatusKehadiran | null;
 	is_offline: boolean;
@@ -154,9 +159,52 @@ export interface AbsensiHarian {
 	verified_at: string | null;
 	catatan_verifikator: string | null;
 	menit_telat: number;
+	menit_pulang_cepat: number;
 	foto_url: string | null;
 	foto_masuk_url: string | null;
 	foto_pulang_url: string | null;
+}
+
+/** Detail satu hari pada matriks rekap kehadiran. */
+export interface AbsensiMatriksHari {
+	status: StatusKehadiran | null;
+	status_masuk: StatusKehadiran | null;
+	status_pulang: StatusKehadiran | null;
+	masuk_jam: string | null;
+	pulang_jam: string | null;
+	menit_telat: number;
+	menit_pulang_cepat: number;
+	masuk_latitude: number | null;
+	masuk_longitude: number | null;
+	pulang_latitude: number | null;
+	pulang_longitude: number | null;
+	ph_hadir: boolean;
+	luar_radius: boolean;
+	is_offline: boolean;
+	is_mock_suspect: boolean;
+	perlu_verifikasi: boolean;
+	foto_masuk_url: string | null;
+	foto_pulang_url: string | null;
+	/** Hari kerja efektif tanpa catatan absensi sama sekali. */
+	tidak_absen: boolean;
+}
+
+export interface AbsensiMatriksPersonel {
+	personel_id: string;
+	nama: string;
+	nrp: string;
+	pangkat: string;
+	satker_id: string;
+	satker_nama: string;
+	unit: string | null;
+	is_active: boolean;
+	hari: Record<string, AbsensiMatriksHari>;
+}
+
+export interface AbsensiMatriksResponse {
+	rentang: { dari: string; sampai: string };
+	tanggal: string[];
+	data: AbsensiMatriksPersonel[];
 }
 
 export interface FotoAbsensi {
@@ -385,6 +433,7 @@ export const LABEL_STATUS_KEHADIRAN: Record<StatusKehadiran, string> = {
 	dinas_luar: 'Dinas Luar',
 	ph: 'PH (Perintah Hadir)',
 	piket: 'Piket/Shift',
+	operasi: 'Operasi/Pam',
 	libur_nasional: 'Libur Nasional',
 	cuti: 'Cuti',
 	izin: 'Izin',

@@ -365,6 +365,10 @@ pub struct AbsensiHarianRow {
     pub unit: Option<String>,
     pub masuk_jam: Option<NaiveTime>,
     pub pulang_jam: Option<NaiveTime>,
+    pub masuk_latitude: Option<f64>,
+    pub masuk_longitude: Option<f64>,
+    pub pulang_latitude: Option<f64>,
+    pub pulang_longitude: Option<f64>,
     pub status_masuk: Option<StatusKehadiran>,
     pub status_pulang: Option<StatusKehadiran>,
     pub is_offline: bool,
@@ -378,6 +382,7 @@ pub struct AbsensiHarianRow {
     pub verified_at: Option<DateTime<Utc>>,
     pub catatan_verifikator: Option<String>,
     pub menit_telat: i64,
+    pub menit_pulang_cepat: i64,
     pub foto_path: Option<String>,
     pub foto_masuk_path: Option<String>,
     pub foto_pulang_path: Option<String>,
@@ -402,8 +407,42 @@ const HARIAN_SELECT: &str = r#"
            p.nrp AS personel_nrp,
            p.pangkat AS personel_pangkat,
            p.unit,
-           max(a.jam) FILTER (WHERE a.jenis = 'masuk')  AS masuk_jam,
-           max(a.jam) FILTER (WHERE a.jenis = 'pulang') AS pulang_jam,
+           CASE WHEN bool_or(phd.tanggal IS NOT NULL)
+                THEN max(a.jam) FILTER (
+                    WHERE a.jenis = 'masuk' AND a.status_kehadiran = 'ph'
+                )
+                ELSE max(a.jam) FILTER (WHERE a.jenis = 'masuk')
+           END AS masuk_jam,
+           CASE WHEN bool_or(phd.tanggal IS NOT NULL)
+                THEN max(a.jam) FILTER (
+                    WHERE a.jenis = 'pulang' AND a.status_kehadiran = 'ph'
+                )
+                ELSE max(a.jam) FILTER (WHERE a.jenis = 'pulang')
+           END AS pulang_jam,
+           CASE WHEN bool_or(phd.tanggal IS NOT NULL)
+                THEN max(a.latitude::float8) FILTER (
+                    WHERE a.jenis = 'masuk' AND a.status_kehadiran = 'ph'
+                )
+                ELSE max(a.latitude::float8) FILTER (WHERE a.jenis = 'masuk')
+           END AS masuk_latitude,
+           CASE WHEN bool_or(phd.tanggal IS NOT NULL)
+                THEN max(a.longitude::float8) FILTER (
+                    WHERE a.jenis = 'masuk' AND a.status_kehadiran = 'ph'
+                )
+                ELSE max(a.longitude::float8) FILTER (WHERE a.jenis = 'masuk')
+           END AS masuk_longitude,
+           CASE WHEN bool_or(phd.tanggal IS NOT NULL)
+                THEN max(a.latitude::float8) FILTER (
+                    WHERE a.jenis = 'pulang' AND a.status_kehadiran = 'ph'
+                )
+                ELSE max(a.latitude::float8) FILTER (WHERE a.jenis = 'pulang')
+           END AS pulang_latitude,
+           CASE WHEN bool_or(phd.tanggal IS NOT NULL)
+                THEN max(a.longitude::float8) FILTER (
+                    WHERE a.jenis = 'pulang' AND a.status_kehadiran = 'ph'
+                )
+                ELSE max(a.longitude::float8) FILTER (WHERE a.jenis = 'pulang')
+           END AS pulang_longitude,
            (array_agg(a.status_kehadiran) FILTER (WHERE a.jenis = 'masuk'))[1]
                AS status_masuk,
            (array_agg(a.status_kehadiran) FILTER (WHERE a.jenis = 'pulang'))[1]
@@ -426,9 +465,28 @@ const HARIAN_SELECT: &str = r#"
                         AND a.jam > s.jam_masuk
                         AND phd.tanggal IS NULL
                        THEN floor(extract(epoch FROM (a.jam - s.jam_masuk)) / 60)::bigint
+                   WHEN a.jenis = 'masuk'
+                        AND a.status_kehadiran = 'ph'
+                        AND jph.jam_mulai IS NOT NULL
+                        AND a.jam > jph.jam_mulai
+                       THEN floor(extract(epoch FROM (a.jam - jph.jam_mulai)) / 60)::bigint
                    ELSE 0
                END
            ), 0) AS menit_telat,
+           coalesce(max(
+               CASE
+                   WHEN a.jenis = 'pulang'
+                        AND a.status_kehadiran = 'dinas_kantor'
+                        AND a.jam < s.jam_pulang
+                       THEN floor(extract(epoch FROM (s.jam_pulang - a.jam)) / 60)::bigint
+                   WHEN a.jenis = 'pulang'
+                        AND a.status_kehadiran = 'ph'
+                        AND jph.jam_selesai IS NOT NULL
+                        AND a.jam < jph.jam_selesai
+                       THEN floor(extract(epoch FROM (jph.jam_selesai - a.jam)) / 60)::bigint
+                   ELSE 0
+               END
+           ), 0) AS menit_pulang_cepat,
            (array_agg(a.foto_path) FILTER (WHERE a.jenis = 'masuk' AND a.foto_path IS NOT NULL))[1]
                AS foto_masuk_path,
            (array_agg(a.foto_path) FILTER (WHERE a.jenis = 'pulang' AND a.foto_path IS NOT NULL))[1]
@@ -439,6 +497,7 @@ const HARIAN_SELECT: &str = r#"
       FROM absensi a
       JOIN personel p ON p.id = a.personel_id
       JOIN satker s ON s.id = a.satker_id
+      LEFT JOIN jadwal_ph jph ON jph.id = a.jadwal_ph_id
       LEFT JOIN (
           SELECT DISTINCT aph.personel_id, jph.tanggal
             FROM absensi_ph aph

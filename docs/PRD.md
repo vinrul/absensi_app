@@ -407,6 +407,27 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 - Keterbatasan dibanding Android: tidak ada pengingat notifikasi latar (WorkManager) dan alamat
   server mengikuti origin aplikasi, bukan dapat diubah pengguna.
 
+### FR-21 Rekap kehadiran matriks per tanggal
+- Tab **Rekap Kehadiran** menampilkan matriks: satu baris per personel dan satu kolom per tanggal.
+- Rentang tanggal maksimal **31 hari**; rentang lebih panjang ditolak di klien dan server.
+- Setiap sel memuat status, jam check-in/check-out, menit telat, dan menit pulang cepat.
+- Sel hari kerja efektif tanpa catatan absensi ditandai **TA** (tidak absen). Sel dengan
+  check-in tanpa check-out ditandai **TC**, dan check-out tanpa check-in **TM**. Penanda ini
+  muncul di tabel, legenda, modal detail, dan PDF matriks; hari ini, hari libur/akhir pekan,
+  serta tanggal mendatang tidak ditandai TA.
+- Sel yang memiliki absensi dapat diklik untuk membuka modal detail berisi status, jam,
+  telat/pulang cepat, foto (jika ada), alamat hasil reverse geocode, dan peta lokasi.
+- Hari strong point memakai jam dan koordinat PH.
+- Tersedia **Export PDF Ringkasan** (agregat per personel) dan **Export PDF Matriks Harian**
+  (maks. 31 hari, dibagi per minggu agar terbaca).
+
+### FR-22 Jam server realtime
+- Endpoint publik `GET /api/v1/waktu` mengembalikan `epoch_ms`, tanggal/jam WITA, zona, dan status
+  jam palsu; endpoint ini tidak mengakses database.
+- Dashboard, web personel, dan Android menampilkan jam server WITA dengan detik dan berdetak lokal.
+- Klien menghitung offset dari satu permintaan, lalu resync setiap 5 menit (15 detik saat jam palsu)
+  serta saat tab/aplikasi kembali aktif. Tidak memakai WebSocket/SSE maupun polling per detik.
+
 ## 6. Kebutuhan non-fungsional
 
 | Aspek | Target |

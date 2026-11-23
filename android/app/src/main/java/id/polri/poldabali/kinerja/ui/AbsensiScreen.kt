@@ -70,6 +70,7 @@ import id.polri.poldabali.kinerja.util.Foto
 import kotlinx.coroutines.launch
 import java.io.File
 import java.time.Instant
+import java.time.LocalDate
 import java.util.Locale
 import java.util.UUID
 
@@ -139,6 +140,15 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
 
     var berkasFoto by remember { mutableStateOf<File?>(null) }
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
+
+    val bulanAwal = remember {
+        val acuan = runCatching {
+            LocalDate.parse(vm.konteksAbsensi?.tanggal ?: vm.absensiHariIni?.tanggal ?: "")
+        }.getOrNull() ?: LocalDate.now()
+        acuan.withDayOfMonth(1).toString() to acuan.withDayOfMonth(acuan.lengthOfMonth()).toString()
+    }
+    var riwayatDari by rememberSaveable { mutableStateOf(bulanAwal.first) }
+    var riwayatSampai by rememberSaveable { mutableStateOf(bulanAwal.second) }
 
     val hariIni = vm.absensiHariIni
     val muatKonteks = vm.memuatKonteksAbsensi
@@ -329,6 +339,11 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
 
     LaunchedEffect(halaman) {
         if (halaman == HALAMAN_RIWAYAT) vm.muatRiwayatBulanIni()
+    }
+
+    LaunchedEffect(vm.riwayatDari, vm.riwayatSampai) {
+        if (vm.riwayatDari.isNotBlank()) riwayatDari = vm.riwayatDari
+        if (vm.riwayatSampai.isNotBlank()) riwayatSampai = vm.riwayatSampai
     }
 
     Column(
@@ -856,8 +871,81 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 }
 
                 Kartu {
-                    val barisRiwayat = remember(vm.riwayat, vm.jadwalPh, vm.absensiPh) {
-                        riwayatHarian(vm.riwayat, vm.jadwalPh, vm.absensiPh)
+                    JudulBagian("Filter Tanggal", "Default tanggal 1 sampai akhir bulan berjalan")
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FieldTanggal(
+                            label = "Dari",
+                            nilai = riwayatDari,
+                            modifier = Modifier.weight(1f),
+                            onPilih = { riwayatDari = it }
+                        )
+                        FieldTanggal(
+                            label = "Sampai",
+                            nilai = riwayatSampai,
+                            modifier = Modifier.weight(1f),
+                            onPilih = { riwayatSampai = it }
+                        )
+                    }
+                    val rentangValid = runCatching {
+                        LocalDate.parse(riwayatDari) <= LocalDate.parse(riwayatSampai)
+                    }.getOrDefault(false)
+                    if (!rentangValid) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Tanggal mulai harus sebelum atau sama dengan tanggal selesai.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Warna.Merah
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TombolKedua(
+                            teks = "Bulan Ini",
+                            modifier = Modifier.weight(1f),
+                            aktif = !vm.sedangMemproses,
+                            onClick = {
+                                val acuan = runCatching {
+                                    LocalDate.parse(
+                                        vm.konteksAbsensi?.tanggal
+                                            ?: vm.absensiHariIni?.tanggal
+                                            ?: ""
+                                    )
+                                }.getOrNull() ?: LocalDate.now()
+                                riwayatDari = acuan.withDayOfMonth(1).toString()
+                                riwayatSampai = acuan.withDayOfMonth(acuan.lengthOfMonth()).toString()
+                                vm.muatRiwayat(riwayatDari, riwayatSampai)
+                            }
+                        )
+                        TombolKedua(
+                            teks = "Tampilkan",
+                            modifier = Modifier.weight(1f),
+                            aktif = rentangValid && !vm.sedangMemproses,
+                            onClick = { vm.muatRiwayat(riwayatDari, riwayatSampai) }
+                        )
+                    }
+                }
+
+                Kartu {
+                    val barisRiwayat = remember(
+                        vm.riwayat,
+                        vm.jadwalPhRiwayat,
+                        vm.absensiPhRiwayat
+                    ) {
+                        riwayatHarian(vm.riwayat, vm.jadwalPhRiwayat, vm.absensiPhRiwayat)
+                    }
+                    val labelRentang = if (
+                        vm.riwayatDari.isNotBlank() && vm.riwayatSampai.isNotBlank()
+                    ) {
+                        rentangIndo(vm.riwayatDari, vm.riwayatSampai)
+                    } else {
+                        "Bulan Ini"
                     }
                     Row(
                         Modifier.fillMaxWidth(),
@@ -866,7 +954,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                     ) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                "Bulan Ini",
+                                labelRentang,
                                 style = MaterialTheme.typography.titleMedium,
                                 color = Warna.Teks
                             )
@@ -876,14 +964,27 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                                 color = Warna.TeksLembut
                             )
                         }
-                        TextButton(onClick = { vm.muatRiwayatBulanIni() }) {
+                        TextButton(
+                            onClick = {
+                                if (
+                                    vm.riwayatDari.isNotBlank() &&
+                                    vm.riwayatSampai.isNotBlank()
+                                ) {
+                                    vm.muatRiwayat(vm.riwayatDari, vm.riwayatSampai)
+                                } else {
+                                    vm.muatRiwayatBulanIni()
+                                }
+                            }
+                        ) {
                             Text("Muat ulang", color = Warna.Navy)
                         }
                     }
                     Spacer(Modifier.height(6.dp))
 
                     if (barisRiwayat.isEmpty()) {
-                        LayarKosong("Belum ada absensi atau jadwal strong point pada bulan ini.")
+                        LayarKosong(
+                            "Belum ada absensi atau jadwal strong point pada rentang tanggal ini."
+                        )
                     } else {
                         barisRiwayat.forEachIndexed { indeks, item ->
                             Column(
@@ -967,6 +1068,9 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
         }
     }
 }
+
+private fun rentangIndo(dari: String, sampai: String): String =
+    "${tanggalIndo(dari)} – ${tanggalIndo(sampai)}"
 
 private fun riwayatHarian(
     riwayat: List<Absensi>,

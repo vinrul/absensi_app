@@ -42,12 +42,77 @@ pub fn html(laporan: &Laporan<'_>) -> String {
     html_dengan_css(laporan, "")
 }
 
-/// Merangkai HTML laporan dengan tambahan CSS khusus (mis. roster tanggal).
-pub fn html_dengan_css(laporan: &Laporan<'_>, css_tambahan: &str) -> String {
+/// Laporan dengan isi HTML kustom (mis. matriks multi-tabel).
+pub struct LaporanKustom<'a> {
+    pub judul: &'a str,
+    pub periode: &'a str,
+    pub satker: &'a str,
+    pub personel: &'a str,
+    pub status: &'a str,
+    pub dicetak_oleh: &'a str,
+    pub dicetak_pada: &'a str,
+    /// Potongan HTML mentah yang sudah di-escape pemanggil.
+    pub isi: String,
+    pub catatan: Option<String>,
+    pub css_tambahan: &'a str,
+}
+
+pub fn html_kustom(laporan: &LaporanKustom<'_>) -> String {
     let logo = base64::engine::general_purpose::STANDARD.encode(include_bytes!(
         "../../../dashboard/static/logo-polda-bali.png"
     ));
+    let catatan = laporan.catatan.clone().unwrap_or_default();
 
+    format!(
+        r#"<!doctype html>
+<html lang="id">
+<head><meta charset="utf-8"><style>{css}{css_tambahan}</style></head>
+<body>
+  <table class="kop"><tr>
+    <td class="logo"><img src="data:image/png;base64,{logo}" alt="Logo Polda Bali"></td>
+    <td class="identitas">
+      <div class="instansi">Kepolisian Negara Republik Indonesia</div>
+      <div class="instansi">Daerah Bali · Direktorat Reserse Kriminal Khusus</div>
+      <h1>{judul}</h1>
+    </td>
+  </tr></table>
+
+  <div class="meta">
+    <span><strong>Periode:</strong> {periode}</span>
+    <span>Dicetak: {dicetak_pada}</span>
+  </div>
+  <div class="filters">
+    <span><strong>Satker:</strong> {satker}</span>
+    <span><strong>Personel:</strong> {personel}</span>
+    <span><strong>Status:</strong> {status}</span>
+  </div>
+
+  {isi}
+
+  <p class="catatan">{catatan}</p>
+  <div class="footer">
+    <div>Dicetak oleh: <strong>{dicetak_oleh}</strong></div>
+    <div class="ttd">Bali, {dicetak_pada}<br><br><br><strong>{dicetak_oleh}</strong></div>
+  </div>
+</body>
+</html>"#,
+        css = CSS_LAPORAN,
+        css_tambahan = laporan.css_tambahan,
+        logo = logo,
+        judul = esc(laporan.judul),
+        periode = esc(laporan.periode),
+        satker = esc(laporan.satker),
+        personel = esc(laporan.personel),
+        status = esc(laporan.status),
+        dicetak_pada = esc(laporan.dicetak_pada),
+        dicetak_oleh = esc(laporan.dicetak_oleh),
+        isi = laporan.isi,
+        catatan = esc(&catatan),
+    )
+}
+
+/// Merangkai HTML laporan dengan tambahan CSS khusus (mis. roster tanggal).
+pub fn html_dengan_css(laporan: &Laporan<'_>, css_tambahan: &str) -> String {
     let kepala = laporan
         .kolom
         .iter()
@@ -80,56 +145,22 @@ pub fn html_dengan_css(laporan: &Laporan<'_>, css_tambahan: &str) -> String {
         }
     });
 
-    format!(
-        r#"<!doctype html>
-<html lang="id">
-<head><meta charset="utf-8"><style>{css}{css_tambahan}</style></head>
-<body>
-  <table class="kop"><tr>
-    <td class="logo"><img src="data:image/png;base64,{logo}" alt="Logo Polda Bali"></td>
-    <td class="identitas">
-      <div class="instansi">Kepolisian Negara Republik Indonesia</div>
-      <div class="instansi">Daerah Bali · Direktorat Reserse Kriminal Khusus</div>
-      <h1>{judul}</h1>
-    </td>
-  </tr></table>
+    let isi = format!(
+        "<table class=\"data\"><thead><tr>{kepala}</tr></thead><tbody>{baris}</tbody></table>"
+    );
 
-  <div class="meta">
-    <span><strong>Periode:</strong> {periode}</span>
-    <span>Dicetak: {dicetak_pada}</span>
-  </div>
-  <div class="filters">
-    <span><strong>Satker:</strong> {satker}</span>
-    <span><strong>Personel:</strong> {personel}</span>
-    <span><strong>Status:</strong> {status}</span>
-  </div>
-
-  <table class="data">
-    <thead><tr>{kepala}</tr></thead>
-    <tbody>{baris}</tbody>
-  </table>
-
-  <p class="catatan">{catatan}</p>
-  <div class="footer">
-    <div>Dicetak oleh: <strong>{dicetak_oleh}</strong></div>
-    <div class="ttd">Bali, {dicetak_pada}<br><br><br><strong>{dicetak_oleh}</strong></div>
-  </div>
-</body>
-</html>"#,
-        css = CSS_LAPORAN,
-        css_tambahan = css_tambahan,
-        logo = logo,
-        judul = esc(laporan.judul),
-        periode = esc(laporan.periode),
-        satker = esc(laporan.satker),
-        personel = esc(laporan.personel),
-        status = esc(laporan.status),
-        dicetak_pada = esc(laporan.dicetak_pada),
-        dicetak_oleh = esc(laporan.dicetak_oleh),
-        kepala = kepala,
-        baris = baris,
-        catatan = esc(&catatan),
-    )
+    html_kustom(&LaporanKustom {
+        judul: laporan.judul,
+        periode: laporan.periode,
+        satker: laporan.satker,
+        personel: laporan.personel,
+        status: laporan.status,
+        dicetak_oleh: laporan.dicetak_oleh,
+        dicetak_pada: laporan.dicetak_pada,
+        isi,
+        catatan: Some(catatan),
+        css_tambahan,
+    })
 }
 
 pub const CSS_LAPORAN: &str = r#"

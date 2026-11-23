@@ -98,6 +98,12 @@ class Repositori(
         return json.decodeFromString(KonteksAbsensi.serializer(), teks)
     }
 
+    /** Jam server WITA untuk sinkronisasi tampilan jam di perangkat. */
+    suspend fun waktuServer(): WaktuServer {
+        val teks = api.panggil("GET", "waktu", butuhToken = false)
+        return json.decodeFromString(WaktuServer.serializer(), teks)
+    }
+
     suspend fun riwayatAbsensi(dari: String, sampai: String): List<Absensi> {
         val teks = api.panggil("GET", "absensi/saya?dari=$dari&sampai=$sampai")
         return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)

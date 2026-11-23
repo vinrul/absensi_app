@@ -6,6 +6,7 @@
 	import { logout, pulihkanSesi, session, bolehMasukDashboard } from '#lib/stores/session.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Avatar from '#lib/components/Avatar.svelte';
+	import JamServer from '#lib/components/JamServer.svelte';
 
 	let { children }: { children?: Snippet } = $props();
 
@@ -368,6 +369,7 @@
 				</div>
 
 				<div class="flex items-center gap-3">
+					<JamServer />
 					<a href="/profil" class="hidden text-right hover:underline sm:block">
 						<p class="text-sm font-medium text-slate-800">{session.user?.nama}</p>
 						<p class="text-[11px] text-slate-500">

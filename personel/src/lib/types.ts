@@ -55,6 +55,7 @@ export type StatusKehadiran =
 	| 'dinas_luar'
 	| 'ph'
 	| 'piket'
+	| 'operasi'
 	| 'libur_nasional'
 	| 'cuti'
 	| 'izin'
@@ -421,6 +422,7 @@ export const LABEL_STATUS_KEHADIRAN: Record<StatusKehadiran, string> = {
 	dinas_luar: 'Dinas Luar',
 	ph: 'PH (Perintah Hadir)',
 	piket: 'Piket / Shift',
+	operasi: 'Operasi / Pam',
 	libur_nasional: 'Libur Nasional',
 	cuti: 'Cuti',
 	izin: 'Izin',

@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import Icon from '#lib/components/Icon.svelte';
 	import Avatar from '#lib/components/Avatar.svelte';
+	import JamServer from '#lib/components/JamServer.svelte';
 	import { hapusSesiLokal, pulihkanSesi, session } from '#lib/stores/session.svelte';
 
 	let { children } = $props();
@@ -276,9 +277,12 @@
 					<p class="truncate text-[10px] text-ink-400">{session.user?.satker_nama}</p>
 				</div>
 			</div>
-			<a href="/profil" aria-label="Profil" class="rounded-full ring-2 ring-white shadow-sm">
-				<Avatar pengguna={session.user} size={34} />
-			</a>
+			<div class="flex shrink-0 items-center gap-2">
+				<JamServer />
+				<a href="/profil" aria-label="Profil" class="rounded-full ring-2 ring-white shadow-sm">
+					<Avatar pengguna={session.user} size={34} />
+				</a>
+			</div>
 		</header>
 
 		<main class="flex-1 px-4 pt-4 pb-aman">

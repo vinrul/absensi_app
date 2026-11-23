@@ -254,11 +254,96 @@
           "nilai_akhir": { "type": "number" },
           "kategori": { "type": "string", "enum": ["sangat_baik", "baik", "cukup", "perlu_pembinaan"] }
         }
+      },
+      "WaktuServer": {
+        "type": "object",
+        "description": "Jam server WITA untuk sinkronisasi jam klien; tanpa akses database.",
+        "properties": {
+          "epoch_ms": { "type": "integer", "format": "int64" },
+          "utc": { "type": "string", "format": "date-time" },
+          "wita": { "type": "string", "format": "date-time" },
+          "tanggal": { "type": "string", "format": "date" },
+          "jam": { "type": "string" },
+          "zona": { "type": "string" },
+          "palsu": { "type": "boolean" }
+        },
+        "required": ["epoch_ms", "utc", "wita", "tanggal", "jam", "zona", "palsu"]
+      },
+      "AbsensiMatriksHari": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "nullable": true },
+          "status_masuk": { "type": "string", "nullable": true },
+          "status_pulang": { "type": "string", "nullable": true },
+          "masuk_jam": { "type": "string", "nullable": true },
+          "pulang_jam": { "type": "string", "nullable": true },
+          "menit_telat": { "type": "integer" },
+          "menit_pulang_cepat": { "type": "integer" },
+          "masuk_latitude": { "type": "number", "nullable": true },
+          "masuk_longitude": { "type": "number", "nullable": true },
+          "pulang_latitude": { "type": "number", "nullable": true },
+          "pulang_longitude": { "type": "number", "nullable": true },
+          "ph_hadir": { "type": "boolean" },
+          "luar_radius": { "type": "boolean" },
+          "is_offline": { "type": "boolean" },
+          "is_mock_suspect": { "type": "boolean" },
+          "perlu_verifikasi": { "type": "boolean" },
+          "foto_masuk_url": { "type": "string", "nullable": true },
+          "foto_pulang_url": { "type": "string", "nullable": true },
+          "tidak_absen": { "type": "boolean" }
+        }
+      },
+      "AbsensiMatriksPersonel": {
+        "type": "object",
+        "properties": {
+          "personel_id": { "type": "string", "format": "uuid" },
+          "nama": { "type": "string" },
+          "nrp": { "type": "string" },
+          "pangkat": { "type": "string" },
+          "satker_id": { "type": "string", "format": "uuid" },
+          "satker_nama": { "type": "string" },
+          "unit": { "type": "string", "nullable": true },
+          "is_active": { "type": "boolean" },
+          "hari": {
+            "type": "object",
+            "additionalProperties": { "$ref": "#/components/schemas/AbsensiMatriksHari" }
+          }
+        }
+      },
+      "AbsensiMatriksResponse": {
+        "type": "object",
+        "properties": {
+          "rentang": {
+            "type": "object",
+            "properties": {
+              "dari": { "type": "string", "format": "date" },
+              "sampai": { "type": "string", "format": "date" }
+            }
+          },
+          "tanggal": { "type": "array", "items": { "type": "string", "format": "date" } },
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AbsensiMatriksPersonel" }
+          }
+        }
       }
     }
   },
   "security": [{ "bearerAuth": [] }],
   "paths": {
+    "/waktu": {
+      "get": {
+        "tags": ["sistem"],
+        "summary": "Waktu server WITA untuk sinkronisasi jam klien",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Waktu server saat ini",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WaktuServer" } } }
+          }
+        }
+      }
+    },
     "/auth/login": {
       "post": {
         "tags": ["auth"],
@@ -988,7 +1073,44 @@
           { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" } },
           { "name": "perlu_verifikasi", "in": "query", "schema": { "type": "boolean" } }
         ],
-        "responses": { "200": { "description": "Satu baris per personel per tanggal, termasuk menit telat" } }
+        "responses": { "200": { "description": "Satu baris per personel per tanggal, termasuk menit telat dan menit pulang cepat" } }
+      }
+    },
+    "/absensi/matriks": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Matriks kehadiran per personel dan tanggal (maksimal 31 hari)",
+        "description": "Setiap sel memuat status, jam masuk/pulang, menit telat, menit pulang cepat, serta koordinat lokasi absensi untuk modal peta.",
+        "parameters": [
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Matriks kehadiran",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AbsensiMatriksResponse" } } }
+          },
+          "422": { "description": "Rentang tanggal melebihi 31 hari" }
+        }
+      }
+    },
+    "/absensi/matriks/ekspor": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Ekspor PDF matriks kehadiran harian (maksimal 31 hari)",
+        "description": "PDF dibagi per minggu agar setiap sel tanggal tetap terbaca. Memuat status, jam masuk/pulang, telat, dan pulang cepat.",
+        "parameters": [
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": {
+          "200": { "description": "Berkas PDF" },
+          "422": { "description": "Rentang tanggal melebihi 31 hari" }
+        }
       }
     },
     "/absensi/rekap": {

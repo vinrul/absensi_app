@@ -3,10 +3,10 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 23 November 2026 (37 unit test backend; 79 cek API pada DB uji;
+Terakhir diverifikasi: 23 November 2026 (38 unit test backend; 87 cek API pada DB uji;
 seed `--reset` development menghasilkan 145 personel, 102 jadwal PH, penempatan tetap, dan
 fallback jadwal bulan sebelumnya; dashboard & web personel `bun run check`/`build`; APK debug;
-`openapi.json` 93 path).
+`openapi.json` 96 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
@@ -37,10 +37,11 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Laporan absensi & strong point berbasis **rentang tanggal** | `dari`/`sampai` di `/absensi/*`, `/ph/*`, `/dashboard/kehadiran`; UI tidak lagi memakai periode bulan |
 | **Modul kinerja/periode dinonaktifkan dari UI** | Menu Kinerja, Penilaian, Print Laporan, Kesiapan, Periode dihapus dari navigasi; route lama diarahkan ke `/dashboard`; tabel & API dibiarkan dorman |
 | Jam server palsu development (`fake`) | `/dev/waktu` + `cargo run --bin fake --`; hanya aktif dengan `APP__ALLOW_FAKE_TIME=true` |
+| **Jam server realtime** | `GET /api/v1/waktu` tanpa akses DB; dashboard, web personel, dan Android menghitung offset lalu berdetak lokal tiap detik; resync 5 menit (15 detik saat jam palsu) dan saat tab/aplikasi aktif kembali |
 | Absensi Android satu alur + peta OSM | status kehadiran → validasi GPS/peta → foto → kirim/offline; riwayat disusun **satu baris per tanggal**; `PetaAbsensi.kt` |
 | Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
 | Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; check-in/check-out ganda 409; rekap menandai tidak strong point / hanya check-in serta total telat & pulang cepat |
-| Aplikasi Android dua tab + riwayat harian | bottom nav **Beranda / Absensi** (tab Strong dihapus); wizard status → lokasi → foto → kirim; riwayat bulan berjalan menggabungkan absensi masuk/pulang, status, dan sesi strong point (jadwal + realisasi) dalam satu baris per tanggal |
+| Aplikasi Android dua tab + riwayat harian | bottom nav **Beranda / Absensi** (tab Strong dihapus); wizard status → lokasi → foto → kirim; riwayat bulan berjalan memakai **filter tanggal mulai/selesai** (default tanggal 1 s.d. akhir bulan) dan menggabungkan absensi masuk/pulang, status, serta sesi strong point (jadwal + realisasi) dalam satu baris per tanggal |
 | Dokumentasi foto absensi & strong point | Unggahan base64 Android disimpan sebagai `foto_path`; galeri dashboard lewat `/absensi/foto` dan `/ph/foto`; berkas `/api/v1/files/{key}` dengan cek pemilik/cakupan satker |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
@@ -51,7 +52,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | Dashboard baru fokus kehadiran & strong point hari ini (filter tanggal + satker); laporan kinerja tetap ada di kode tetapi tidak dijangkau UI |
-| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
+| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; hari kerja tanpa absensi ditandai **TA**, check-in tanpa check-out **TC**, check-out tanpa check-in **TM**; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet. Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
 | Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (daftar sesi hari ini + wizard), riwayat; halaman kinerja masih ada di disk tetapi tidak dijangkau navigasi; login memakai kanal `personel_web` |
 | Deteksi lokasi tiruan (fake GPS) | Android memeriksa `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/mock app; server `APP__MOCK_LOCATION_POLICY=flag|reject` (default `flag`, produksi `reject`); antrean mencatat penolakan; panduan `docs/fake-gps.md` |
@@ -59,7 +60,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
-| Dokumentasi API | `/docs` (93 path), `/api-docs/openapi.json` |
+| Dokumentasi API | `/docs` (96 path), `/api-docs/openapi.json` |
 | Backup script | `deploy/backup.sh` (belum dijadwalkan di server) |
 
 **Belum / pekerjaan lanjutan** — lihat §9 backlog.
@@ -289,6 +290,27 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     `/laporan`) tetap ada agar data lama tidak hilang. Laporan absensi/strong point memakai
     **rentang tanggal**, bukan periode bulanan. Jangan menambah fitur baru ke modul dorman
     ini tanpa keputusan produk; jangan `DROP TABLE`.
+31. **Jam server realtime tanpa socket.** `GET /api/v1/waktu` membaca `service::waktu`
+    (termasuk jam palsu) tanpa akses database dan mengembalikan `epoch_ms` + tanggal/jam WITA.
+    Klien menghitung `offset = epoch_ms_server − tengah(latensi request)`, lalu berdetak lokal
+    tiap detik. Resync tiap 5 menit; saat `palsu=true` resync tiap 15 detik dan epoch fake yang
+    tidak berubah tidak menggeser offset (agar jam tetap berdetak). Jangan ganti dengan polling
+    per detik, WebSocket, atau SSE: untuk jam, itu membebani server dan baterai tanpa manfaat.
+    Sinkronisasi ulang juga dipicu saat tab browser kembali terlihat/fokus.
+32. **Rekap kehadiran berbentuk matriks per tanggal.** `GET /api/v1/absensi/matriks`
+    mengembalikan satu baris per personel dengan peta tanggal → detail (status, jam, menit telat,
+    menit pulang cepat, koordinat, foto). Rentang **maksimal 31 hari** divalidasi di server dan
+    klien. Hari strong point memakai jam/koordinat PH (bukan absensi kantor) bila keduanya ada.
+    Alamat pada modal diambil lewat reverse geocode Nominatim di browser (antrean 1 req/detik,
+    cache), bukan disimpan di database. Matriks memuat semua personel aktif dalam cakupan,
+    ditambah personel nonaktif yang masih punya data. PDF `/absensi/matriks/ekspor` membagi
+    tanggal menjadi blok 7 hari per bagian dengan kop/tabel berulang agar tetap terbaca; karena
+    bisa panjang saat seluruh satker dipilih, filter satker/personel disarankan untuk cetak.
+    Hari kerja efektif tanpa catatan absensi diberi flag `tidak_absen` (TA) — hanya untuk
+    personel aktif, tanggal sebelum hari ini (WITA), dan bukan hari libur/akhir pekan di luar
+    `satker.hari_kerja`. Check-in tanpa check-out ditandai **TC**, check-out tanpa check-in
+    **TM** hanya untuk status yang mewajibkan keduanya (Dinas Kantor/PH/Piket/Operasi);
+    status sekali absen (Dinas Luar/Cuti/Izin/Sakit) tidak dianggap TC.
 
 ---
 
