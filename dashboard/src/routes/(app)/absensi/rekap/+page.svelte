@@ -951,7 +951,7 @@
 							onchange={() => muatRekap()}
 						/>
 					</div>
-					<div class="min-w-48">
+					<div class="min-w-64">
 						<label class="label" for="rekap-satker">Satker</label>
 						<Combobox
 							id="rekap-satker"
@@ -963,7 +963,7 @@
 						/>
 					</div>
 					{#if modeRekap === 'matriks'}
-						<div class="min-w-56">
+						<div class="min-w-72">
 							<label class="label" for="rekap-personel">Personel</label>
 							<Combobox
 								id="rekap-personel"
@@ -990,7 +990,7 @@
 						onchange={() => muatRekapHarian()}
 					/>
 				</div>
-				<div class="min-w-48">
+				<div class="min-w-64">
 					<label class="label" for="harian-satker">Satker</label>
 					<Combobox
 						id="harian-satker"
@@ -1035,7 +1035,7 @@
 						onchange={() => muatVerifikasi()}
 					/>
 				</div>
-				<div class="min-w-48">
+				<div class="min-w-64">
 					<label class="label" for="verif-satker">Satker</label>
 					<Combobox
 						id="verif-satker"
@@ -1046,7 +1046,7 @@
 						onchange={() => ubahSatker('verifikasi')}
 					/>
 				</div>
-				<div class="min-w-56">
+				<div class="min-w-72">
 					<label class="label" for="verif-personel">Personel</label>
 					<Combobox
 						id="verif-personel"
@@ -1080,7 +1080,7 @@
 						onchange={() => muatDetail()}
 					/>
 				</div>
-				<div class="min-w-48">
+				<div class="min-w-64">
 					<label class="label" for="detail-satker">Satker</label>
 					<Combobox
 						id="detail-satker"
@@ -1091,7 +1091,7 @@
 						onchange={() => ubahSatker('detail')}
 					/>
 				</div>
-				<div class="min-w-56">
+				<div class="min-w-72">
 					<label class="label" for="detail-personel">Personel</label>
 					<Combobox
 						id="detail-personel"
