@@ -356,7 +356,8 @@ Catatan penting:
   **Verifikasi**, dan **Detail per Orang** dengan filter terpisah. **Rekap Harian** menampilkan
   kartu satu tanggal (default hari ini) + filter satker: Tidak Absen, Jadwal PH (rincian Sudah/
   Belum PH), DK, DL, Piket, Operasi, Cuti, Izin, dan Sakit; klik kartu membuka daftar personel.
-  Tab Rekap
+  Sub-tab **Peta** menampilkan marker lokasi check-in berwarna sesuai status, titik dinas +
+  radius, dan strong point + radius, dengan basemap Jalan/Satelit. Tab Rekap
   Kehadiran memiliki **Matriks Harian** (maks. 31 hari, status + jam + telat/pulang cepat per
   tanggal, klik sel untuk alamat & peta) dan **Ringkasan**; tersedia **PDF Ringkasan** serta
   **PDF Matriks Harian** (dibagi per minggu). Badge status dan penanda **TA/TC/TM** tampil

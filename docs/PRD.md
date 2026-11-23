@@ -444,6 +444,11 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
   personel yang punya jadwal sekaligus berapa yang sudah dan belum check-in PH.
 - Klik kartu membuka modal berisi daftar personel pada kategori tersebut, lengkap dengan status,
   jam, sesi strong point, penanda TA/TC, dan tombol **Detail** ke modal absensi penuh.
+- Rekap Harian memiliki sub-tab **Ringkasan** dan **Peta**. Peta menampilkan marker lokasi
+  **check-in** setiap personel dengan warna sesuai status, titik dinas beserta radius, dan strong
+  point beserta radius. Basemap dapat diganti **Jalan/Satelit**, dengan legenda warna dan popup
+  detail (nama, NRP, satker, status, jam check-in, sesi strong point). Titik yang ditampilkan
+  hanya yang aktif dan sesuai filter satker.
 
 ## 6. Kebutuhan non-fungsional
 

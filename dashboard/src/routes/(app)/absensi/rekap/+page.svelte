@@ -14,7 +14,9 @@
 		Personel,
 		RekapAbsensi,
 		Satker,
-		StatusKehadiran
+		StatusKehadiran,
+		StrongPoint,
+		TitikDinas
 	} from '#lib/types';
 	import { adalahPimpinanSaja } from '#lib/stores/session.svelte';
 	import { LABEL_STATUS_KEHADIRAN } from '#lib/types';
@@ -23,6 +25,7 @@
 	import Modal from '#lib/components/Modal.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PetaLokasi from '#lib/components/PetaLokasi.svelte';
+	import PetaRekapHarian from '#lib/components/PetaRekapHarian.svelte';
 	import { alamatDariKoordinat } from '#lib/geocode';
 
 	type TabId = 'rekap' | 'harian' | 'verifikasi' | 'detail';
@@ -107,6 +110,9 @@
 	    let tokenMatriks = 0;
 
 	    let matriksHarian = $state<AbsensiMatriksResponse | null>(null);
+	    let modeHarian = $state<'ringkasan' | 'peta'>('ringkasan');
+	    let titikDinasHarian = $state<TitikDinas[]>([]);
+	    let strongPointHarian = $state<StrongPoint[]>([]);
 
 	    type KategoriHarian = {
 	        id: string;
@@ -550,7 +556,18 @@
 	                sampai: filter.harian.tanggal
 	            });
 	            if (filter.harian.satker_id) params.set('satker_id', filter.harian.satker_id);
-	            matriksHarian = await api<AbsensiMatriksResponse>(`/absensi/matriks?${params}`);
+	            const paramsTitik = new URLSearchParams();
+	            if (filter.harian.satker_id) paramsTitik.set('satker_id', filter.harian.satker_id);
+	            const queryTitik = paramsTitik.toString();
+	            const akhiranTitik = queryTitik ? `?${queryTitik}` : '';
+	            const [hasilMatriks, titik, strong] = await Promise.all([
+	                api<AbsensiMatriksResponse>(`/absensi/matriks?${params}`),
+	                api<TitikDinas[]>(`/titik-dinas${akhiranTitik}`),
+	                api<StrongPoint[]>(`/ph/strong-point${akhiranTitik}`)
+	            ]);
+	            matriksHarian = hasilMatriks;
+	            titikDinasHarian = titik.filter((item) => item.is_active);
+	            strongPointHarian = strong.filter((item) => item.is_active);
 	        } catch (err) {
 	            error =
 	                err instanceof ApiError ? err.message : 'Gagal memuat rekap harian';
@@ -1095,7 +1112,7 @@
 
 	{#if tab === 'harian'}
 		<div class="space-y-4">
-			<div class="flex flex-wrap items-end justify-between gap-2">
+			<div class="flex flex-wrap items-end justify-between gap-3">
 				<div>
 					<h2 class="text-sm font-semibold text-slate-700">
 						Rekap Harian {tanggalSingkat(filter.harian.tanggal)}
@@ -1104,15 +1121,47 @@
 						{matriksHarian?.data.length ?? 0} personel ·
 						{filter.harian.satker_id
 							? (satkerMap.get(filter.harian.satker_id) ?? '-')
-							: 'Semua Satker'} · klik kartu untuk melihat daftar orang
+							: 'Semua Satker'} ·
+						{modeHarian === 'ringkasan'
+							? 'klik kartu untuk melihat daftar orang'
+							: 'marker check-in, titik dinas, dan strong point'}
 					</p>
+				</div>
+				<div class="flex items-center gap-2">
+					{#if memuat}
+						<span class="text-[11px] text-slate-400">Memuat…</span>
+					{/if}
+					<div class="flex overflow-hidden rounded-lg border border-slate-200">
+						<button
+							type="button"
+							class="px-3 py-1.5 text-xs font-medium transition"
+							class:bg-navy-800={modeHarian === 'ringkasan'}
+							class:text-white={modeHarian === 'ringkasan'}
+							class:text-slate-600={modeHarian !== 'ringkasan'}
+							aria-pressed={modeHarian === 'ringkasan'}
+							onclick={() => (modeHarian = 'ringkasan')}
+						>
+							Ringkasan
+						</button>
+						<button
+							type="button"
+							class="border-l border-slate-200 px-3 py-1.5 text-xs font-medium transition"
+							class:bg-navy-800={modeHarian === 'peta'}
+							class:text-white={modeHarian === 'peta'}
+							class:text-slate-600={modeHarian !== 'peta'}
+							aria-pressed={modeHarian === 'peta'}
+							onclick={() => (modeHarian = 'peta')}
+						>
+							Peta
+						</button>
+					</div>
 				</div>
 			</div>
 			{#if memuat && !matriksHarian}
 				<p class="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
 					Memuat rekap harian…
 				</p>
-			{:else}
+			{:else if modeHarian === 'ringkasan'}
 				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{#each kategoriHarianList as kategori (kategori.id)}
 						<button
@@ -1148,6 +1197,13 @@
 						Tidak ada absensi atau jadwal strong point pada tanggal ini.
 					</p>
 				{/if}
+			{:else}
+				<PetaRekapHarian
+					data={matriksHarian?.data ?? []}
+					tanggal={filter.harian.tanggal}
+					titikDinas={titikDinasHarian}
+					strongPoint={strongPointHarian}
+				/>
 			{/if}
 		</div>
 	{:else if tab === 'rekap' && modeRekap === 'matriks'}
