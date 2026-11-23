@@ -115,6 +115,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.64 | Jam server realtime di dashboard, web personel, Android | ✅ | `GET /api/v1/waktu` tanpa DB; offset + detak lokal tiap detik; resync 5 menit (15 detik saat jam palsu) dan saat tab/aplikasi aktif; badge **PALSU** di development |
 | 3.65 | Rekap kehadiran matriks per tanggal | ✅ | `GET /absensi/matriks`: satu baris per personel, satu kolom per tanggal, maks. 31 hari (422 bila lebih); sel memuat status, check-in/out, telat, pulang cepat; badge status dan **TC/TA** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; status Izin/Sakit/DL/Cuti tetap tampil bersama penanda Jadwal PH; klik sel membuka modal alamat Nominatim + peta Leaflet, foto, koordinat, dan rincian sesi |
 | 3.66 | Export PDF Ringkasan & Matriks Harian | ✅ | Dua tombol di tab Rekap Kehadiran: `/absensi/rekap/ekspor` (ringkasan) dan `/absensi/matriks/ekspor` (matriks per minggu, maks. 31 hari; 422 bila lebih); legenda PDF memuat TA/TC/TM dan sel menampilkan sesi strong point |
+| 3.67 | Tab Rekap Harian ringkas | ✅ | Filter tanggal (default hari ini) + satker; kartu Tidak Absen, Jadwal PH, Sudah PH, DK, DL, Piket, Operasi, Cuti, Izin, Sakit, TK, Libur; klik kartu membuka modal daftar personel + tombol Detail; memakai `/absensi/matriks` satu hari |
 
 ## 4. Modul Strong Point v2 (terpisah dari absensi harian)
 
@@ -260,6 +261,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.27 | Rekap matriks kehadiran | ✅ | API: 146 personel × 30 tanggal, koordinat terisi, rentang 61 hari ditolak 422; personel baru tanpa absensi memperoleh sel **TA** pada hari kerja lampau; check-in tanpa check-out terbaca **TC**; Chrome headless 1600×1000: matriks tampil, sel PH 03 Nov menunjukkan `07:05–09:05 · T 5m · PC 25m`, modal menampilkan alamat Nominatim + peta Leaflet |
 | 9.28 | PDF matriks harian | ✅ | `GET /absensi/matriks/ekspor` 7 hari → 702 KB/10 halaman; 30 hari → 2,6 MB/46 halaman dengan 5 bagian mingguan; 32 hari → 422; legenda PDF memuat TA/TC/TM dan sesi strong point |
 | 9.29 | Tampilan sesi strong point & badge matriks | ✅ | Chrome headless: 289 sel menampilkan sesi Pagi dan 48 sel Sesi Sore; contoh `PH Pagi 07:05–09:05 · T 5m`, `DK PH Jadwal PH Pagi 07:00–09:00 TA`, dan `PH TC Pagi 07:05– TC · T 5m tanpa check-out` |
+| 9.30 | Tab Rekap Harian | ✅ | Chrome headless: 12 kartu tampil (Tidak Absen 146, Jadwal PH 3, status lain 0 pada data demo); klik kartu membuka modal 146 personel dengan badge TA dan tombol Detail; URL menjadi `?tab=harian` |
 
 ## 10. Yang belum dikerjakan (backlog)
 

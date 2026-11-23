@@ -25,7 +25,7 @@
 	import PetaLokasi from '#lib/components/PetaLokasi.svelte';
 	import { alamatDariKoordinat } from '#lib/geocode';
 
-	type TabId = 'rekap' | 'verifikasi' | 'detail';
+	type TabId = 'rekap' | 'harian' | 'verifikasi' | 'detail';
 
 	const TAB: { id: TabId; label: string; keterangan: string }[] = [
 		{
@@ -33,6 +33,12 @@
 			label: 'Rekap Kehadiran',
 			keterangan:
 				'Matriks status, jam, telat, dan pulang cepat per tanggal (maks. 31 hari) atau ringkasan per personel.'
+		},
+		{
+			id: 'harian',
+			label: 'Rekap Harian',
+			keterangan:
+				'Ringkasan satu tanggal: tidak absen, jadwal PH, sudah PH, dan jumlah tiap status kehadiran.'
 		},
 		{
 			id: 'verifikasi',
@@ -76,6 +82,7 @@
 	// Filter dipisah per tab agar tidak saling mengubah.
 	let filter = $state({
 		rekap: { ...rentangBawaan(), satker_id: '', personel_id: '' },
+		harian: { tanggal: tanggalHariIni(), satker_id: '' },
 		verifikasi: { ...rentangBawaan(), satker_id: '', personel_id: '' },
 		detail: { ...rentangBawaan(), satker_id: '', personel_id: '' }
 	});
@@ -98,6 +105,17 @@
 	    let fotoMasukMatriks = $state<string | null>(null);
 	    let fotoPulangMatriks = $state<string | null>(null);
 	    let tokenMatriks = 0;
+
+	    let matriksHarian = $state<AbsensiMatriksResponse | null>(null);
+
+	    type KategoriHarian = {
+	        id: string;
+	        label: string;
+	        keterangan: string;
+	        tone: 'green' | 'amber' | 'red' | 'blue' | 'slate' | 'gold';
+	        orang: AbsensiMatriksPersonel[];
+	    };
+	    let kategoriHarian = $state<KategoriHarian | null>(null);
 
 	let daftarVerifikasi = $state<ListResponse<AbsensiHarian> | null>(null);
 	let halamanVerifikasi = $state(1);
@@ -268,6 +286,135 @@
 	        return bagian.join(' · ');
 	    }
 
+	    const STATUS_HARIAN: {
+	        status: StatusKehadiran;
+	        label: string;
+	        keterangan: string;
+	        tone: KategoriHarian['tone'];
+	    }[] = [
+	        {
+	            status: 'dinas_kantor',
+	            label: 'Dinas Kantor',
+	            keterangan: 'Absensi kantor',
+	            tone: 'green'
+	        },
+	        {
+	            status: 'dinas_luar',
+	            label: 'Dinas Luar',
+	            keterangan: 'Tugas di luar kantor',
+	            tone: 'blue'
+	        },
+	        {
+	            status: 'piket',
+	            label: 'Piket/Shift',
+	            keterangan: 'Piket atau shift',
+	            tone: 'green'
+	        },
+	        {
+	            status: 'operasi',
+	            label: 'Operasi/Pam',
+	            keterangan: 'Operasi atau pengamanan',
+	            tone: 'green'
+	        },
+	        { status: 'cuti', label: 'Cuti', keterangan: 'Cuti disetujui', tone: 'amber' },
+	        { status: 'izin', label: 'Izin', keterangan: 'Izin tidak masuk', tone: 'amber' },
+	        { status: 'sakit', label: 'Sakit', keterangan: 'Sakit', tone: 'amber' },
+	        {
+	            status: 'tanpa_keterangan',
+	            label: 'Tanpa Keterangan',
+	            keterangan: 'Tidak ada keterangan',
+	            tone: 'red'
+	        },
+	        {
+	            status: 'libur_nasional',
+	            label: 'Libur',
+	            keterangan: 'Libur nasional/khusus',
+	            tone: 'slate'
+	        }
+	    ];
+
+	    const kategoriHarianList = $derived.by(() => {
+	        const data = matriksHarian?.data ?? [];
+	        const tanggal = filter.harian.tanggal;
+	        const tidakAbsen: AbsensiMatriksPersonel[] = [];
+	        const jadwalPh: AbsensiMatriksPersonel[] = [];
+	        const sudahPh: AbsensiMatriksPersonel[] = [];
+	        const perStatus = new Map<StatusKehadiran, AbsensiMatriksPersonel[]>();
+
+	        for (const orang of data) {
+	            const hari = orang.hari[tanggal];
+	            if (!hari) continue;
+	            if (hari.tidak_absen) tidakAbsen.push(orang);
+	            if (hari.jadwal_strong) jadwalPh.push(orang);
+	            if (hari.ph_absen) sudahPh.push(orang);
+	            const status = statusEfektif(hari);
+	            if (status) {
+	                const daftar = perStatus.get(status) ?? [];
+	                daftar.push(orang);
+	                perStatus.set(status, daftar);
+	            }
+	        }
+
+	        const urut = (daftar: AbsensiMatriksPersonel[]) =>
+	            [...daftar].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+
+	        const kartu: KategoriHarian[] = [
+	            {
+	                id: 'tidak_absen',
+	                label: 'Tidak Absen',
+	                keterangan: 'Hari kerja tanpa catatan absensi',
+	                tone: 'red',
+	                orang: urut(tidakAbsen)
+	            },
+	            {
+	                id: 'jadwal_ph',
+	                label: 'Jadwal PH',
+	                keterangan: 'Punya jadwal strong point',
+	                tone: 'blue',
+	                orang: urut(jadwalPh)
+	            },
+	            {
+	                id: 'sudah_ph',
+	                label: 'Sudah PH',
+	                keterangan: 'Sudah check-in strong point',
+	                tone: 'green',
+	                orang: urut(sudahPh)
+	            },
+	            ...STATUS_HARIAN.map((item) => ({
+	                id: item.status,
+	                label: item.label,
+	                keterangan: item.keterangan,
+	                tone: item.tone,
+	                orang: urut(perStatus.get(item.status) ?? [])
+	            }))
+	        ];
+	        return kartu;
+	    });
+
+	    function kelasBarKategori(tone: KategoriHarian['tone']) {
+	        if (tone === 'red') return 'bg-rose-500';
+	        if (tone === 'amber') return 'bg-amber-500';
+	        if (tone === 'blue') return 'bg-sky-500';
+	        if (tone === 'green') return 'bg-emerald-500';
+	        if (tone === 'gold') return 'bg-gold-500';
+	        return 'bg-slate-400';
+	    }
+
+	    function bukaKategoriHarian(kategori: KategoriHarian) {
+	        kategoriHarian = kategori;
+	    }
+
+	    function tutupKategoriHarian() {
+	        kategoriHarian = null;
+	    }
+
+	    function bukaDetailHarian(orang: AbsensiMatriksPersonel) {
+	        const hari = orang.hari[filter.harian.tanggal];
+	        if (!hari) return;
+	        tutupKategoriHarian();
+	        void bukaDetailMatriks(orang, filter.harian.tanggal, hari);
+	    }
+
 	    function ubahModeRekap(mode: 'matriks' | 'ringkasan') {
 	        if (mode === modeRekap) return;
 	        modeRekap = mode;
@@ -400,6 +547,29 @@
 	        }
 	    }
 
+	    async function muatRekapHarian() {
+	        tutupKategoriHarian();
+	        if (!filter.harian.tanggal) {
+	            error = 'Pilih tanggal rekap harian.';
+	            return;
+	        }
+	        memuat = true;
+	        error = null;
+	        try {
+	            const params = new URLSearchParams({
+	                dari: filter.harian.tanggal,
+	                sampai: filter.harian.tanggal
+	            });
+	            if (filter.harian.satker_id) params.set('satker_id', filter.harian.satker_id);
+	            matriksHarian = await api<AbsensiMatriksResponse>(`/absensi/matriks?${params}`);
+	        } catch (err) {
+	            error =
+	                err instanceof ApiError ? err.message : 'Gagal memuat rekap harian';
+	        } finally {
+	            memuat = false;
+	        }
+	    }
+
 	async function muatVerifikasi(page = 1) {
 		memuat = true;
 		error = null;
@@ -455,6 +625,7 @@
 	function muatTab(id: TabId, page = 1) {
 		if (id === 'verifikasi' && adalahPimpinanSaja()) return muatRekap();
 		if (id === 'rekap') return muatRekap();
+		if (id === 'harian') return muatRekapHarian();
 		if (id === 'verifikasi') return muatVerifikasi(page);
 		return muatDetail(page);
 	}
@@ -480,7 +651,7 @@
 			goto('/absensi/rekap?tab=rekap', { replace: true, reset: false });
 			return;
 		}
-		if (nilai === 'rekap' || nilai === 'verifikasi' || nilai === 'detail') {
+		if (nilai === 'rekap' || nilai === 'harian' || nilai === 'verifikasi' || nilai === 'detail') {
 			if (nilai !== tab) {
 				tab = nilai;
 				if (siapMuat) muatTab(nilai);
@@ -489,6 +660,7 @@
 	});
 
 	function ubahSatker(id: TabId) {
+		if (id === 'harian') return muatRekapHarian();
 		const aktif = filter[id];
 		const daftar = personelUntuk(aktif.satker_id);
 		if (aktif.personel_id && !daftar.some((p) => p.id === aktif.personel_id)) {
@@ -498,6 +670,7 @@
 	}
 
 	async function eksporPdf(tampilan: 'ringkasan' | 'matriks' = modeRekap) {
+		if (tab === 'harian') return;
 		const aktif = filter[tab];
 		if (tab === 'rekap' && tampilan === 'matriks') {
 			const masalah = validasiRentangRekap();
@@ -647,7 +820,8 @@
 		personelList = orang.data;
 
 		const tabAwal = page.url.searchParams.get('tab');
-		if (tabAwal === 'detail') tab = 'detail';
+		if (tabAwal === 'harian') tab = 'harian';
+		else if (tabAwal === 'detail') tab = 'detail';
 		else if (tabAwal === 'verifikasi') tab = adalahPimpinanSaja() ? 'rekap' : 'verifikasi';
 
 		siapMuat = true;
@@ -683,7 +857,7 @@
 						{mengekspor ? 'Menyiapkan…' : 'PDF Matriks Harian'}
 					</button>
 				</div>
-			{:else}
+			{:else if tab !== 'harian'}
 				<button
 					class="btn btn-ghost border border-slate-300"
 					disabled={mengekspor}
@@ -788,6 +962,42 @@
 					{/if}
 					<p class="pb-2 text-[11px] text-slate-500">Maksimal rentang 31 hari.</p>
 				</div>
+			</div>
+		{:else if tab === 'harian'}
+			<div class="flex flex-wrap items-end gap-3">
+				<div>
+					<label class="label" for="harian-tanggal">Tanggal</label>
+					<input
+						id="harian-tanggal"
+						type="date"
+						class="input"
+						bind:value={filter.harian.tanggal}
+						onchange={() => muatRekapHarian()}
+					/>
+				</div>
+				<div class="min-w-48">
+					<label class="label" for="harian-satker">Satker</label>
+					<select
+						id="harian-satker"
+						class="input"
+						bind:value={filter.harian.satker_id}
+						onchange={() => muatRekapHarian()}
+					>
+						<option value="">Semua Satker</option>
+						{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
+					</select>
+				</div>
+				<button
+					type="button"
+					class="btn btn-ghost border border-slate-300"
+					onclick={() => {
+						filter.harian.tanggal = tanggalHariIni();
+						muatRekapHarian();
+					}}
+				>
+					Hari Ini
+				</button>
+				<p class="pb-2 text-[11px] text-slate-500">Default tanggal hari ini.</p>
 			</div>
 		{:else if tab === 'verifikasi'}
 			<div class="flex flex-wrap items-end gap-3">
@@ -894,7 +1104,58 @@
 		<p class="rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-700 ring-1 ring-rose-200">{error}</p>
 	{/if}
 
-	{#if tab === 'rekap' && modeRekap === 'matriks'}
+	{#if tab === 'harian'}
+		<div class="space-y-4">
+			<div class="flex flex-wrap items-end justify-between gap-2">
+				<div>
+					<h2 class="text-sm font-semibold text-slate-700">
+						Rekap Harian {tanggalSingkat(filter.harian.tanggal)}
+					</h2>
+					<p class="text-[11px] text-slate-500">
+						{matriksHarian?.data.length ?? 0} personel ·
+						{filter.harian.satker_id
+							? (satkerMap.get(filter.harian.satker_id) ?? '-')
+							: 'Semua Satker'} · klik kartu untuk melihat daftar orang
+					</p>
+				</div>
+			</div>
+			{#if memuat && !matriksHarian}
+				<p class="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+					Memuat rekap harian…
+				</p>
+			{:else}
+				<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+					{#each kategoriHarianList as kategori (kategori.id)}
+						<button
+							type="button"
+							class="card flex flex-col items-start gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-navy-400"
+							onclick={() => bukaKategoriHarian(kategori)}
+						>
+							<span class="h-1 w-10 rounded-full {kelasBarKategori(kategori.tone)}"></span>
+							<span class="mt-2 text-2xl font-semibold text-slate-800">
+								{kategori.orang.length}
+							</span>
+							<span class="text-sm font-medium text-slate-700">{kategori.label}</span>
+							<span class="text-[11px] text-slate-500">{kategori.keterangan}</span>
+						</button>
+					{/each}
+				</div>
+				{#if (matriksHarian?.data.length ?? 0) === 0}
+					<p
+						class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500"
+					>
+						Tidak ada personel pada filter ini.
+					</p>
+				{:else if kategoriHarianList.every((k) => k.orang.length === 0)}
+					<p
+						class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500"
+					>
+						Tidak ada absensi atau jadwal strong point pada tanggal ini.
+					</p>
+				{/if}
+			{/if}
+		</div>
+	{:else if tab === 'rekap' && modeRekap === 'matriks'}
 		<div class="card overflow-hidden">
 			<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
 				<div>
@@ -1731,6 +1992,93 @@
 							<figcaption class="text-[11px] text-slate-500">Foto check-out</figcaption>
 						</figure>
 					{/if}
+				</div>
+			{/if}
+		</div>
+	{/if}
+</Modal>
+
+<Modal
+	open={!!kategoriHarian}
+	title={kategoriHarian?.label ?? 'Rekap Harian'}
+	lebar="max-w-3xl"
+	onclose={tutupKategoriHarian}
+>
+	{#if kategoriHarian}
+		{@const tanggal = filter.harian.tanggal}
+		<div class="space-y-3 text-sm">
+			<div class="rounded-lg bg-slate-50 p-3">
+				<p class="text-sm font-semibold text-slate-800">
+					{kategoriHarian.label} · {tanggalSingkat(tanggal)}
+				</p>
+				<p class="text-xs text-slate-500">
+					{kategoriHarian.keterangan} · {kategoriHarian.orang.length} personel
+				</p>
+			</div>
+			{#if kategoriHarian.orang.length === 0}
+				<p
+					class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500"
+				>
+					Tidak ada personel pada kategori ini.
+				</p>
+			{:else}
+				<div
+					class="max-h-[65vh] divide-y divide-slate-100 overflow-auto rounded-lg border border-slate-200"
+				>
+					{#each kategoriHarian.orang as orang (orang.personel_id)}
+						{@const hari = orang.hari[tanggal]}
+						{@const status = hari ? statusEfektif(hari) : null}
+						<div class="flex flex-wrap items-start justify-between gap-3 p-3">
+							<div class="min-w-0">
+								<p class="font-medium text-slate-800">{orang.nama}</p>
+								<p class="text-[11px] text-slate-500">
+									{orang.pangkat} · {orang.nrp}
+								</p>
+								<p class="text-[11px] text-slate-400">
+									{orang.unit || orang.satker_nama}
+								</p>
+								<div class="mt-1 flex flex-wrap gap-1">
+									{#if status}
+										<Badge tone={nadaStatus(status)}>{LABEL_STATUS_KEHADIRAN[status]}</Badge>
+									{/if}
+									{#if hari?.tidak_absen}<Badge tone="slate">TA</Badge>{/if}
+									{#if hari?.tc}<Badge tone="red">TC</Badge>{/if}
+									{#if hari?.jadwal_strong && status !== 'ph'}
+										<Badge tone="blue">Jadwal PH</Badge>
+									{/if}
+								</div>
+							</div>
+							<div class="text-right text-[11px] text-slate-600">
+								{#if hari}
+									{#if hari.sesi_strong.length > 0}
+										{#each hari.sesi_strong as sesi}
+											<p class="font-mono">
+												{labelSesi(sesi)} {waktuSesi(sesi)}
+												{#if sesi.tc}
+													<span class="font-semibold text-rose-600">TC</span>
+												{/if}
+												{#if sesi.tidak_absen}
+													<span class="font-semibold text-slate-400">TA</span>
+												{/if}
+											</p>
+										{/each}
+									{:else if !hari.tidak_absen}
+										<p class="font-mono">{waktuMatriks(hari)}</p>
+									{/if}
+									{#if hari.tidak_absen}
+										<p class="text-slate-400">Tidak absen</p>
+									{/if}
+								{/if}
+								<button
+									type="button"
+									class="mt-1 text-[11px] font-medium text-navy-700 hover:underline"
+									onclick={() => bukaDetailHarian(orang)}
+								>
+									Detail
+								</button>
+							</div>
+						</div>
+					{/each}
 				</div>
 			{/if}
 		</div>

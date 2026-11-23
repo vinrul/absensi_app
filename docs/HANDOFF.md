@@ -52,7 +52,8 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | Dashboard baru fokus kehadiran & strong point hari ini (filter tanggal + satker); laporan kinerja tetap ada di kode tetapi tidak dijangkau UI |
-| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; badge status dan **TA/TC/TM** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet dan rincian sesi. Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
+| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Rekap Harian**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; badge status dan **TA/TC/TM** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet dan rincian sesi. Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
+| **Rekap Harian ringkas** | Tab **Rekap Harian** dengan filter tanggal (default hari ini) + satker; kartu **Tidak Absen**, **Jadwal PH**, **Sudah PH**, DK, DL, Piket, Operasi, Cuti, Izin, Sakit, TK, dan Libur; klik kartu membuka daftar personel + tombol Detail; memakai matriks satu hari, tanpa endpoint baru |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
 | Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (daftar sesi hari ini + wizard), riwayat; halaman kinerja masih ada di disk tetapi tidak dijangkau navigasi; login memakai kanal `personel_web` |
 | Deteksi lokasi tiruan (fake GPS) | Android memeriksa `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/mock app; server `APP__MOCK_LOCATION_POLICY=flag|reject` (default `flag`, produksi `reject`); antrean mencatat penolakan; panduan `docs/fake-gps.md` |
@@ -316,6 +317,13 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     check-in/check-out, telat/pulang cepat, serta flag TC/TA per sesi. Jika ada jadwal tetapi
     tidak ada absensi, sel menampilkan PH + TA; jika statusnya Izin/Sakit/Dinas Luar/Cuti,
     status tersebut tetap tampil bersama penanda Jadwal PH.
+33. **Rekap Harian memakai ulang matriks satu hari.** Tab **Rekap Harian** memanggil
+    `GET /absensi/matriks?dari=<tanggal>&sampai=<tanggal>` (bukan endpoint baru), lalu
+    menghitung kartu di klien: Tidak Absen (`tidak_absen`), Jadwal PH (`jadwal_strong`),
+    Sudah PH (`ph_absen`), serta status DK/DL/Piket/Operasi/Cuti/Izin/Sakit/TK/Libur dari
+    `statusEfektif`. Kartu dapat diklik untuk modal daftar personel dan tombol **Detail**
+    menuju modal absensi penuh. Jangan menduplikasi query agregat di server kecuali kartu
+    perlu dihitung untuk periode yang lebih besar.
 
 ---
 
@@ -361,11 +369,13 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
   dengan `service/pdf.rs` memakai Chrome/Edge `--headless --print-to-pdf`; lokasi browser
   auto-detect atau `APP__CHROME_PATH`.
 - **Rekap Absensi** (`/absensi/rekap`) memakai tab lokal tanpa route baru: **Rekap Kehadiran**
-  (periode + satker), **Verifikasi** (periode + satker + personel, aksi Setujui + foto), dan
-  **Detail per Orang** (periode + satker + personel wajib). Tiap tab punya filter sendiri dan
-  memuat data saat dibuka. Tab Verifikasi/Detail memakai `GET /absensi/harian` (satu baris per
-  personel per tanggal: masuk & pulang digabung, `menit_telat` hanya untuk Dinas Kantor), rekap
-  memakai `GET /absensi/rekap` yang juga mengembalikan total `menit_telat` per personel.
+  (periode + satker), **Rekap Harian** (satu tanggal + satker, kartu ringkasan), **Verifikasi**
+  (periode + satker + personel, aksi Setujui + foto), dan **Detail per Orang** (periode + satker
+  + personel wajib). Tiap tab punya filter sendiri dan memuat data saat dibuka. Tab Verifikasi/Detail
+  memakai `GET /absensi/harian` (satu baris per personel per tanggal: masuk & pulang digabung,
+  `menit_telat` hanya untuk Dinas Kantor), rekap memakai `GET /absensi/rekap` yang juga
+  mengembalikan total `menit_telat` per personel, sedangkan Rekap Harian memakai
+  `GET /absensi/matriks` satu hari dan menghitung kartu di klien.
   Penyetujuan dari tab Verifikasi mengulang `POST /absensi/{id}/verifikasi` untuk setiap
   `perlu_verifikasi_ids` pada baris tanggal tersebut.
 - **Halaman detail** dashboard: `/rencana-kerja/{id}`, `/hasil-kerja/{id}`, dan `/output/{id}`

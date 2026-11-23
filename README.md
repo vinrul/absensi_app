@@ -352,13 +352,16 @@ Catatan penting:
 
 **Fitur aktif lainnya:**
 
-- **Rekap absensi berbasis rentang tanggal**: tab **Rekap Kehadiran**, **Verifikasi**, dan
-  **Detail per Orang** dengan filter `dari`–`sampai`. Tab Rekap Kehadiran memiliki **Matriks
-  Harian** (maks. 31 hari, status + jam + telat/pulang cepat per tanggal, klik sel untuk alamat &
-  peta) dan **Ringkasan**; tersedia **PDF Ringkasan** serta **PDF Matriks Harian** (dibagi per
-  minggu). Badge status dan penanda **TA/TC/TM** tampil terpisah (mis. **DK TC**); sesi strong
-  point pagi/sore ditampilkan beserta realisasinya, dan jadwal PH tanpa absensi tampil **PH +
-  TA**. Absen masuk/pulang pada tanggal yang sama digabung satu baris.
+- **Rekap absensi berbasis rentang tanggal**: tab **Rekap Kehadiran**, **Rekap Harian**,
+  **Verifikasi**, dan **Detail per Orang** dengan filter terpisah. **Rekap Harian** menampilkan
+  kartu satu tanggal (default hari ini) + filter satker: Tidak Absen, Jadwal PH, Sudah PH, DK, DL,
+  Piket, Operasi, Cuti, Izin, Sakit, TK, dan Libur; klik kartu membuka daftar personel. Tab Rekap
+  Kehadiran memiliki **Matriks Harian** (maks. 31 hari, status + jam + telat/pulang cepat per
+  tanggal, klik sel untuk alamat & peta) dan **Ringkasan**; tersedia **PDF Ringkasan** serta
+  **PDF Matriks Harian** (dibagi per minggu). Badge status dan penanda **TA/TC/TM** tampil
+  terpisah (mis. **DK TC**); sesi strong point pagi/sore ditampilkan beserta realisasinya, dan
+  jadwal PH tanpa absensi tampil **PH + TA**. Absen masuk/pulang pada tanggal yang sama digabung
+  satu baris.
 - **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 22 tingkat
   Polri termasuk Brigpol + 17 pangkat ASN/PNS)/jabatan/telepon/email, ganti password, pengaturan
   alamat server, dan antrean offline. Form personel dashboard memakai **Combobox ber-pencarian**

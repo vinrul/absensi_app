@@ -435,6 +435,16 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 - Klien menghitung offset dari satu permintaan, lalu resync setiap 5 menit (15 detik saat jam palsu)
   serta saat tab/aplikasi kembali aktif. Tidak memakai WebSocket/SSE maupun polling per detik.
 
+### FR-23 Rekap harian ringkas
+- Tab **Rekap Harian** menampilkan ringkasan satu tanggal dengan filter **tanggal** (default hari
+  ini, tombol **Hari Ini**) dan **satker**.
+- Kartu ringkasan: **Tidak Absen**, **Jadwal PH**, **Sudah PH**, Dinas Kantor, Dinas Luar,
+  Piket/Shift, Operasi/Pam, Cuti, Izin, Sakit, Tanpa Keterangan, dan Libur.
+- Jumlah pada kartu dihitung dari data matriks satu hari; jadwal PH dan absensi PH dihitung
+  terpisah sehingga personel dengan jadwal tetapi tidak hadir tetap terlihat di kedua kartu.
+- Klik kartu membuka modal berisi daftar personel pada kategori tersebut, lengkap dengan status,
+  jam, sesi strong point, penanda TA/TC, dan tombol **Detail** ke modal absensi penuh.
+
 ## 6. Kebutuhan non-fungsional
 
 | Aspek | Target |
