@@ -304,10 +304,11 @@ Catatan penting:
   (klik atau geser penanda), lingkaran radius, dan input koordinat manual tetap tersedia.
 - **Absensi**: GPS radius 100 m (validasi server), 8 status kehadiran (termasuk PH/Perintah Hadir
   pada absensi harian), foto opsional, deteksi mock location, antrean offline + sinkronisasi otomatis.
-- **Alur absensi Android**: tombol besar **Absensi** → validasi lokasi dengan peta OpenStreetMap,
-  titik dinas terdekat, radius, jarak, dan akurasi → pilihan status kehadiran → kirim/simpan offline.
-  Tombol Masuk/Pulang mengikuti absensi hari ini dari server; bila server tidak terjangkau,
-  keduanya ditampilkan dan data dapat disimpan offline.
+- **Alur absensi Android**: satu tab **Absensi** dengan wizard **pilih status → ambil GPS/radius →
+  ambil foto → kirim**. Status tersedia: Dinas Kantor, Dinas Luar, PH/Strong Point, Piket/Shift,
+  Operasi/Pam, Cuti, Izin, dan Sakit. Bila masih ada check-in terbuka, scan berikutnya otomatis
+  menjadi check-out tanpa memilih status. Tab **Strong** dihapus; jadwal strong point tampil di
+  Beranda dan diproses lewat tab Absensi.
 - **Wizard izin**: penjelasan lokasi, kamera, notifikasi, WorkManager, dan penyimpanan sebelum login. 
 - **Kebijakan fake GPS**: Android mendeteksi `Location.isMock`/`isFromMockProvider`, menampilkan
   peringatan bila Developer Options atau aplikasi mock dipilih, lalu mengirim `is_mock_suspect`.
@@ -322,11 +323,14 @@ Catatan penting:
   Jika admin lupa menyusun jadwal bulan berjalan, sistem otomatis memakai jadwal bulan sebelumnya
   dan menandainya di dashboard; `GET /ph/jadwal/status` mengingatkan penyusunan bulan depan.
   Satu jadwal = satu sesi + satu titik; check-in/check-out wajib lokasi dan radius. Check-in dibuka
-  30 menit sebelum jam mulai dan ditutup di jam selesai; check-out maksimal 60 menit setelah jam
-  selesai. Server mencatat **menit telat** dan **menit pulang cepat**; rekap per rentang tanggal
-  menjumlahkan keduanya dan menandai tidak hadir/hanya check-in. Hari libur nasional tidak mengubah
-  jadwal strong point. Ekspor PDF jadwal berupa tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota. Android &
-  web personel menampilkan sesi hari ini dengan tombol kondisional dan antrean offline.
+  30 menit sebelum jam mulai dan ditutup di jam selesai; check-out sesi sampai 23:59. Server mencatat
+  **menit telat** dan **menit pulang cepat**; rekap per rentang tanggal menjumlahkannya. Absensi
+  strong point juga dicerminkan ke absensi harian berstatus `ph`, sehingga kehadiran strong point
+  dihitung sebagai kehadiran kantor. Bila sesi pagi lupa check-out dan sesi sore sudah dibuka,
+  aplikasi memprioritaskan check-in sore dan sesi pagi ditandai **tidak check-out**. Hari libur
+  nasional tidak mengubah jadwal strong point. Ekspor PDF jadwal berupa tabel
+  Tanggal/Sesi/Jam/Titik/Regu/Anggota. Android & web personel menampilkan sesi hari ini dengan
+  tombol kondisional dan antrean offline.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
   60 menit sebelum jadwal.
 
@@ -395,13 +399,13 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 ## Verifikasi yang sudah dilakukan
 
 - `cargo test` → **37 test lulus** (geofence, scoring, deteksi berkas, kanal login, policy mock GPS).
-- `bun tools/uji/api-smoke.js` → **74/74 cek lulus** pada database uji `kinerja_test`:
+- `bun tools/uji/api-smoke.js` → **79/79 cek lulus** pada database uji `kinerja_test`:
   RBAC ber-scope, pembatasan login dashboard (pimpinan/admin vs atasan/personel), kanal
   `personel_web` (personel & atasan 200, admin 403), CRUD satker/personel/admin, titik dinas
   (termasuk ubah jenis & koordinat), zona waktu & jam Sabtu, kanal login Android, tutup/buka
   periode, kesiapan satker, kalender libur, jadwal & absensi PH, jam server palsu, verifikasi,
   foto dokumentasi, rekap, dan penandaan mock GPS pada policy `flag`.
-- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (92 path).
+- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (93 path).
 - `bun run check` → 0 error · `bun run build` → sukses (dashboard dan `personel/`).
 - Login `personel_web` diuji pada API: atasan & personel 200, admin 403, refresh cookie 200.
 - `gradlew :app:assembleDebug` → APK debug terbentuk (7 tab, termasuk PH).

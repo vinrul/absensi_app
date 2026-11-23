@@ -274,6 +274,7 @@ fun labelStatusKehadiran(status: String): String = when (status) {
     "dinas_luar" -> "Dinas Luar"
     "ph" -> "PH (Perintah Hadir)"
     "piket" -> "Piket/Shift"
+    "operasi" -> "Operasi/Pam"
     "libur_nasional" -> "Libur Nasional"
     "cuti" -> "Cuti"
     "izin" -> "Izin"
@@ -399,7 +400,7 @@ fun warnaKategori(kategori: String): Color = when (kategori) {
 }
 
 fun warnaStatusKehadiran(status: String): Color = when (status) {
-    "dinas_kantor", "piket", "dinas_luar", "ph" -> Warna.Hijau
+    "dinas_kantor", "piket", "dinas_luar", "ph", "operasi" -> Warna.Hijau
     "tanpa_keterangan" -> Warna.Merah
     "libur_nasional" -> Warna.TeksLembut
     else -> Warna.Kuning

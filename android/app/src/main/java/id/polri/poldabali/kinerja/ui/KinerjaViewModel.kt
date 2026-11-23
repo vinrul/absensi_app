@@ -18,6 +18,7 @@ import id.polri.poldabali.kinerja.data.Graf
 import id.polri.poldabali.kinerja.data.Hasil
 import id.polri.poldabali.kinerja.data.HasilRequest
 import id.polri.poldabali.kinerja.data.JadwalPhSaya
+import id.polri.poldabali.kinerja.data.KonteksAbsensi
 import id.polri.poldabali.kinerja.data.Lampiran
 import id.polri.poldabali.kinerja.data.Output
 import id.polri.poldabali.kinerja.data.OutputRequest
@@ -65,6 +66,12 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         private set
 
     var absensiHariIni by mutableStateOf<AbsensiHariIni?>(null)
+        private set
+
+    var konteksAbsensi by mutableStateOf<KonteksAbsensi?>(null)
+        private set
+
+    var memuatKonteksAbsensi by mutableStateOf(false)
         private set
 
     var memuatAbsensiHariIni by mutableStateOf(false)
@@ -318,6 +325,30 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         }
     }
 
+    /** Memuat konteks check-in/check-out dari server. */
+    fun muatKonteksAbsensi() {
+        viewModelScope.launch {
+            memuatKonteksAbsensi = true
+            try {
+                konteksAbsensi = repo.konteksAbsensi()
+                absensiHariIniOffline = false
+            } catch (error: ApiException) {
+                konteksAbsensi = null
+                if (error.status == 401) {
+                    pengguna = null
+                    galat = "Sesi berakhir, silakan login kembali"
+                } else {
+                    absensiHariIniOffline = true
+                }
+            } catch (_: Exception) {
+                konteksAbsensi = null
+                absensiHariIniOffline = true
+            } finally {
+                memuatKonteksAbsensi = false
+            }
+        }
+    }
+
     private suspend fun muatSemuaLangsung() {
         periode = repo.periodeAktif()
         antrean = repo.daftarAntrean()
@@ -326,6 +357,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         runCatching { absensiHariIni = repo.absensiHariIni() }
             .onSuccess { absensiHariIniOffline = false }
             .onFailure { absensiHariIniOffline = true }
+        runCatching { konteksAbsensi = repo.konteksAbsensi() }
 
         // Ringkasan di Beranda butuh jumlah dokumen & nilai terbaru.
         runCatching { rencana = daftarRencanaSaya() }
@@ -355,7 +387,20 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     }
 
     fun muatRiwayatBulanIni() {
-        jalankan { riwayat = repo.riwayatAbsensiBulanIni() }
+        jalankan {
+            runCatching { konteksAbsensi = repo.konteksAbsensi() }
+            riwayat = repo.riwayatAbsensiBulanIni()
+            val acuan = tanggalAcuan()
+            val dari = acuan.withDayOfMonth(1).toString()
+            jadwalPh = repo.jadwalPhSaya(dari, acuan.toString())
+            absensiPh = repo.absensiPhSaya(dari, acuan.toString())
+        }
+    }
+
+    /** Tanggal server bila tersedia agar riwayat tetap benar saat jam server dipalsukan. */
+    private fun tanggalAcuan(): LocalDate {
+        val teks = konteksAbsensi?.tanggal ?: absensiHariIni?.tanggal
+        return teks?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now()
     }
 
     fun kirimAbsensi(
@@ -394,8 +439,10 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
                 riwayat = repo.riwayatAbsensiBulanIni()
                 runCatching { absensiHariIni = repo.absensiHariIni() }
                     .onSuccess { absensiHariIniOffline = false }
+                runCatching { konteksAbsensi = repo.konteksAbsensi() }
+                val aksi = if (hasilKirim.aksi == "checkout") "Check-out" else "Check-in"
                 val info = buildString {
-                    append("Absen ${request.jenis} tercatat pukul ${hasilKirim.data.jam}")
+                    append("$aksi tercatat pukul ${hasilKirim.data.jam}")
                     val jarak = hasilKirim.geofence.jarakM
                     if (jarak != null) append(String.format(java.util.Locale.US, " (%.0f m dari titik dinas)", jarak))
                 }
@@ -853,8 +900,9 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     // ---------------------------------------------------------------------- PH
 
     private suspend fun muatPhLangsung() {
-        val dari = LocalDate.now().minusDays(7).toString()
-        val sampai = LocalDate.now().plusDays(30).toString()
+        val acuan = tanggalAcuan()
+        val dari = acuan.minusDays(7).toString()
+        val sampai = acuan.plusDays(30).toString()
         jadwalPh = repo.jadwalPhSaya(dari, sampai)
         absensiPh = repo.absensiPhSaya(dari, sampai)
         antreanPh = repo.daftarAntreanPh()

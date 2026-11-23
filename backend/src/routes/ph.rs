@@ -13,15 +13,18 @@ use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use crate::auth::extractor::AuthUser;
-use crate::domain::enums::{AbsensiJenis, JenisAkun, SatkerLevel, TitikDinasJenis};
+use crate::domain::enums::{
+    AbsensiJenis, JenisAkun, SatkerLevel, StatusKehadiran, TitikDinasJenis,
+};
 use crate::error::{AppError, AppResult};
+use crate::repo::absensi::{self, NewAbsensi};
 use crate::repo::personel;
 use crate::repo::ph::{
     self, AbsensiPhRow, JadwalPhRow, JadwalPhSayaRow, NewAbsensiPh, PenempatanBaru, StrongPointRow,
 };
 use crate::repo::satker;
 use crate::service::waktu::{
-    akhir_bulan, awal_bulan, geser_bulan, hari_ini_wita, ke_wita, parse_bulan,
+    akhir_bulan, awal_bulan, geser_bulan, hari_ini_wita, ke_wita, override_aktif, parse_bulan,
 };
 use crate::service::{akses, geofence, laporan, pdf, storage};
 use crate::state::AppState;
@@ -1166,7 +1169,8 @@ pub async fn create_absensi_ph(
         .await?
         .ok_or_else(|| AppError::Unprocessable("Strong point jadwal tidak ditemukan".into()))?;
 
-    let lokal = ke_wita(req.captured_at);
+    let acuan = override_aktif().unwrap_or(req.captured_at);
+    let lokal = ke_wita(acuan);
     let tanggal = lokal.date_naive();
     let jam = lokal.time();
     if tanggal != jadwal.tanggal {
@@ -1215,12 +1219,12 @@ pub async fn create_absensi_ph(
                     "Anda sudah check-out pada sesi strong point ini".into(),
                 ));
             }
-            if req.captured_at < masuk {
+            if acuan < masuk {
                 return Err(AppError::Unprocessable(
                     "Waktu check-out tidak valid".into(),
                 ));
             }
-            let batas_akhir = geser_menit(jadwal.jam_selesai, 60);
+            let batas_akhir = NaiveTime::from_hms_opt(23, 59, 0).unwrap_or(jadwal.jam_selesai);
             if jam > batas_akhir {
                 return Err(AppError::Unprocessable(format!(
                     "Batas check-out sesi ini pukul {}.",
@@ -1312,7 +1316,7 @@ pub async fn create_absensi_ph(
             strong_point_id: strong_point.id,
             satker_id: jadwal.satker_id,
             jenis: req.jenis,
-            captured_at: req.captured_at,
+            captured_at: acuan,
             jam,
             latitude: Some(lat),
             longitude: Some(lng),
@@ -1325,6 +1329,38 @@ pub async fn create_absensi_ph(
             perlu_verifikasi,
             menit_telat,
             menit_pulang_cepat,
+        },
+    )
+    .await?;
+
+    // Cermin ke absensi harian agar rekap kehadiran kantor menghitung strong point.
+    let _ = absensi::insert(
+        &state.pool,
+        &NewAbsensi {
+            id: Uuid::new_v5(&Uuid::NAMESPACE_OID, format!("absensi-ph-{id}").as_bytes()),
+            grup_id: jadwal.id,
+            jadwal_ph_id: Some(jadwal.id),
+            client_uuid: Uuid::new_v5(
+                &Uuid::NAMESPACE_OID,
+                format!("absensi-ph-client-{id}").as_bytes(),
+            ),
+            personel_id: user.id(),
+            satker_id: jadwal.satker_id,
+            tanggal: jadwal.tanggal,
+            jenis: req.jenis,
+            status_kehadiran: StatusKehadiran::Ph,
+            captured_at: acuan,
+            jam,
+            latitude: Some(lat),
+            longitude: Some(lng),
+            akurasi_m: req.akurasi_m,
+            jarak_m: hasil.jarak_m,
+            dalam_radius: hasil.dalam_radius,
+            is_mock_suspect: is_mock,
+            is_offline: req.is_offline.unwrap_or(false),
+            foto_path: foto_path.as_deref(),
+            device_id: None,
+            perlu_verifikasi,
         },
     )
     .await?;

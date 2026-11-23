@@ -119,10 +119,42 @@ data class AbsensiHariIni(
 )
 
 @Serializable
+data class KonteksAbsensi(
+    val tanggal: String,
+    val jam: String,
+    val aksi: String,
+    val jenis: String? = null,
+    val statusTerkunci: String? = null,
+    val catatan: String? = null,
+    val bukaKantor: String = "07:00",
+    val tutupKantor: String = "15:00",
+    val adaJadwalStrong: Boolean = false,
+    val strongTerbuka: Boolean = false,
+    val jadwalStrong: List<KonteksStrong> = emptyList()
+)
+
+@Serializable
+data class KonteksStrong(
+    val jadwalPhId: String,
+    val strongPointNama: String,
+    val latitude: Double,
+    val longitude: Double,
+    val radiusM: Int = 100,
+    val jamMulai: String,
+    val jamSelesai: String,
+    val sesi: String? = null,
+    val sudahMasuk: Boolean = false,
+    val sudahPulang: Boolean = false,
+    val bisaMasuk: Boolean = false,
+    val bisaPulang: Boolean = false
+)
+
+@Serializable
 data class AbsensiResponse(
     val data: Absensi,
     val geofence: Geofence,
-    val serverTime: String
+    val serverTime: String,
+    val aksi: String = "checkin"
 )
 
 @Serializable

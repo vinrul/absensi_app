@@ -1046,9 +1046,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     sqlx::query(
                         "INSERT INTO absensi (id, client_uuid, personel_id, satker_id, tanggal, jenis,
                                               status_kehadiran, captured_at, jam, latitude, longitude,
-                                              akurasi_m, jarak_m, dalam_radius, is_offline, perlu_verifikasi)
+                                              akurasi_m, jarak_m, dalam_radius, is_offline, perlu_verifikasi,
+                                              grup_id)
                          VALUES ($1, $2, $3, $4, $5, $6::absensi_jenis, $7::status_kehadiran, $8, $9,
-                                 $10::float8::numeric, $11::float8::numeric, 12, 8.5, true, $12, $12)",
+                                 $10::float8::numeric, $11::float8::numeric, 12, 8.5, true, $12, $12, $13)",
                     )
                     .bind(uid(&format!("absensi-{personel_id}-{tanggal}-{jenis}")))
                     .bind(Uuid::new_v5(
@@ -1065,6 +1066,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .bind(-8.65629_f64)
                     .bind(115.22144_f64)
                     .bind(offline)
+                    .bind(uid(&format!("grup-absensi-{personel_id}-{tanggal}")))
                     .execute(&pool)
                     .await?;
                 }
@@ -1144,6 +1146,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .bind(115.22164_f64)
                 .bind(menit_telat)
                 .bind(menit_pulang_cepat)
+                .execute(&pool)
+                .await?;
+
+                // Cermin ke absensi harian agar rekap kehadiran ikut menghitung PH.
+                sqlx::query(
+                    "INSERT INTO absensi (
+                         id, grup_id, jadwal_ph_id, client_uuid, personel_id, satker_id,
+                         tanggal, jenis, status_kehadiran, captured_at, jam, latitude, longitude,
+                         akurasi_m, jarak_m, dalam_radius, is_offline, is_mock_suspect, perlu_verifikasi
+                     )
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::absensi_jenis,
+                             'ph', $9, $10, $11::float8::numeric, $12::float8::numeric,
+                             8, 2, true, false, false, false)",
+                )
+                .bind(uid(&format!("absensi-ph-{jadwal_id}-{personel_id}-{jenis}")))
+                .bind(jadwal_id)
+                .bind(jadwal_id)
+                .bind(Uuid::new_v5(
+                    &Uuid::NAMESPACE_OID,
+                    format!("absensi-ph-client-{jadwal_id}-{personel_id}-{jenis}").as_bytes(),
+                ))
+                .bind(personel_id)
+                .bind(satker_id)
+                .bind(*tanggal)
+                .bind(jenis)
+                .bind(captured)
+                .bind(jam)
+                .bind(-8.65610_f64)
+                .bind(115.22164_f64)
                 .execute(&pool)
                 .await?;
             }

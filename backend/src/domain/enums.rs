@@ -140,6 +140,7 @@ pg_enum!(
         DinasLuar => "dinas_luar",
         Ph => "ph",
         Piket => "piket",
+        Operasi => "operasi",
         LiburNasional => "libur_nasional",
         Cuti => "cuti",
         Izin => "izin",
@@ -153,7 +154,7 @@ impl StatusKehadiran {
     pub fn dihitung_hadir(&self) -> bool {
         matches!(
             self,
-            Self::DinasKantor | Self::DinasLuar | Self::Ph | Self::Piket
+            Self::DinasKantor | Self::DinasLuar | Self::Ph | Self::Piket | Self::Operasi
         )
     }
 
@@ -167,6 +168,22 @@ impl StatusKehadiran {
 
     pub fn butuh_radius(&self) -> bool {
         matches!(self, Self::DinasKantor | Self::Piket)
+    }
+
+    /// Status yang memerlukan pasangan check-in dan check-out.
+    pub fn butuh_checkout(&self) -> bool {
+        matches!(
+            self,
+            Self::DinasKantor | Self::Piket | Self::Operasi | Self::Ph
+        )
+    }
+
+    /// Status yang hanya dicatat sekali per hari (tanpa check-out).
+    pub fn sekali_sehari(&self) -> bool {
+        matches!(
+            self,
+            Self::DinasLuar | Self::Cuti | Self::Izin | Self::Sakit
+        )
     }
 }
 

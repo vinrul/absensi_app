@@ -7,7 +7,7 @@ use axum::response::Response;
 use axum::routing::{get, post};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Utc};
+use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -19,6 +19,7 @@ use crate::repo::absensi::{
     self, AbsensiHarianRow, AbsensiRow, ListFilter, ListHarianFilter, NewAbsensi,
 };
 use crate::repo::personel;
+use crate::repo::ph;
 use crate::repo::satker;
 use crate::repo::titik_dinas;
 use crate::repo::{ListResponse, pagination};
@@ -33,6 +34,7 @@ pub fn routes() -> Router<AppState> {
         .route("/", get(list_absensi).post(create_absensi))
         .route("/saya", get(list_saya))
         .route("/hari-ini", get(hari_ini))
+        .route("/konteks", get(konteks_absensi))
         .route("/harian", get(list_harian))
         .route("/rekap", get(rekap_absensi))
         .route("/rekap/ekspor", get(ekspor_rekap_pdf))
@@ -107,6 +109,40 @@ pub struct AbsensiResponse {
     pub data: AbsensiDto,
     pub geofence: GeofenceInfo,
     pub server_time: DateTime<Utc>,
+    /// `checkin` atau `checkout` — ditentukan server, bukan klien.
+    pub aksi: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct KonteksAbsensiDto {
+    pub tanggal: NaiveDate,
+    pub jam: String,
+    /// `checkin`, `checkout`, atau `selesai`.
+    pub aksi: String,
+    pub jenis: Option<AbsensiJenis>,
+    pub status_terkunci: Option<StatusKehadiran>,
+    pub catatan: Option<String>,
+    pub buka_kantor: String,
+    pub tutup_kantor: String,
+    pub ada_jadwal_strong: bool,
+    pub strong_terbuka: bool,
+    pub jadwal_strong: Vec<KonteksStrongDto>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct KonteksStrongDto {
+    pub jadwal_ph_id: Uuid,
+    pub strong_point_nama: String,
+    pub latitude: f64,
+    pub longitude: f64,
+    pub radius_m: i32,
+    pub jam_mulai: String,
+    pub jam_selesai: String,
+    pub sesi: Option<String>,
+    pub sudah_masuk: bool,
+    pub sudah_pulang: bool,
+    pub bisa_masuk: bool,
+    pub bisa_pulang: bool,
 }
 
 // ------------------------------------------------------------------- create
@@ -137,12 +173,20 @@ fn koordinat_valid(lat: Option<f64>, lng: Option<f64>) -> Option<(f64, f64)> {
     }
 }
 
+fn geser_menit_absensi(jam: NaiveTime, menit: i64) -> NaiveTime {
+    let detik = (jam.num_seconds_from_midnight() as i64 + menit * 60).clamp(0, 86_399) as u32;
+    NaiveTime::from_num_seconds_from_midnight_opt(detik, 0).unwrap_or(jam)
+}
+
 pub async fn create_absensi(
     State(state): State<AppState>,
     user: AuthUser,
     Json(req): Json<AbsensiRequest>,
 ) -> AppResult<Json<AbsensiResponse>> {
     let personel = personel::active_personel(&state.pool, user.id()).await?;
+    let satker = satker::find(&state.pool, personel.satker_id)
+        .await?
+        .ok_or_else(|| AppError::Unprocessable("Satker personel tidak ditemukan".into()))?;
 
     // Idempotensi: antrean offline boleh mencoba ulang berkali-kali.
     if let Some(existing) = absensi::find_by_client_uuid(&state.pool, req.client_uuid).await? {
@@ -156,6 +200,7 @@ pub async fn create_absensi(
             data: existing.into(),
             geofence,
             server_time: waktu::sekarang_utc(),
+            aksi: "ulang".into(),
         }));
     }
 
@@ -178,22 +223,101 @@ pub async fn create_absensi(
         ));
     }
 
-    if absensi::exists_harian(&state.pool, personel.id, tanggal, req.jenis).await? {
-        return Err(AppError::Conflict(format!(
-            "Absen {} sudah tercatat pada tanggal {}",
-            match req.jenis {
-                AbsensiJenis::Masuk => "masuk",
-                AbsensiJenis::Pulang => "pulang",
-            },
-            tanggal
-        )));
-    }
+    let id = Uuid::now_v7();
+    let batas_cari = hari_ini - Duration::days(2);
+    let terbuka = absensi::catatan_terbuka(&state.pool, personel.id, batas_cari).await?;
+    let open = terbuka.filter(|row| {
+        if row.tanggal == hari_ini {
+            true
+        } else if matches!(
+            row.status_kehadiran,
+            StatusKehadiran::Piket | StatusKehadiran::Operasi
+        ) {
+            row.tanggal == hari_ini - Duration::days(1)
+                && acuan.signed_duration_since(row.captured_at) <= Duration::hours(25)
+        } else {
+            false
+        }
+    });
+    let is_checkout = open.is_some();
+    let status = open
+        .as_ref()
+        .map(|row| row.status_kehadiran)
+        .unwrap_or(req.status_kehadiran);
+    let jenis = if is_checkout {
+        AbsensiJenis::Pulang
+    } else {
+        AbsensiJenis::Masuk
+    };
+    let tanggal_absensi = open.as_ref().map(|row| row.tanggal).unwrap_or(tanggal);
+    let grup_id = open.as_ref().map(|row| row.grup_id).unwrap_or(id);
 
-    if req.jenis == AbsensiJenis::Pulang
-        && !absensi::exists_harian(&state.pool, personel.id, tanggal, AbsensiJenis::Masuk).await?
+    if !is_checkout {
+        if status == StatusKehadiran::Ph {
+            return Err(AppError::Unprocessable(
+                "Absensi PH/strong point dilakukan melalui menu Strong Point.".into(),
+            ));
+        }
+        if matches!(
+            status,
+            StatusKehadiran::TanpaKeterangan | StatusKehadiran::LiburNasional
+        ) {
+            return Err(AppError::Unprocessable(
+                "Status tersebut tidak dapat dipilih dari aplikasi.".into(),
+            ));
+        }
+        let jadwal_hari = ph::jadwal_saya(&state.pool, personel.id, hari_ini, hari_ini).await?;
+        if status == StatusKehadiran::DinasKantor && !jadwal_hari.is_empty() {
+            return Err(AppError::Unprocessable(
+                "Hari ini Anda memiliki jadwal strong point. Absensi kantor tidak dapat dipakai."
+                    .into(),
+            ));
+        }
+        if ph::sesi_ph_terbuka(&state.pool, personel.id, hari_ini).await? {
+            return Err(AppError::Unprocessable(
+                "Selesaikan check-out strong point terlebih dahulu.".into(),
+            ));
+        }
+        if status == StatusKehadiran::DinasKantor {
+            let buka = geser_menit_absensi(satker.jam_masuk, -30);
+            if jam < buka {
+                return Err(AppError::Unprocessable(format!(
+                    "Absensi kantor dibuka pukul {}.",
+                    buka.format("%H:%M")
+                )));
+            }
+            if jam > satker.jam_pulang {
+                return Err(AppError::Unprocessable(
+                    "Jam kerja sudah berakhir. Pilih Dinas Luar, Piket/Shift, Cuti, Izin, Sakit, atau Operasi/Pam."
+                        .into(),
+                ));
+            }
+        }
+
+        let status_hari = absensi::status_hari_ini(&state.pool, personel.id, hari_ini).await?;
+        if status_hari.iter().any(|nilai| nilai.sekali_sehari()) {
+            return Err(AppError::Conflict(
+                "Anda sudah mencatat absensi hari ini.".into(),
+            ));
+        }
+        if status.sekali_sehari() && !status_hari.is_empty() {
+            return Err(AppError::Conflict(
+                "Status ini hanya dapat dicatat sekali per hari.".into(),
+            ));
+        }
+        if status == StatusKehadiran::DinasKantor
+            && status_hari.contains(&StatusKehadiran::DinasKantor)
+        {
+            return Err(AppError::Conflict(
+                "Absensi kantor hari ini sudah lengkap.".into(),
+            ));
+        }
+    } else if let Some(open) = &open
+        && open.status_kehadiran == StatusKehadiran::DinasKantor
+        && open.tanggal != hari_ini
     {
         return Err(AppError::Unprocessable(
-            "Absen masuk belum tercatat untuk hari ini".into(),
+            "Batas check-out kantor sudah lewat.".into(),
         ));
     }
 
@@ -220,7 +344,7 @@ pub async fn create_absensi(
         })
         .collect();
 
-    let butuh_gps = req.status_kehadiran.dihitung_hadir();
+    let butuh_gps = status.dihitung_hadir();
     let koordinat = koordinat_valid(req.latitude, req.longitude);
 
     if butuh_gps && koordinat.is_none() {
@@ -229,7 +353,7 @@ pub async fn create_absensi(
         ));
     }
 
-    if butuh_gps && titik.is_empty() {
+    if status.butuh_radius() && titik.is_empty() {
         return Err(AppError::Unprocessable(
             "Satker belum memiliki titik dinas aktif, hubungi admin".into(),
         ));
@@ -241,15 +365,15 @@ pub async fn create_absensi(
         None => geofence::evaluasi(&[], 0.0, 0.0, 0.0),
     };
 
-    if req.status_kehadiran.butuh_radius() && !hasil.dalam_radius {
+    if status.butuh_radius() && !hasil.dalam_radius {
         let jarak = hasil.jarak_m.unwrap_or(0.0);
         let radius = hasil.radius_m.unwrap_or(100);
         return Err(AppError::Unprocessable(format!(
-            "Anda berada {jarak:.0} m dari titik dinas (radius {radius} m). Dekati lokasi atau ajukan koreksi ke atasan."
+            "Anda berada {jarak:.0} m dari titik dinas (radius {radius} m). Absensi wajib di dalam radius."
         )));
     }
 
-    if req.status_kehadiran == StatusKehadiran::DinasLuar && hasil.dalam_radius {
+    if status == StatusKehadiran::DinasLuar && hasil.dalam_radius {
         // Dinas luar yang ternyata di dalam radius kantor tetap dicatat apa adanya.
         tracing::info!(personel = %personel.nrp.as_deref().unwrap_or("-"), "dinas luar tercatat di dalam radius kantor");
     }
@@ -282,7 +406,7 @@ pub async fn create_absensi(
             ));
         }
 
-        let key = storage::kunci_absensi(personel.satker_id, tanggal, Uuid::now_v7(), ext);
+        let key = storage::kunci_absensi(personel.satker_id, tanggal_absensi, Uuid::now_v7(), ext);
         state.storage.save(&key, &bytes).await?;
         foto_path = Some(key);
     }
@@ -291,21 +415,20 @@ pub async fn create_absensi(
     let perlu_verifikasi = req.is_offline.unwrap_or(false)
         || is_mock
         || akurasi > 100.0
-        || (req.status_kehadiran.butuh_radius() && !hasil.dalam_radius)
-        || req.status_kehadiran == StatusKehadiran::TanpaKeterangan;
-
-    let id = Uuid::now_v7();
+        || (status.butuh_radius() && !hasil.dalam_radius);
 
     let inserted = absensi::insert(
         &state.pool,
         &NewAbsensi {
             id,
+            grup_id,
+            jadwal_ph_id: None,
             client_uuid: req.client_uuid,
             personel_id: personel.id,
             satker_id: personel.satker_id,
-            tanggal,
-            jenis: req.jenis,
-            status_kehadiran: req.status_kehadiran,
+            tanggal: tanggal_absensi,
+            jenis,
+            status_kehadiran: status,
             captured_at: acuan,
             jam,
             latitude: koordinat.map(|(lat, _)| lat),
@@ -341,6 +464,7 @@ pub async fn create_absensi(
             dalam_radius: hasil.dalam_radius,
         },
         server_time: waktu::sekarang_utc(),
+        aksi: if is_checkout { "checkout" } else { "checkin" }.into(),
     }))
 }
 
@@ -372,6 +496,119 @@ pub async fn hari_ini(
         tanggal,
         masuk,
         pulang,
+    }))
+}
+
+/// Konteks tombol Absensi: apakah check-in/check-out dan sesi strong point mana
+/// yang sedang aktif. Ditentukan server agar klien tidak menebak.
+pub async fn konteks_absensi(
+    State(state): State<AppState>,
+    user: AuthUser,
+) -> AppResult<Json<KonteksAbsensiDto>> {
+    let personel = personel::active_personel(&state.pool, user.id()).await?;
+    let satker = satker::find(&state.pool, personel.satker_id)
+        .await?
+        .ok_or_else(|| AppError::Unprocessable("Satker personel tidak ditemukan".into()))?;
+    let acuan = waktu::sekarang_utc();
+    let lokal = ke_wita(acuan);
+    let tanggal = lokal.date_naive();
+    let jam = lokal.time();
+    let hari_ini = waktu::hari_ini_wita();
+
+    let batas_cari = hari_ini - Duration::days(2);
+    let terbuka = absensi::catatan_terbuka(&state.pool, personel.id, batas_cari).await?;
+    let open = terbuka.filter(|row| {
+        if row.tanggal == hari_ini {
+            true
+        } else if matches!(
+            row.status_kehadiran,
+            StatusKehadiran::Piket | StatusKehadiran::Operasi
+        ) {
+            row.tanggal == hari_ini - Duration::days(1)
+                && acuan.signed_duration_since(row.captured_at) <= Duration::hours(25)
+        } else {
+            false
+        }
+    });
+
+    let status_hari = absensi::status_hari_ini(&state.pool, personel.id, hari_ini).await?;
+    let (mut aksi, mut jenis, mut status_terkunci, mut catatan) = if let Some(open) = &open {
+        (
+            "checkout".to_string(),
+            Some(AbsensiJenis::Pulang),
+            Some(open.status_kehadiran),
+            Some(format!(
+                "Check-out {} yang dimulai pukul {}.",
+                label_status_kehadiran(open.status_kehadiran),
+                open.jam.format("%H:%M")
+            )),
+        )
+    } else if status_hari
+        .iter()
+        .any(|nilai| nilai.sekali_sehari() || *nilai == StatusKehadiran::DinasKantor)
+    {
+        (
+            "selesai".to_string(),
+            None,
+            None,
+            Some("Absensi hari ini sudah tercatat.".to_string()),
+        )
+    } else {
+        ("checkin".to_string(), Some(AbsensiJenis::Masuk), None, None)
+    };
+
+    let jadwal = ph::jadwal_saya(&state.pool, personel.id, hari_ini, hari_ini).await?;
+    let mut jadwal_strong = Vec::with_capacity(jadwal.len());
+    for item in &jadwal {
+        let sudah_masuk =
+            ph::exists_absensi_ph(&state.pool, item.id, personel.id, AbsensiJenis::Masuk).await?;
+        let sudah_pulang =
+            ph::exists_absensi_ph(&state.pool, item.id, personel.id, AbsensiJenis::Pulang).await?;
+        let buka = geser_menit_absensi(item.jam_mulai, -30);
+        let bisa_masuk = !sudah_masuk && jam >= buka && jam <= item.jam_selesai;
+        let bisa_pulang = sudah_masuk && !sudah_pulang;
+        jadwal_strong.push(KonteksStrongDto {
+            jadwal_ph_id: item.id,
+            strong_point_nama: item.strong_point_nama.clone(),
+            latitude: item.latitude,
+            longitude: item.longitude,
+            radius_m: item.radius_m,
+            jam_mulai: item.jam_mulai.format("%H:%M").to_string(),
+            jam_selesai: item.jam_selesai.format("%H:%M").to_string(),
+            sesi: item.sesi.clone(),
+            sudah_masuk,
+            sudah_pulang,
+            bisa_masuk,
+            bisa_pulang,
+        });
+    }
+
+    let strong_terbuka = ph::sesi_ph_terbuka(&state.pool, personel.id, hari_ini).await?;
+    let ada_sesi_mendatang = jadwal.iter().any(|item| item.jam_mulai > jam);
+    let ada_ph_selesai = jadwal_strong
+        .iter()
+        .any(|item| item.sudah_masuk && item.sudah_pulang);
+    if aksi == "checkin" && ada_ph_selesai && !ada_sesi_mendatang && !strong_terbuka {
+        aksi = "selesai".into();
+        jenis = None;
+        status_terkunci = None;
+        catatan = Some("Absensi strong point hari ini sudah lengkap.".into());
+    }
+
+    Ok(Json(KonteksAbsensiDto {
+        tanggal,
+        jam: jam.format("%H:%M").to_string(),
+        aksi,
+        jenis,
+        status_terkunci,
+        catatan,
+        buka_kantor: geser_menit_absensi(satker.jam_masuk, -30)
+            .format("%H:%M")
+            .to_string(),
+        tutup_kantor: satker.jam_pulang.format("%H:%M").to_string(),
+        ada_jadwal_strong: !jadwal.is_empty(),
+        strong_terbuka,
+        jadwal_strong,
     }))
 }
 
@@ -836,6 +1073,7 @@ fn label_status_kehadiran(status: StatusKehadiran) -> &'static str {
         StatusKehadiran::DinasLuar => "Dinas Luar",
         StatusKehadiran::Ph => "PH",
         StatusKehadiran::Piket => "Piket/Shift",
+        StatusKehadiran::Operasi => "Operasi/Pam",
         StatusKehadiran::LiburNasional => "Libur Nasional",
         StatusKehadiran::Cuti => "Cuti",
         StatusKehadiran::Izin => "Izin",

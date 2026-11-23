@@ -8,6 +8,8 @@ use crate::error::{AppError, AppResult};
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct AbsensiRow {
     pub id: Uuid,
+    pub grup_id: Uuid,
+    pub jadwal_ph_id: Option<Uuid>,
     pub client_uuid: Uuid,
     pub personel_id: Uuid,
     pub satker_id: Uuid,
@@ -54,6 +56,8 @@ pub struct AbsensiListItem {
 
 pub struct NewAbsensi<'a> {
     pub id: Uuid,
+    pub grup_id: Uuid,
+    pub jadwal_ph_id: Option<Uuid>,
     pub client_uuid: Uuid,
     pub personel_id: Uuid,
     pub satker_id: Uuid,
@@ -78,21 +82,23 @@ pub struct NewAbsensi<'a> {
 pub async fn insert(pool: &PgPool, data: &NewAbsensi<'_>) -> AppResult<u16> {
     const SQL: &str = r#"
         INSERT INTO absensi (
-            id, client_uuid, personel_id, satker_id, tanggal, jenis, status_kehadiran,
-            captured_at, jam, latitude, longitude, akurasi_m, jarak_m, dalam_radius,
-            is_mock_suspect, is_offline, foto_path, device_id, perlu_verifikasi
+            id, grup_id, jadwal_ph_id, client_uuid, personel_id, satker_id, tanggal, jenis,
+            status_kehadiran, captured_at, jam, latitude, longitude, akurasi_m, jarak_m,
+            dalam_radius, is_mock_suspect, is_offline, foto_path, device_id, perlu_verifikasi
         )
         VALUES (
-            $1, $2, $3, $4, $5, $6, $7,
-            $8, $9, $10::float8::numeric, $11::float8::numeric,
-            $12::float8::numeric, $13::float8::numeric, $14,
-            $15, $16, $17, $18, $19
+            $1, $2, $3, $4, $5, $6, $7, $8, $9,
+            $10, $11, $12::float8::numeric, $13::float8::numeric,
+            $14::float8::numeric, $15::float8::numeric, $16,
+            $17, $18, $19, $20, $21
         )
         ON CONFLICT (client_uuid) DO NOTHING
     "#;
 
     let result = sqlx::query(SQL)
         .bind(data.id)
+        .bind(data.grup_id)
+        .bind(data.jadwal_ph_id)
         .bind(data.client_uuid)
         .bind(data.personel_id)
         .bind(data.satker_id)
@@ -122,8 +128,8 @@ pub async fn find_by_client_uuid(
     client_uuid: Uuid,
 ) -> AppResult<Option<AbsensiRow>> {
     const SQL: &str = r#"
-        SELECT id, client_uuid, personel_id, satker_id, tanggal, jenis, status_kehadiran,
-               captured_at, jam,
+        SELECT id, grup_id, jadwal_ph_id, client_uuid, personel_id, satker_id, tanggal, jenis,
+               status_kehadiran, captured_at, jam,
                latitude::float8  AS latitude,
                longitude::float8 AS longitude,
                akurasi_m::float8 AS akurasi_m,
@@ -141,8 +147,8 @@ pub async fn find_by_client_uuid(
 
 pub async fn find(pool: &PgPool, id: Uuid) -> AppResult<Option<AbsensiRow>> {
     const SQL: &str = r#"
-        SELECT a.id, a.client_uuid, a.personel_id, a.satker_id, a.tanggal, a.jenis,
-               a.status_kehadiran, a.captured_at, a.jam,
+        SELECT a.id, a.grup_id, a.jadwal_ph_id, a.client_uuid, a.personel_id, a.satker_id, a.tanggal,
+               a.jenis, a.status_kehadiran, a.captured_at, a.jam,
                a.latitude::float8  AS latitude,
                a.longitude::float8 AS longitude,
                a.akurasi_m::float8 AS akurasi_m,
@@ -175,6 +181,80 @@ pub async fn exists_harian(
     Ok(found.is_some())
 }
 
+/// Catatan check-in terakhir yang belum memiliki check-out.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct AbsensiTerbukaRow {
+    pub id: Uuid,
+    pub grup_id: Uuid,
+    pub tanggal: NaiveDate,
+    pub status_kehadiran: StatusKehadiran,
+    pub captured_at: DateTime<Utc>,
+    pub jam: NaiveTime,
+}
+
+pub async fn catatan_terbuka(
+    pool: &PgPool,
+    personel_id: Uuid,
+    batas_tanggal: NaiveDate,
+) -> AppResult<Option<AbsensiTerbukaRow>> {
+    const SQL: &str = r#"
+        SELECT m.id, coalesce(m.grup_id, m.id) AS grup_id, m.tanggal,
+               m.status_kehadiran, m.captured_at, m.jam
+          FROM absensi m
+         WHERE m.personel_id = $1
+           AND m.tanggal >= $2
+           AND m.jenis = 'masuk'
+           AND m.status_kehadiran IN ('dinas_kantor', 'piket', 'operasi')
+           AND NOT EXISTS (
+               SELECT 1 FROM absensi p
+                WHERE p.personel_id = m.personel_id
+                  AND p.jenis = 'pulang'
+                  AND coalesce(p.grup_id, p.id) = coalesce(m.grup_id, m.id)
+           )
+         ORDER BY m.captured_at DESC
+         LIMIT 1
+    "#;
+    Ok(sqlx::query_as::<_, AbsensiTerbukaRow>(SQL)
+        .bind(personel_id)
+        .bind(batas_tanggal)
+        .fetch_optional(pool)
+        .await?)
+}
+
+pub async fn ada_status_hari_ini(
+    pool: &PgPool,
+    personel_id: Uuid,
+    tanggal: NaiveDate,
+    status: StatusKehadiran,
+) -> AppResult<bool> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (
+             SELECT 1 FROM absensi
+              WHERE personel_id = $1 AND tanggal = $2 AND status_kehadiran = $3
+         )",
+    )
+    .bind(personel_id)
+    .bind(tanggal)
+    .bind(status)
+    .fetch_one(pool)
+    .await?)
+}
+
+pub async fn status_hari_ini(
+    pool: &PgPool,
+    personel_id: Uuid,
+    tanggal: NaiveDate,
+) -> AppResult<Vec<StatusKehadiran>> {
+    Ok(sqlx::query_scalar::<_, StatusKehadiran>(
+        "SELECT DISTINCT status_kehadiran FROM absensi
+          WHERE personel_id = $1 AND tanggal = $2 AND jenis = 'masuk'",
+    )
+    .bind(personel_id)
+    .bind(tanggal)
+    .fetch_all(pool)
+    .await?)
+}
+
 pub async fn list_personel(
     pool: &PgPool,
     personel_id: Uuid,
@@ -182,8 +262,8 @@ pub async fn list_personel(
     sampai: NaiveDate,
 ) -> AppResult<Vec<AbsensiRow>> {
     const SQL: &str = r#"
-        SELECT a.id, a.client_uuid, a.personel_id, a.satker_id, a.tanggal, a.jenis,
-               a.status_kehadiran, a.captured_at, a.jam,
+        SELECT a.id, a.grup_id, a.jadwal_ph_id, a.client_uuid, a.personel_id, a.satker_id, a.tanggal,
+               a.jenis, a.status_kehadiran, a.captured_at, a.jam,
                a.latitude::float8  AS latitude,
                a.longitude::float8 AS longitude,
                a.akurasi_m::float8 AS akurasi_m,
@@ -432,9 +512,12 @@ pub struct RekapRow {
     pub hadir: i64,
     pub dinas_luar: i64,
     pub piket: i64,
+    pub operasi: i64,
     pub telat: i64,
     /// Total menit keterlambatan untuk hari berstatus `dinas_kantor`.
     pub menit_telat: i64,
+    /// Total menit pulang cepat untuk hari berstatus `dinas_kantor`.
+    pub menit_pulang_cepat: i64,
     pub cuti: i64,
     pub izin: i64,
     pub sakit: i64,
@@ -446,20 +529,33 @@ pub struct RekapRow {
 const REKAP_SQL: &str = r#"
     SELECT p.id AS personel_id, p.nama, p.nrp, p.pangkat, p.jabatan, p.unit, p.satker_id,
            count(a.id) FILTER (
-               WHERE a.status_kehadiran IN ('dinas_kantor', 'dinas_luar', 'piket', 'ph')
+               WHERE a.status_kehadiran IN ('dinas_kantor', 'dinas_luar', 'piket', 'operasi', 'ph')
            ) AS hadir,
            count(a.id) FILTER (WHERE a.status_kehadiran = 'dinas_luar') AS dinas_luar,
            count(a.id) FILTER (WHERE a.status_kehadiran = 'piket') AS piket,
+           count(a.id) FILTER (WHERE a.status_kehadiran = 'operasi') AS operasi,
            count(a.id) FILTER (
-               WHERE a.status_kehadiran IN ('dinas_kantor', 'piket') AND a.jam > s.jam_masuk
-                 AND phd.tanggal IS NULL
+               WHERE (a.status_kehadiran = 'dinas_kantor' AND a.jam > s.jam_masuk
+                      AND phd.tanggal IS NULL)
+                  OR (a.status_kehadiran = 'ph' AND a.jam > j.jam_mulai)
            ) AS telat,
            coalesce(sum(
                CASE WHEN a.status_kehadiran = 'dinas_kantor' AND a.jam > s.jam_masuk
                          AND phd.tanggal IS NULL
                     THEN floor(extract(epoch FROM (a.jam - s.jam_masuk)) / 60)::bigint
+                    WHEN a.status_kehadiran = 'ph' AND a.jam > j.jam_mulai
+                    THEN floor(extract(epoch FROM (a.jam - j.jam_mulai)) / 60)::bigint
                     ELSE 0 END
            ), 0)::bigint AS menit_telat,
+           coalesce(sum(
+               CASE WHEN pl.jenis = 'pulang' AND pl.status_kehadiran = 'dinas_kantor'
+                         AND pl.jam < s.jam_pulang
+                    THEN floor(extract(epoch FROM (s.jam_pulang - pl.jam)) / 60)::bigint
+                    WHEN pl.jenis = 'pulang' AND pl.status_kehadiran = 'ph'
+                         AND jp.id IS NOT NULL AND pl.jam < jp.jam_selesai
+                    THEN floor(extract(epoch FROM (jp.jam_selesai - pl.jam)) / 60)::bigint
+                    ELSE 0 END
+           ), 0)::bigint AS menit_pulang_cepat,
            count(a.id) FILTER (WHERE a.status_kehadiran = 'cuti') AS cuti,
            count(a.id) FILTER (WHERE a.status_kehadiran = 'izin') AS izin,
            count(a.id) FILTER (WHERE a.status_kehadiran = 'sakit') AS sakit,
@@ -473,6 +569,13 @@ const REKAP_SQL: &str = r#"
              ON a.personel_id = p.id
             AND a.jenis = 'masuk'
             AND a.tanggal BETWEEN $2 AND $3
+      LEFT JOIN jadwal_ph j ON j.id = a.jadwal_ph_id
+      LEFT JOIN absensi pl
+             ON pl.personel_id = p.id
+            AND pl.jenis = 'pulang'
+            AND pl.tanggal = a.tanggal
+            AND coalesce(pl.grup_id, pl.id) = coalesce(a.grup_id, a.id)
+      LEFT JOIN jadwal_ph jp ON jp.id = pl.jadwal_ph_id
       LEFT JOIN (
           SELECT DISTINCT aph.personel_id, jph.tanggal
             FROM absensi_ph aph

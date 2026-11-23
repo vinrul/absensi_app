@@ -23,8 +23,7 @@ import id.polri.poldabali.kinerja.ui.theme.Warna
 @Composable
 fun BerandaScreen(
     vm: KinerjaViewModel,
-    onBukaAbsensi: () -> Unit,
-    onBukaStrong: () -> Unit
+    onBukaAbsensi: () -> Unit
 ) {
     val pengguna = vm.pengguna
     val statusServer = vm.absensiHariIni
@@ -117,8 +116,8 @@ fun BerandaScreen(
             }
             Spacer(Modifier.height(10.dp))
             TombolKedua(
-                teks = "Buka Strong Point",
-                onClick = onBukaStrong
+                teks = if (jadwalHariIni.isEmpty()) "Buka Absensi" else "Absen Strong Point",
+                onClick = onBukaAbsensi
             )
         }
 

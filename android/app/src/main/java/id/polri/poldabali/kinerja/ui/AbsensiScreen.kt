@@ -2,6 +2,7 @@ package id.polri.poldabali.kinerja.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.location.Location
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -19,12 +20,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Favorite
@@ -33,8 +32,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,21 +55,29 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import id.polri.poldabali.kinerja.data.Absensi
+import id.polri.poldabali.kinerja.data.AbsensiPh
+import id.polri.poldabali.kinerja.data.JadwalPhSaya
+import id.polri.poldabali.kinerja.data.KonteksAbsensi
+import id.polri.poldabali.kinerja.data.KonteksStrong
+import id.polri.poldabali.kinerja.data.TitikDinas
 import id.polri.poldabali.kinerja.lokasi.Lokasi
 import id.polri.poldabali.kinerja.ui.theme.Warna
 import id.polri.poldabali.kinerja.util.Foto
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.Instant
 import java.util.Locale
+import java.util.UUID
 
 private const val HALAMAN_BERANDA = 0
-private const val HALAMAN_VALIDASI = 1
-private const val HALAMAN_STATUS = 2
-private const val HALAMAN_RIWAYAT = 3
+private const val HALAMAN_STATUS = 1
+private const val HALAMAN_LOKASI = 2
+private const val HALAMAN_FOTO = 3
+private const val HALAMAN_RIWAYAT = 4
 
 private data class OpsiStatus(
     val nilai: String,
@@ -82,24 +87,46 @@ private data class OpsiStatus(
 )
 
 private val STATUS_KEHADIRAN = listOf(
-    OpsiStatus("dinas_kantor", "Dinas Kantor", Icons.Filled.Home),
-    OpsiStatus("dinas_luar", "Dinas Luar", Icons.Filled.Place),
-    OpsiStatus("ph", "PH", Icons.Filled.Person, "Perintah Hadir"),
-    OpsiStatus("piket", "Piket / Shift", Icons.Filled.Lock),
-    OpsiStatus("cuti", "Cuti", Icons.Filled.DateRange),
-    OpsiStatus("izin", "Izin", Icons.AutoMirrored.Filled.List),
-    OpsiStatus("sakit", "Sakit", Icons.Filled.Favorite),
-    OpsiStatus("tanpa_keterangan", "Tanpa Keterangan", Icons.Filled.Warning)
+    OpsiStatus("dinas_kantor", "Dinas Kantor", Icons.Filled.Home, "Wajib di dalam radius kantor"),
+    OpsiStatus("dinas_luar", "Dinas Luar", Icons.Filled.Place, "Catat lokasi, cukup check-in"),
+    OpsiStatus("ph", "PH / Strong Point", Icons.Filled.Person, "Sesuai jadwal strong point"),
+    OpsiStatus("piket", "Piket / Shift", Icons.Filled.Lock, "Wajib check-in dan check-out"),
+    OpsiStatus("operasi", "Operasi / Pam", Icons.Filled.Warning, "Boleh di luar radius kantor"),
+    OpsiStatus("cuti", "Cuti", Icons.Filled.DateRange, "Cukup satu catatan per hari"),
+    OpsiStatus("izin", "Izin", Icons.AutoMirrored.Filled.List, "Cukup satu catatan per hari"),
+    OpsiStatus("sakit", "Sakit", Icons.Filled.Favorite, "Cukup satu catatan per hari")
+)
+
+private data class SesiStrongRiwayat(
+    val sesi: String,
+    val jadwal: String,
+    val titik: String,
+    val masuk: String?,
+    val pulang: String?
+)
+
+private data class StatusRiwayat(
+    val label: String,
+    val masuk: List<String>,
+    val pulang: List<String>
+)
+
+private data class BarisRiwayatHarian(
+    val tanggal: String,
+    val status: List<StatusRiwayat>,
+    val strong: List<SesiStrongRiwayat>
 )
 
 @Composable
 fun AbsensiScreen(vm: KinerjaViewModel) {
-    val konteks = LocalContext.current
+    val konteksApp = LocalContext.current
     val skop = rememberCoroutineScope()
 
     var halaman by rememberSaveable { mutableIntStateOf(HALAMAN_BERANDA) }
-    var jenis by rememberSaveable { mutableStateOf("masuk") }
     var status by rememberSaveable { mutableStateOf<String?>(null) }
+    var jenis by rememberSaveable { mutableStateOf("masuk") }
+    var jadwalId by rememberSaveable { mutableStateOf<String?>(null) }
+    var checkout by rememberSaveable { mutableStateOf(false) }
     var offline by rememberSaveable { mutableStateOf(false) }
 
     var lat by remember { mutableStateOf<Double?>(null) }
@@ -114,20 +141,34 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
     var fotoBase64 by remember { mutableStateOf<String?>(null) }
 
     val hariIni = vm.absensiHariIni
-    val dalamRadius = vm.titikTerdekat?.terdekat?.dalamRadius == true
-    val titikTerdekat = vm.titikTerdekat?.titik?.minByOrNull { it.jarakM ?: Double.MAX_VALUE }
+    val muatKonteks = vm.memuatKonteksAbsensi
+    val sesiTerpilih = vm.konteksAbsensi?.jadwalStrong?.firstOrNull { it.jadwalPhId == jadwalId }
+    val titikPeta = titikUntukPeta(vm, status, sesiTerpilih)
+    val jarakStrong = if (lat != null && lng != null && sesiTerpilih != null) {
+        jarakMeter(lat!!, lng!!, sesiTerpilih.latitude, sesiTerpilih.longitude)
+    } else {
+        null
+    }
+    val dalamRadiusKantor = vm.titikTerdekat?.terdekat?.dalamRadius == true
+    val dalamRadiusStrong = jarakStrong != null && jarakStrong <= (sesiTerpilih?.radiusM ?: 0)
+    val dalamRadius = if (status == "ph") dalamRadiusStrong else dalamRadiusKantor
+    val butuhRadius = status == "dinas_kantor" || status == "piket" || status == "ph"
+    val butuhLokasi = status == null || status !in listOf("cuti", "izin", "sakit")
+    val jarakTampil = if (status == "ph") jarakStrong else vm.titikTerdekat?.terdekat?.jarakM
+    val radiusTampil = if (status == "ph") sesiTerpilih?.radiusM else vm.titikTerdekat?.terdekat?.radiusM
+    val namaTitik = if (status == "ph") sesiTerpilih?.strongPointNama else titikPeta?.nama
 
     fun punya(izin: String) =
-        ContextCompat.checkSelfPermission(konteks, izin) == PackageManager.PERMISSION_GRANTED
+        ContextCompat.checkSelfPermission(konteksApp, izin) == PackageManager.PERMISSION_GRANTED
 
     suspend fun ambilLokasi() {
         mengambilLokasi = true
         try {
-            val lokasi = Lokasi.ambil(konteks)
+            val lokasi = Lokasi.ambil(konteksApp)
             lat = lokasi.latitude
             lng = lokasi.longitude
             akurasi = lokasi.accuracy.toDouble()
-            val kondisi = Lokasi.kondisi(konteks, lokasi)
+            val kondisi = Lokasi.kondisi(konteksApp, lokasi)
             mock = kondisi.mock
             devOptions = kondisi.developerOptions
             aplikasiMock = kondisi.aplikasiMock
@@ -164,21 +205,6 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
         }
     }
 
-    fun mulaiValidasi() {
-        vm.bersihkanPesan()
-        vm.muatAbsensiHariIni()
-        halaman = HALAMAN_VALIDASI
-        if (lat == null) mintaAtauAmbilLokasi()
-    }
-
-    fun lanjutPilihStatus(jenisDipilih: String) {
-        jenis = jenisDipilih
-        status = if (dalamRadius) "dinas_kantor" else null
-        offline = vm.absensiHariIniOffline
-        vm.bersihkanPesan()
-        halaman = HALAMAN_STATUS
-    }
-
     val ambilFoto = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { sukses ->
@@ -188,11 +214,11 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
     }
 
     fun bukaKamera() {
-        val berkas = Foto.berkasSementara(File(konteks.cacheDir, "absensi"))
+        val berkas = Foto.berkasSementara(File(konteksApp.cacheDir, "absensi"))
         berkasFoto = berkas
         val uri = FileProvider.getUriForFile(
-            konteks,
-            "${konteks.packageName}.fileprovider",
+            konteksApp,
+            "${konteksApp.packageName}.fileprovider",
             berkas
         )
         ambilFoto.launch(uri)
@@ -205,8 +231,104 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
         else vm.pesanGalat("Izin kamera diperlukan untuk mengambil foto bukti")
     }
 
+    fun resetKeBeranda() {
+        vm.muatKonteksAbsensi()
+        vm.muatAbsensiHariIni()
+        status = null
+        jenis = "masuk"
+        jadwalId = null
+        checkout = false
+        fotoBase64 = null
+        berkasFoto = null
+        halaman = HALAMAN_BERANDA
+    }
+
+    fun sesiMasukBerikutnya(k: KonteksAbsensi): KonteksStrong? =
+        k.jadwalStrong.firstOrNull { it.bisaMasuk }
+
+    fun sesiTerbuka(k: KonteksAbsensi): KonteksStrong? =
+        k.jadwalStrong.firstOrNull { it.sudahMasuk && !it.sudahPulang }
+
+    fun mulai() {
+        vm.bersihkanPesan()
+        vm.muatKonteksAbsensi()
+        val k = vm.konteksAbsensi
+        if (k == null) {
+            vm.pesanGalat("Konteks absensi belum tersedia. Periksa koneksi lalu coba lagi.")
+            return
+        }
+        if (k.aksi == "selesai") {
+            vm.pesanGalat("Absensi hari ini sudah lengkap.")
+            return
+        }
+        if (k.aksi == "checkout") {
+            checkout = true
+            jenis = "pulang"
+            status = k.statusTerkunci
+            jadwalId = null
+            halaman = HALAMAN_LOKASI
+            if (lat == null) mintaAtauAmbilLokasi()
+            return
+        }
+
+        if (k.strongTerbuka) {
+            val baru = sesiMasukBerikutnya(k)
+            val terbuka = sesiTerbuka(k)
+            if (baru != null) {
+                checkout = false
+                jenis = "masuk"
+                status = "ph"
+                jadwalId = baru.jadwalPhId
+                vm.pesanSukses(
+                    "Check-in sesi ${labelSesi(baru)}. Sesi sebelumnya yang belum check-out ditandai tidak check-out."
+                )
+                halaman = HALAMAN_LOKASI
+                if (lat == null) mintaAtauAmbilLokasi()
+                return
+            }
+            if (terbuka != null) {
+                checkout = true
+                jenis = "pulang"
+                status = "ph"
+                jadwalId = terbuka.jadwalPhId
+                halaman = HALAMAN_LOKASI
+                if (lat == null) mintaAtauAmbilLokasi()
+                return
+            }
+        }
+
+        status = null
+        jenis = "masuk"
+        jadwalId = null
+        checkout = false
+        halaman = HALAMAN_STATUS
+    }
+
+    fun pilihStatus(nilai: String) {
+        if (!opsiAktif(nilai, vm.konteksAbsensi)) return
+        status = nilai
+        checkout = false
+        jenis = "masuk"
+        jadwalId = if (nilai == "ph") {
+            vm.konteksAbsensi?.jadwalStrong?.firstOrNull { it.bisaMasuk }?.jadwalPhId
+        } else {
+            null
+        }
+        if (nilai == "ph" && jadwalId == null) {
+            vm.pesanGalat("Tidak ada sesi strong point yang bisa check-in sekarang.")
+            return
+        }
+        halaman = HALAMAN_LOKASI
+        if (lat == null) mintaAtauAmbilLokasi()
+    }
+
     LaunchedEffect(Unit) {
         vm.muatAbsensiHariIni()
+        vm.muatKonteksAbsensi()
+    }
+
+    LaunchedEffect(halaman) {
+        if (halaman == HALAMAN_RIWAYAT) vm.muatRiwayatBulanIni()
     }
 
     Column(
@@ -224,8 +346,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(124.dp)
-                        .clickable { mulaiValidasi() },
+                        .height(124.dp),
                     shape = RoundedCornerShape(18.dp),
                     color = Warna.Navy,
                     shadowElevation = 3.dp
@@ -248,7 +369,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                             color = Color.White
                         )
                         Text(
-                            "Absen dengan validasi lokasi GPS",
+                            "Pilih status, ambil lokasi, lalu kirim",
                             style = MaterialTheme.typography.bodySmall,
                             color = Warna.NavySoft
                         )
@@ -256,30 +377,94 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 }
 
                 Kartu {
+                    JudulBagian("Status Absensi", ringkasanKonteks(vm.konteksAbsensi, muatKonteks))
+                    vm.konteksAbsensi?.catatan?.let {
+                        Spacer(Modifier.height(6.dp))
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Warna.TeksLembut)
+                    }
+                    vm.konteksAbsensi?.let { k ->
+                        if (k.adaJadwalStrong) {
+                            Spacer(Modifier.height(8.dp))
+                            k.jadwalStrong.forEach { sesi ->
+                                BarisInfo(
+                                    labelSesi(sesi),
+                                    buildString {
+                                        append(sesi.strongPointNama)
+                                        when {
+                                            sesi.sudahPulang -> append(" · selesai")
+                                            sesi.sudahMasuk -> append(" · sudah check-in")
+                                            sesi.bisaMasuk -> append(" · siap check-in")
+                                            else -> append(" · di luar jendela")
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        when (k.aksi) {
+                            "selesai" -> KotakPesan(
+                                "Absensi hari ini sudah lengkap. Scan berikutnya baru dapat dilakukan besok.",
+                                JenisPesan.Sukses
+                            )
+
+                            "checkout" -> {
+                                TombolUtama("Check-out Sekarang", memuat = muatKonteks) { mulai() }
+                                Text(
+                                    "Check-out tidak perlu memilih status lagi.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Warna.TeksLembut,
+                                    modifier = Modifier.padding(top = 6.dp)
+                                )
+                            }
+
+                            else -> {
+                                if (k.strongTerbuka && sesiMasukBerikutnya(k) == null) {
+                                    KotakPesan(
+                                        "Sesi strong point belum check-out. Check-out tidak perlu memilih status lagi.",
+                                        JenisPesan.Info
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    TombolUtama("Check-out Strong Point", memuat = muatKonteks) {
+                                        mulai()
+                                    }
+                                } else {
+                                    if (k.strongTerbuka && sesiMasukBerikutnya(k) != null) {
+                                        KotakPesan(
+                                            "Sesi strong point berikutnya sudah dibuka. Sesi sebelumnya yang belum check-out akan ditandai tidak check-out.",
+                                            JenisPesan.Info
+                                        )
+                                        Spacer(Modifier.height(8.dp))
+                                    }
+                                    TombolUtama("Mulai Absensi", memuat = muatKonteks) { mulai() }
+                                }
+                            }
+                        }
+                    }
+                    if (vm.konteksAbsensi == null && !muatKonteks) {
+                        Text(
+                            "Konteks absensi tidak dapat dimuat. Periksa koneksi lalu muat ulang.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Warna.Merah
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TombolKedua("Muat Ulang") { vm.muatKonteksAbsensi() }
+                    }
+                }
+
+                Kartu {
+                    val h = hariIni
                     val keterangan = when {
-                        vm.memuatAbsensiHariIni && hariIni == null -> "Memeriksa absensi hari ini…"
+                        vm.memuatAbsensiHariIni && h == null -> "Memeriksa absensi hari ini…"
                         vm.absensiHariIniOffline -> "Tidak dapat memeriksa absensi hari ini (offline)"
-                        hariIni?.masuk != null && hariIni?.pulang != null ->
-                            "Absensi hari ini sudah lengkap"
-
-                        hariIni?.masuk != null ->
-                            "Sudah absen masuk pukul ${hariIni?.masuk?.jam}"
-
-                        else -> "Belum absen masuk hari ini"
+                        h != null && h.masuk != null && h.pulang != null -> "Absensi hari ini sudah lengkap"
+                        h?.masuk != null -> "Sudah absen masuk pukul ${h.masuk.jam}"
+                        else -> "Belum ada absensi hari ini"
                     }
                     JudulBagian("Status Hari Ini", keterangan)
-                    if (hariIni?.pulang != null) {
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            "Sudah absen pulang pukul ${hariIni?.pulang?.jam}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Warna.TeksLembut
-                        )
-                    }
                     if (vm.absensiHariIniOffline) {
                         Spacer(Modifier.height(8.dp))
                         KotakPesan(
-                            "Status tidak dapat diambil dari server. Anda tetap dapat memilih absen masuk/pulang dan menyimpannya secara offline.",
+                            "Status tidak dapat diambil dari server. Absensi dapat disimpan offline dan dikirim otomatis.",
                             JenisPesan.Info
                         )
                     }
@@ -309,10 +494,71 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 )
             }
 
-            HALAMAN_VALIDASI -> {
-                BarisKembali("Validasi Lokasi (GPS)") {
+            HALAMAN_STATUS -> {
+                BarisKembali("Pilih Status Kehadiran") {
                     vm.bersihkanPesan()
                     halaman = HALAMAN_BERANDA
+                }
+
+                Kartu {
+                    JudulBagian(
+                        "Status Kehadiran",
+                        "Pilih status sebelum mengambil lokasi dan foto"
+                    )
+                    Spacer(Modifier.height(8.dp))
+
+                    STATUS_KEHADIRAN.chunked(2).forEach { baris ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            baris.forEach { opsi ->
+                                KartuStatus(
+                                    opsi = opsi,
+                                    terpilih = status == opsi.nilai,
+                                    aktif = opsiAktif(opsi.nilai, vm.konteksAbsensi),
+                                    alasan = alasanTidakAktif(opsi.nilai, vm.konteksAbsensi),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    pilihStatus(opsi.nilai)
+                                }
+                            }
+                            if (baris.size == 1) Spacer(Modifier.weight(1f))
+                        }
+                        Spacer(Modifier.height(8.dp))
+                    }
+
+                    if (vm.absensiHariIniOffline && vm.konteksAbsensi == null) {
+                        Spacer(Modifier.height(4.dp))
+                        KotakPesan(
+                            "Server tidak terjangkau. Pilih status dan tentukan check-in/check-out secara manual.",
+                            JenisPesan.Info
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (checkout) "Mode check-out" else "Mode check-in",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Warna.Teks
+                            )
+                            Switch(checked = checkout, onCheckedChange = { checkout = it })
+                        }
+                    }
+                }
+            }
+
+            HALAMAN_LOKASI -> {
+                BarisKembali("Validasi Lokasi (GPS)") {
+                    vm.bersihkanPesan()
+                    halaman = if (checkout || vm.konteksAbsensi?.aksi == "checkout") {
+                        HALAMAN_BERANDA
+                    } else {
+                        HALAMAN_STATUS
+                    }
                 }
 
                 Kartu {
@@ -320,7 +566,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                         latitude = lat,
                         longitude = lng,
                         akurasiM = akurasi,
-                        titik = titikTerdekat,
+                        titik = titikPeta,
                         modifier = Modifier.fillMaxWidth()
                     )
 
@@ -346,10 +592,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
 
                     Spacer(Modifier.height(8.dp))
                     TombolKedua(
-                        teks = when {
-                            lat == null -> "Ambil Lokasi"
-                            else -> "Perbarui Lokasi"
-                        },
+                        teks = if (lat == null) "Ambil Lokasi" else "Perbarui Lokasi",
                         aktif = !mengambilLokasi,
                         onClick = { mintaAtauAmbilLokasi() }
                     )
@@ -357,6 +600,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
 
                 if (lat != null) {
                     val warna = when {
+                        !butuhRadius -> Warna.Biru
                         dalamRadius -> Warna.Hijau
                         vm.absensiHariIniOffline -> Warna.Kuning
                         else -> Warna.Merah
@@ -370,7 +614,11 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                         Column(Modifier.padding(14.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
-                                    if (dalamRadius) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                                    if (!butuhRadius || dalamRadius) {
+                                        Icons.Filled.CheckCircle
+                                    } else {
+                                        Icons.Filled.Warning
+                                    },
                                     contentDescription = null,
                                     tint = warna,
                                     modifier = Modifier.size(24.dp)
@@ -378,6 +626,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     when {
+                                        !butuhRadius -> "Lokasi Tercatat"
                                         dalamRadius -> "Lokasi Terverifikasi"
                                         vm.absensiHariIniOffline -> "Lokasi Belum Terverifikasi"
                                         else -> "Di Luar Radius"
@@ -390,19 +639,33 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 when {
+                                    !butuhRadius ->
+                                        "Status ini tidak mewajibkan absensi di dalam radius kantor."
+
                                     dalamRadius ->
-                                        "Anda berada dalam radius ${vm.titikTerdekat?.terdekat?.radiusM ?: 100} meter dari titik dinas."
+                                        "Anda berada dalam radius ${radiusTampil ?: 100} meter dari ${namaTitik ?: "titik absensi"}."
 
                                     vm.absensiHariIniOffline ->
-                                        "Titik dinas belum dapat diverifikasi karena server tidak terjangkau. Absensi akan disimpan offline dan diverifikasi saat sinkronisasi."
+                                        "Lokasi belum dapat diverifikasi karena server tidak terjangkau."
 
                                     else ->
-                                        "Anda berada di luar radius titik dinas. Status Dinas Kantor/Piket tidak dapat dipilih."
+                                        "Absensi wajib di dalam radius ${namaTitik ?: "titik absensi"}. Dekati lokasi lalu perbarui."
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Warna.TeksLembut
                             )
                             Spacer(Modifier.height(8.dp))
+                            BarisInfo(
+                                "Status",
+                                if (checkout) {
+                                    "Check-out ${labelStatusKehadiran(status ?: "-")}"
+                                } else {
+                                    "Check-in ${labelStatusKehadiran(status ?: "-")}"
+                                }
+                            )
+                            if (status == "ph" && sesiTerpilih != null) {
+                                BarisInfo("Sesi", labelSesi(sesiTerpilih))
+                            }
                             BarisInfo(
                                 "Koordinat Anda",
                                 if (lat != null && lng != null) {
@@ -412,18 +675,13 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                                 }
                             )
                             BarisInfo(
-                                "Jarak ke Titik Dinas",
-                                vm.titikTerdekat?.terdekat?.jarakM?.let {
-                                    String.format(Locale.US, "%.0f meter", it)
-                                } ?: "Menghitung…"
+                                "Jarak",
+                                jarakTampil?.let { String.format(Locale.US, "%.0f meter", it) }
+                                    ?: "Menghitung…"
                             )
                             BarisInfo(
                                 "Akurasi GPS",
                                 akurasi?.let { String.format(Locale.US, "± %.0f meter", it) } ?: "-"
-                            )
-                            BarisInfo(
-                                "Titik Dinas",
-                                titikTerdekat?.nama ?: vm.titikTerdekat?.terdekat?.titikNama ?: "-"
                             )
                         }
                     }
@@ -444,131 +702,56 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                             JenisPesan.Info
                         )
                     }
-
-                    when {
-                        vm.absensiHariIniOffline -> {
-                            KotakPesan(
-                                "Status absensi hari ini tidak dapat diambil dari server. Pilih jenis absen yang sesuai; data akan disimpan offline.",
-                                JenisPesan.Info
-                            )
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                TombolAbsen(
-                                    "ABSEN MASUK",
-                                    "(Check In)",
-                                    Warna.Hijau,
-                                    Modifier.weight(1f)
-                                ) { lanjutPilihStatus("masuk") }
-                                TombolAbsen(
-                                    "ABSEN PULANG",
-                                    "(Check Out)",
-                                    Warna.Merah,
-                                    Modifier.weight(1f)
-                                ) { lanjutPilihStatus("pulang") }
-                            }
-                        }
-
-                        vm.memuatAbsensiHariIni && hariIni == null -> {
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    strokeWidth = 2.dp,
-                                    color = Warna.Navy
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    "Memeriksa absensi hari ini…",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Warna.TeksLembut
-                                )
-                            }
-                        }
-
-                        hariIni?.masuk == null -> {
-                            TombolAbsen(
-                                "ABSEN MASUK",
-                                "(Check In)",
-                                Warna.Hijau,
-                                Modifier.fillMaxWidth()
-                            ) { lanjutPilihStatus("masuk") }
-                        }
-
-                        hariIni?.pulang == null -> {
-                            TombolAbsen(
-                                "ABSEN PULANG",
-                                "(Check Out)",
-                                Warna.Merah,
-                                Modifier.fillMaxWidth()
-                            ) { lanjutPilihStatus("pulang") }
-                        }
-
-                        else -> {
-                            KotakPesan(
-                                "Absensi hari ini sudah lengkap (masuk dan pulang).",
-                                JenisPesan.Sukses
-                            )
-                        }
-                    }
                 } else {
                     KotakPesan(
                         "Ambil lokasi terlebih dahulu untuk melanjutkan absensi.",
                         JenisPesan.Info
                     )
                 }
+
+                val bolehLanjut = !mengambilLokasi &&
+                        (lat != null || !butuhLokasi) &&
+                        (!butuhRadius || dalamRadius || vm.absensiHariIniOffline) &&
+                        !(status == "ph" && jadwalId == null)
+                TombolUtama(
+                    teks = "Lanjut ke Foto",
+                    aktif = bolehLanjut,
+                    onClick = { halaman = HALAMAN_FOTO }
+                )
             }
 
-            HALAMAN_STATUS -> {
-                BarisKembali("Pilih Status Kehadiran") {
+            HALAMAN_FOTO -> {
+                BarisKembali("Foto & Kirim") {
                     vm.bersihkanPesan()
-                    halaman = HALAMAN_VALIDASI
+                    halaman = HALAMAN_LOKASI
                 }
 
                 Kartu {
                     JudulBagian(
-                        "Status Kehadiran",
-                        "Pilih alasan kehadiran Anda hari ini"
+                        if (checkout) "Konfirmasi Check-out" else "Konfirmasi Check-in",
+                        "Periksa data sebelum mengirim"
                     )
                     Spacer(Modifier.height(8.dp))
-
-                    STATUS_KEHADIRAN.chunked(2).forEach { baris ->
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            baris.forEach { opsi ->
-                                KartuStatus(
-                                    opsi = opsi,
-                                    terpilih = status == opsi.nilai,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    status = opsi.nilai
-                                }
-                            }
-                            if (baris.size == 1) Spacer(Modifier.weight(1f))
+                    BarisInfo("Aksi", if (checkout) "Check-out" else "Check-in")
+                    BarisInfo("Status", labelStatusKehadiran(status ?: "-"))
+                    if (status == "ph" && sesiTerpilih != null) {
+                        BarisInfo("Sesi", labelSesi(sesiTerpilih))
+                        BarisInfo("Titik", sesiTerpilih.strongPointNama)
+                    } else if (namaTitik != null) {
+                        BarisInfo("Titik", namaTitik)
+                    }
+                    BarisInfo(
+                        "Lokasi",
+                        if (lat != null && lng != null) {
+                            String.format(Locale.US, "%.6f, %.6f", lat, lng)
+                        } else {
+                            "Tidak dilampirkan"
                         }
-                        Spacer(Modifier.height(8.dp))
-                    }
-
-                    val butuhRadius = status == "dinas_kantor" || status == "piket"
-                    if (butuhRadius && !dalamRadius && !offline && !vm.absensiHariIniOffline) {
-                        KotakPesan(
-                            "Status Dinas Kantor/Piket membutuhkan lokasi di dalam radius titik dinas. Pilih status lain atau perbarui lokasi.",
-                            JenisPesan.Galat
-                        )
-                    }
+                    )
                 }
 
                 Kartu {
-                    JudulBagian(
-                        "Dokumentasi",
-                        "Foto bukti bersifat opsional, maksimal 5 MB"
-                    )
+                    JudulBagian("Dokumentasi", "Foto bukti, maksimal 5 MB")
                     Spacer(Modifier.height(8.dp))
                     Text(
                         if (fotoBase64 != null) "Foto siap diunggah." else "Belum ada foto.",
@@ -585,7 +768,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                     )
                 }
 
-                if (vm.absensiHariIniOffline) {
+                if (vm.absensiHariIniOffline && vm.konteksAbsensi == null) {
                     Kartu {
                         Row(
                             Modifier.fillMaxWidth(),
@@ -599,7 +782,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                                     color = Warna.Teks
                                 )
                                 Text(
-                                    "Absensi disimpan di perangkat lalu dikirim otomatis saat ada sinyal",
+                                    "Absensi disimpan di perangkat lalu dikirim otomatis",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = Warna.TeksLembut
                                 )
@@ -609,31 +792,58 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                     }
                 }
 
-                val butuhRadius = status == "dinas_kantor" || status == "piket"
-                val bolehKirim =
-                    status != null &&
-                            (offline || vm.absensiHariIniOffline || !(butuhRadius && !dalamRadius))
+                val bolehKirim = status != null &&
+                        (checkout || status != "ph" || jadwalId != null) &&
+                        (lat != null || !butuhLokasi) &&
+                        (!butuhRadius || dalamRadius || vm.absensiHariIniOffline) &&
+                        !vm.sedangMemproses
 
                 TombolUtama(
                     teks = if (offline) "Simpan Absensi (Offline)" else "Kirim Absensi",
                     memuat = vm.sedangMemproses,
                     aktif = bolehKirim,
                     onClick = {
-                        val statusFinal = status ?: return@TombolUtama
-                        vm.kirimAbsensi(
-                            jenis = jenis,
-                            statusKehadiran = statusFinal,
-                            latitude = lat,
-                            longitude = lng,
-                            akurasi = akurasi,
-                            mock = mock,
-                            fotoBase64 = fotoBase64,
-                            offline = offline
-                        ) { info ->
-                            vm.pesanSukses(info)
-                            fotoBase64 = null
-                            berkasFoto = null
-                            halaman = HALAMAN_BERANDA
+                        val finalStatus = status ?: return@TombolUtama
+                        val finalJenis = if (checkout) "pulang" else "masuk"
+                        if (finalStatus == "ph") {
+                            val idJadwal = jadwalId
+                            if (idJadwal == null) {
+                                vm.pesanGalat("Sesi strong point tidak ditemukan.")
+                                return@TombolUtama
+                            }
+                            vm.kirimAbsensiPh(
+                                clientUuid = UUID.randomUUID().toString(),
+                                jadwalId = idJadwal,
+                                jenis = finalJenis,
+                                capturedAt = Instant.now().toString(),
+                                latitude = lat,
+                                longitude = lng,
+                                akurasi = akurasi,
+                                mock = mock,
+                                fotoBase64 = fotoBase64,
+                                offline = false
+                            ) { sukses, info ->
+                                if (sukses) {
+                                    vm.pesanSukses(info)
+                                    resetKeBeranda()
+                                } else {
+                                    vm.pesanGalat(info)
+                                }
+                            }
+                        } else {
+                            vm.kirimAbsensi(
+                                jenis = finalJenis,
+                                statusKehadiran = finalStatus,
+                                latitude = lat,
+                                longitude = lng,
+                                akurasi = akurasi,
+                                mock = mock,
+                                fotoBase64 = fotoBase64,
+                                offline = offline
+                            ) { info ->
+                                vm.pesanSukses(info)
+                                resetKeBeranda()
+                            }
                         }
                     }
                 )
@@ -646,6 +856,9 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                 }
 
                 Kartu {
+                    val barisRiwayat = remember(vm.riwayat, vm.jadwalPh, vm.absensiPh) {
+                        riwayatHarian(vm.riwayat, vm.jadwalPh, vm.absensiPh)
+                    }
                     Row(
                         Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -658,7 +871,7 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                                 color = Warna.Teks
                             )
                             Text(
-                                "${vm.riwayat.size} catatan",
+                                "${barisRiwayat.size} tanggal",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Warna.TeksLembut
                             )
@@ -669,34 +882,68 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
                     }
                     Spacer(Modifier.height(6.dp))
 
-                    if (vm.riwayat.isEmpty()) {
-                        LayarKosong("Belum ada absensi pada bulan ini.")
+                    if (barisRiwayat.isEmpty()) {
+                        LayarKosong("Belum ada absensi atau jadwal strong point pada bulan ini.")
                     } else {
-                        vm.riwayat.forEach { item ->
-                            Row(
-                                Modifier.fillMaxWidth().padding(vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                        barisRiwayat.forEachIndexed { indeks, item ->
+                            Column(
+                                Modifier.fillMaxWidth().padding(vertical = 9.dp),
+                                verticalArrangement = Arrangement.spacedBy(3.dp)
                             ) {
-                                Column(Modifier.weight(1f)) {
+                                Text(
+                                    tanggalIndo(item.tanggal),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Warna.Teks,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                item.status.forEach { status ->
                                     Text(
-                                        "${tanggalIndo(item.tanggal)} · ${item.jenis}",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Warna.Teks
-                                    )
-                                    Text(
-                                        buildString {
-                                            append(labelStatusKehadiran(item.statusKehadiran))
-                                            item.jarakM?.let {
-                                                append(String.format(Locale.US, " · %.0f m", it))
-                                            }
-                                            if (item.perluVerifikasi) append(" · menunggu verifikasi")
-                                        },
+                                        status.label,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = Warna.TeksLembut
                                     )
+                                    if (status.masuk.isNotEmpty() || status.pulang.isNotEmpty()) {
+                                        Text(
+                                            buildString {
+                                                append("Check-in: ")
+                                                append(status.masuk.joinToString(", ").ifEmpty { "-" })
+                                                append("   ·   Check-out: ")
+                                                append(status.pulang.joinToString(", ").ifEmpty { "-" })
+                                            },
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Warna.Teks
+                                        )
+                                    }
                                 }
-                                Lencana(item.jam, warnaStatusKehadiran(item.statusKehadiran))
+                                item.strong.forEach { sesi ->
+                                    Text(
+                                        buildString {
+                                            append("Strong Point ${sesi.sesi} ${sesi.jadwal}")
+                                            append(" · ${sesi.titik}")
+                                            append(" · ")
+                                            append(
+                                                when {
+                                                    sesi.masuk == null -> "belum absen"
+                                                    sesi.pulang == null ->
+                                                        "${sesi.masuk} → belum check-out"
+
+                                                    else -> "${sesi.masuk} → ${sesi.pulang}"
+                                                }
+                                            )
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (sesi.masuk != null) Warna.Hijau else Warna.TeksLembut
+                                    )
+                                }
+                                if (indeks < barisRiwayat.lastIndex) {
+                                    Spacer(Modifier.height(2.dp))
+                                    Box(
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(1.dp)
+                                            .background(Color(0xFFE2E8F0))
+                                    )
+                                }
                             }
                         }
                     }
@@ -721,6 +968,138 @@ fun AbsensiScreen(vm: KinerjaViewModel) {
     }
 }
 
+private fun riwayatHarian(
+    riwayat: List<Absensi>,
+    jadwalPh: List<JadwalPhSaya>,
+    absensiPh: List<AbsensiPh>
+): List<BarisRiwayatHarian> {
+    val absensiPerTanggal = riwayat.distinctBy { it.id }.groupBy { it.tanggal }
+    val jadwalUnik = jadwalPh.distinctBy { it.id }
+    val jadwalPerTanggal = jadwalUnik.groupBy { it.tanggal }
+    val jadwalById = jadwalUnik.associateBy { it.id }
+    val absensiPhPerJadwal = absensiPh.distinctBy { it.id }.groupBy { it.jadwalPhId }
+    val semuaTanggal = sortedSetOf<String>()
+    semuaTanggal.addAll(absensiPerTanggal.keys)
+    semuaTanggal.addAll(jadwalPerTanggal.keys)
+    for (catatan in absensiPh) {
+        jadwalById[catatan.jadwalPhId]?.let { semuaTanggal.add(it.tanggal) }
+    }
+
+    return semuaTanggal.sortedDescending().map { tanggal ->
+        val catatan = absensiPerTanggal[tanggal].orEmpty()
+        val jadwal = jadwalPerTanggal[tanggal].orEmpty()
+        val adaStrong = jadwal.isNotEmpty()
+        // Cermin absensi strong point tidak diulang sebagai absensi kantor.
+        val utama = catatan.filter { !adaStrong || it.statusKehadiran != "ph" }
+        val status = utama
+            .groupBy { it.statusKehadiran }
+            .map { (kode, daftar) ->
+                StatusRiwayat(
+                    label = labelStatusKehadiran(kode),
+                    masuk = daftar.filter { it.jenis == "masuk" }.map { it.jam }.distinct().sorted(),
+                    pulang = daftar.filter { it.jenis == "pulang" }.map { it.jam }.distinct().sorted()
+                )
+            }
+            .toMutableList()
+        if (adaStrong) status.add(StatusRiwayat("PH / Strong Point", emptyList(), emptyList()))
+        val strong = jadwal
+            .sortedWith(compareBy<JadwalPhSaya>({ it.jamMulai }, { it.sesi.orEmpty() }))
+            .map { item ->
+                val sesi = absensiPhPerJadwal[item.id].orEmpty()
+                SesiStrongRiwayat(
+                    sesi = when (item.sesi) {
+                        "pagi" -> "Pagi"
+                        "sore" -> "Sore"
+                        else -> "Sesi"
+                    },
+                    jadwal = "${item.jamMulai}–${item.jamSelesai}",
+                    titik = item.strongPointNama,
+                    masuk = sesi.filter { it.jenis == "masuk" }.minByOrNull { it.jam }?.jam,
+                    pulang = sesi.filter { it.jenis == "pulang" }.maxByOrNull { it.jam }?.jam
+                )
+            }
+        BarisRiwayatHarian(
+            tanggal = tanggal,
+            status = status,
+            strong = strong
+        )
+    }
+}
+
+private fun ringkasanKonteks(konteks: KonteksAbsensi?, memuat: Boolean): String = when {
+    memuat && konteks == null -> "Memeriksa status absensi…"
+    konteks == null -> "Konteks absensi tidak tersedia"
+    konteks.aksi == "selesai" -> "Absensi hari ini sudah lengkap"
+    konteks.aksi == "checkout" -> "Siap check-out ${labelStatusKehadiran(konteks.statusTerkunci ?: "-")}"
+    konteks.strongTerbuka && konteks.jadwalStrong.any { it.bisaMasuk } ->
+        "Sesi strong point berikutnya siap check-in"
+
+    konteks.strongTerbuka -> "Sesi strong point belum check-out"
+    konteks.adaJadwalStrong -> "Hari ini ada jadwal strong point"
+    else -> "Siap check-in"
+}
+
+private fun opsiAktif(nilai: String, konteks: KonteksAbsensi?): Boolean {
+    if (konteks == null) return nilai != "ph"
+    if (konteks.aksi == "selesai") return false
+    return when (nilai) {
+        "dinas_kantor" -> !konteks.adaJadwalStrong && dalamJamKantor(konteks)
+        "ph" -> konteks.jadwalStrong.any { it.bisaMasuk }
+        else -> true
+    }
+}
+
+private fun alasanTidakAktif(nilai: String, konteks: KonteksAbsensi?): String? {
+    if (konteks == null) return if (nilai == "ph") "Butuh koneksi ke server" else null
+    if (konteks.aksi == "selesai") return "Absensi hari ini sudah lengkap"
+    return when (nilai) {
+        "dinas_kantor" -> when {
+            konteks.adaJadwalStrong -> "Hari ini wajib strong point"
+            !dalamJamKantor(konteks) -> "Di luar jam ${konteks.bukaKantor}–${konteks.tutupKantor}"
+            else -> null
+        }
+
+        "ph" -> if (konteks.jadwalStrong.any { it.bisaMasuk }) null else "Belum ada sesi yang dibuka"
+        else -> null
+    }
+}
+
+private fun dalamJamKantor(konteks: KonteksAbsensi): Boolean =
+    konteks.jam >= konteks.bukaKantor && konteks.jam <= konteks.tutupKantor
+
+private fun titikUntukPeta(
+    vm: KinerjaViewModel,
+    status: String?,
+    sesi: KonteksStrong?
+): TitikDinas? {
+    if (status == "ph" && sesi != null) {
+        return TitikDinas(
+            id = sesi.jadwalPhId,
+            nama = sesi.strongPointNama,
+            jenis = "kantor",
+            latitude = sesi.latitude,
+            longitude = sesi.longitude,
+            radiusM = sesi.radiusM
+        )
+    }
+    return vm.titikTerdekat?.titik?.minByOrNull { it.jarakM ?: Double.MAX_VALUE }
+}
+
+private fun labelSesi(sesi: KonteksStrong): String {
+    val nama = when (sesi.sesi) {
+        "sore" -> "Sore"
+        "pagi" -> "Pagi"
+        else -> "Sesi"
+    }
+    return "$nama ${sesi.jamMulai}–${sesi.jamSelesai}"
+}
+
+private fun jarakMeter(lat1: Double, lng1: Double, lat2: Double, lng2: Double): Double {
+    val hasil = FloatArray(1)
+    Location.distanceBetween(lat1, lng1, lat2, lng2, hasil)
+    return hasil[0].toDouble()
+}
+
 @Composable
 private fun BarisKembali(judul: String, onKembali: () -> Unit) {
     Row(
@@ -740,52 +1119,49 @@ private fun BarisKembali(judul: String, onKembali: () -> Unit) {
 }
 
 @Composable
-private fun TombolAbsen(
-    teks: String,
-    subteks: String,
-    warna: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(64.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = warna,
-            contentColor = Color.White
-        )
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(teks, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.bodyMedium)
-            Text(subteks, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.8f))
-        }
-    }
-}
-
-@Composable
 private fun KartuStatus(
     opsi: OpsiStatus,
     terpilih: Boolean,
+    aktif: Boolean,
+    alasan: String?,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    val warna = if (terpilih) Warna.Hijau else Warna.TeksLembut
+    val warna = when {
+        terpilih -> Warna.Hijau
+        !aktif -> Warna.TeksLembut
+        else -> Warna.TeksLembut
+    }
     Surface(
-        modifier = modifier.clickable { onClick() },
+        modifier = modifier.clickable(enabled = aktif) { onClick() },
         shape = RoundedCornerShape(12.dp),
-        color = if (terpilih) Warna.Hijau.copy(alpha = 0.08f) else Color.White,
-        border = BorderStroke(1.dp, if (terpilih) Warna.Hijau else Color(0xFFCBD5E1))
+        color = when {
+            terpilih -> Warna.Hijau.copy(alpha = 0.08f)
+            !aktif -> Color(0xFFF1F5F9)
+            else -> Color.White
+        },
+        border = BorderStroke(
+            1.dp,
+            when {
+                terpilih -> Warna.Hijau
+                !aktif -> Color(0xFFE2E8F0)
+                else -> Color(0xFFCBD5E1)
+            }
+        )
     ) {
         Row(
             Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            RadioButton(selected = terpilih, onClick = onClick)
+            RadioButton(selected = terpilih, onClick = if (aktif) onClick else null, enabled = aktif)
             Icon(
                 opsi.ikon,
                 contentDescription = null,
-                tint = if (terpilih) Warna.Hijau else Warna.Navy,
+                tint = when {
+                    terpilih -> Warna.Hijau
+                    !aktif -> Color(0xFF94A3B8)
+                    else -> Warna.Navy
+                },
                 modifier = Modifier.size(20.dp)
             )
             Spacer(Modifier.width(6.dp))
@@ -793,10 +1169,14 @@ private fun KartuStatus(
                 Text(
                     opsi.label,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (terpilih) Warna.Hijau else Warna.Teks,
+                    color = when {
+                        terpilih -> Warna.Hijau
+                        !aktif -> Color(0xFF94A3B8)
+                        else -> Warna.Teks
+                    },
                     fontWeight = FontWeight.Medium
                 )
-                opsi.keterangan?.let {
+                (alasan ?: opsi.keterangan)?.let {
                     Text(
                         it,
                         style = MaterialTheme.typography.labelSmall,

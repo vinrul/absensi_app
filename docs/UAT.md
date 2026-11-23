@@ -18,7 +18,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| A1 | Buka `/docs` | Daftar seluruh operasi (92 path) tampil, filter tag berfungsi | ✅ | |
+| A1 | Buka `/docs` | Daftar seluruh operasi (93 path) tampil, filter tag berfungsi | ✅ | |
 | A2 | Login memakai username `superuser` | Berhasil; `jenis_akun=admin`, `nrp=null` | ✅ | API |
 | A3 | Login memakai NRP `000001` | Gagal (admin tidak punya NRP) | ✅ | API |
 | A4 | Login `superuser` dengan `client=android` | 403 "Akun admin hanya dapat masuk melalui dashboard web" | ✅ | API |
@@ -76,6 +76,11 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A55a | Bulan berjalan belum punya jadwal (fake time Desember) | Sistem menyalin jadwal November secara otomatis dan menandai `disalin_dari_bulan` di dashboard | ✅ | API + smoke |
 | A55b | Penempatan anggota: satker (termasuk Polda/Polres) → titik → checkbox anggota (tanpa level) | Simpan membuat satu baris per anggota; simpan ulang tidak menggandakan | ✅ | API + UI |
 | A55c | Menyusun jadwal untuk anggota yang belum ditempatkan | Server menolak 422 dan meminta anggota ditempatkan lebih dulu | ✅ | API |
+| A55d | Buka aplikasi Android | Hanya ada tab **Beranda** dan **Absensi**; wizard absensi berurutan status → GPS → foto → kirim | ✅ | build + emulator |
+| A55e | Check-in Dinas Kantor lalu tekan Absensi lagi | Scan kedua otomatis menjadi check-out tanpa memilih status; konteks berubah menjadi `selesai` | ✅ | API + emulator |
+| A55f | Piket lintas hari: check-in 23:00, scan besok 22:00 | Scan dibaca sebagai check-out siklus piket; selisih > 25 jam menjadi check-in baru | ✅ | API + fake time |
+| A55g | Hari dengan jadwal strong point | Pilihan Dinas Kantor dinonaktifkan; check-in/check-out strong point dicatat juga sebagai absensi `ph` dan masuk rekap kehadiran | ✅ | API + emulator |
+| A55h | Sesi pagi lupa check-out, jendela sesi sore dibuka | Scan sore menjadi check-in sesi sore; sesi pagi tetap tanpa check-out dan tampil terpisah | ✅ | API |
 | A56 | Tombol **Lihat** dokumentasi di Rekap Absensi | Galeri foto absensi per personel tampil (tanggal, masuk/pulang, jam, status); hanya pengelola sesuai cakupan yang dapat membuka | ✅ | API + build |
 | A57 | Dokumentasi di **Detail per Orang** | Tombol **Masuk** dan **Pulang** tampil pada tanggal yang memiliki foto; modal menampilkan gambar penuh | ✅ | API + build |
 | A58 | Tombol **Lihat** dokumentasi di Rekap Strong Point | Galeri foto check-in strong point per personel tampil; foto tanpa token ditolak 401, di luar cakupan 403 | ✅ | API |
@@ -118,7 +123,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C6 | Nyalakan data → kirim antrean | Terkirim sekali (tidak duplikat), antrean kosong | ⬜ | |
 | C7 | Lihat daftar absensi satker | Hanya data sendiri | ✅ | API |
 | C8 | Buka dashboard pimpinan | 403 (tidak berhak) | ✅ | API |
-| C9 | Buka tab **Strong** | Tombol besar **Strong Point** dan **Riwayat Strong Point**; status sesi hari ini dan antrean offline tampil | ✅ | emulator |
+| C9 | Bottom navigation Android | Hanya **Beranda** dan **Absensi**; tab Strong dihapus | ✅ | emulator |
 | C9a | Wizard lokasi strong point | Peta OSM tanpa titik dinas, marker hijau lokasi, koordinat, akurasi GPS, dan alamat hasil geocode `geocode.vinrul.my.id` tampil | ✅ | emulator |
 | C9b | Check-in → dokumentasi → kirim | Progress "Langkah 2 dari 3", foto/documentasi (dapat dilewati bila kamera tidak tersedia), lalu kirim; status berubah menjadi Check-in pukul HH:mm | ✅ | emulator |
 | C9c | Check-out | Langsung ke "Langkah 2 dari 2" tanpa dokumentasi; status menjadi Sudah check-out pukul HH:mm | ✅ | emulator |
@@ -139,7 +144,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C22 | Sudah absen masuk hari ini | Hanya tombol **Absen Pulang** yang tampil | ✅ | emulator |
 | C23 | Di dalam radius | Status Dinas Kantor otomatis terpilih; di luar radius tidak ada yang terpilih | ✅ | emulator |
 | C24 | Server tidak terjangkau saat cek absensi hari ini | Dua tombol tampil, mode offline aktif, absensi tersimpan di perangkat | ✅ | emulator |
-| C25 | Riwayat absensi | Terbuka di halaman terpisah dan memuat riwayat bulan berjalan | ✅ | emulator |
+| C25 | Riwayat absensi per tanggal | Satu baris per tanggal: status, check-in, check-out; jadwal dan realisasi strong point tampil pada tanggal yang sama | ✅ | emulator |
 | C26 | Jam server palsu `20-11-2026 07:45` | Absensi tercatat tanggal 20 Nov 2026 pukul 07:45; reset mengembalikan jam sistem | ✅ | API + emulator |
 | C27 | Pilih status **PH (Perintah Hadir)** | Tersimpan sebagai status `ph` dan dihitung hadir | ✅ | API |
 | C28 | Buka tab Rencana → **+ Baru** | Wizard langkah 1 (jenis rencana) tampil; bottom nav menampilkan 6 tab termasuk Strong | ✅ | emulator |
@@ -218,7 +223,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | F3 | `bun run check` | 0 error, 0 warning (dashboard & personel) | ✅ | |
 | F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` dan `personel/build` | ✅ | |
 | F5 | `.gradlew :app:assembleDebug` | APK debug terbentuk | ✅ | |
-| F6 | `bun tools/uji/api-smoke.js` | 74/74 cek lulus (DB `kinerja_test`) | ✅ | |
+| F6 | `bun tools/uji/api-smoke.js` | 79/79 cek lulus (DB `kinerja_test`) | ✅ | |
 | F7 | `bun tools/uji/openapi-check.js` | JSON valid, semua `$ref` ada | ✅ | |
 | F8 | Restore backup di lingkungan uji | Data & berkas kembali utuh | ⬜ | |
 | F9 | Uji 1 bulan data riil | Hitung periode < 60 detik | ⬜ | |

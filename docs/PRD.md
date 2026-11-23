@@ -265,9 +265,20 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
   sistem otomatis memakai jadwal bulan terakhir yang tersedia dan menandainya
   `disalin_dari_bulan`; bulan yang belum berjalan tidak di-fallback. `GET /ph/jadwal/status`
   memberi peringatan agar jadwal bulan depan disusun sebelum tanggal 1.
-- **Satu jadwal = satu sesi dan satu titik.** Check-in hanya sekali dan check-out hanya sekali
-  per jadwal. Check-in dibuka `jam_mulai − 30 menit` dan ditolak setelah `jam_selesai`;
-  check-out wajib setelah check-in dan maksimal `jam_selesai + 60 menit`.
+- **Satu jadwal = satu sesi dan satu titik.** Check-in dibuka `jam_mulai − 30 menit` dan ditolak
+  setelah `jam_selesai`; check-out sesi dapat dilakukan sampai pukul **23:59** hari yang sama.
+- **Absensi harian satu pintu**: status Dinas Kantor, Dinas Luar, PH/Strong Point, Piket/Shift,
+  Operasi/Pam, Cuti, Izin, dan Sakit. Server menentukan check-in/check-out otomatis dari catatan
+  terbuka (scan kedua = check-out tanpa memilih status). Piket/Operasi tanpa jadwal memakai
+  toleransi check-out 24 jam + 1 jam; lewat itu siklus lama ditutup tanpa check-out dan scan baru
+  menjadi check-in. Dinas Kantor dibuka 30 menit sebelum jam masuk dan ditolak setelah jam pulang;
+  Piket wajib radius kantor, Operasi/Pam boleh di luar radius dengan lokasi tetap dicatat.
+- **Strong point menggantikan absensi kantor**: bila hari itu ada jadwal strong point, Dinas Kantor
+  tidak dapat dipilih. Kehadiran strong point dicerminkan ke absensi harian (`ph`) sehingga
+  dihitung hadir, telat, dan pulang cepat pada rekap kehadiran. Jika sesi sore sudah dibuka saat
+  sesi pagi belum check-out, check-in sore diprioritaskan dan sesi pagi ditandai tidak check-out.
+- **Android hanya memiliki tab Beranda dan Absensi** dengan urutan wizard status → GPS → foto →
+  kirim. Tab Strong dihapus; sesi strong point ditampilkan di Beranda dan diproses lewat Absensi.
 - Personel hanya dapat check-in/check-out pada jadwal miliknya dan pada tanggal jadwal.
 - Check-in **dan check-out wajib menyertakan koordinat**; server memvalidasi radius titik.
 - Server mencatat `menit_telat` (check-in setelah jam mulai) dan `menit_pulang_cepat`

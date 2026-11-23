@@ -73,15 +73,15 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.24 | Pagination seragam di semua modul daftar | ✅ | komponen `Pagination.svelte`; server-side: dashboard, penilaian, rencana, hasil, output, personel, admin, persetujuan, verifikasi & detail absensi; client-side: satker, libur, titik dinas, kesiapan, PH, rekap kehadiran |
 | 3.25 | Peta interaktif OpenStreetMap untuk tambah/edit titik dinas | ✅ | `PetaPicker.svelte` (Leaflet): tinggi `h-72 sm:h-96`, tombol **Peta/Satelit** (ArcGIS World Imagery), pencarian alamat **Nominatim** dengan debounce 700 ms (min. 3 huruf, cache, 1 req/detik), klik hasil → peta & koordinat terisi; modal titik dinas `max-w-5xl` |
 | 3.26 | Jam server palsu untuk development | ✅ | `cargo run --bin fake -- 20-11-2026 07:45`; endpoint `/dev/waktu` hanya aktif bila `APP__ALLOW_FAKE_TIME=true`; produksi memakai jam sistem |
-| 3.27 | Alur absensi Android bertahap | ✅ | tombol besar → validasi peta/GPS → pilihan status → kirim/simpan offline |
+| 3.27 | Alur absensi Android satu pintu | ✅ | pilih status kehadiran → validasi peta/GPS → foto → kirim/simpan offline |
 | 3.28 | Tombol absen adaptif status hari ini | ✅ | hanya Masuk bila belum masuk; hanya Pulang bila sudah masuk; dua tombol bila status server tidak dapat diambil |
 | 3.29 | Peta absensi Android (OSM) + radius & titik terdekat | ✅ | `PetaAbsensi.kt` (osmdroid), marker lokasi, titik dinas, radius, akurasi |
 | 3.30 | Wizard izin pertama kali sebelum login | ✅ | `WizardIzinScreen.kt`: lokasi, kamera, notifikasi, WorkManager/penyimpanan + alasan tiap izin |
-| 3.31 | Riwayat absensi di halaman terpisah | ✅ | tombol **Riwayat Absensi** pada halaman awal tab Absensi |
+| 3.31 | Riwayat absensi di halaman terpisah | ✅ | tombol **Riwayat Absensi**; satu baris per tanggal berisi status, check-in, check-out, serta jadwal & realisasi sesi strong point |
 | 3.32 | Wizard input rencana kerja Android 4 langkah | ✅ | `WizardRencana.kt`: jenis → dasar tugas → rincian kegiatan → lampiran; **Simpan Draf** & **Ajukan ke Atasan** |
 | 3.33 | Rincian kegiatan multi-entri dengan field lengkap | ✅ | program, kegiatan, uraian, tujuan, indikator, target kuantitas/kualitas, tanggal mulai/selesai; migrasi `0013` menambah kolom pada `rencana_tahapan`; detail dashboard menampilkan seluruh field |
 | 3.34 | Lampiran lebih dari satu berkas pada wizard | ✅ | pemilih dokumen multi-select; tiap berkas diunggah ke `POST /lampiran` setelah rencana tersimpan |
-| 3.35 | Pengaturan tab bottom nav | ✅ | **Beranda / Absensi / Strong** (3 tab); menu Rencana/Hasil/Output dihapus dari navigasi Android |
+| 3.35 | Pengaturan tab bottom nav | ✅ | **Beranda / Absensi** (2 tab); tab Strong dihapus, menu Rencana/Hasil/Output juga tidak dijangkau navigasi |
 | 3.36 | Ubah draft / perbaiki rencana yang diminta revisi | ✅ | tombol **Ubah Rencana** / **Perbaiki Rencana** membuka wizard terisi data lama, catatan atasan, rincian, dan lampiran; `PATCH /rencana-kerja/{id}` mengganti tahapan secara transaksional |
 | 3.37 | Date picker untuk seluruh tanggal rencana | ✅ | `FieldTanggal` + `DatePickerDialog` Material 3: tanggal dasar, tanggal mulai/selesai kegiatan; tanpa input teks |
 | 3.38 | Persetujuan rencana di Android untuk atasan/pimpinan | ✅ | kartu **Persetujuan Rencana** di Beranda + tombol **Tinjau Persetujuan** di tab Rencana; daftar `GET /rencana-kerja/persetujuan`, detail rincian + lampiran, keputusan Setujui / Minta Revisi / Tolak |
@@ -132,7 +132,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.13 | Export PDF jadwal & rekap | ✅ | `/ph/jadwal/ekspor` (tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota) dan `/ph/rekap/ekspor` |
 | 4.14 | Tab Strong Point di dashboard | ✅ | `?tab=` jadwal, rekap, penempatan, titik; filter **bulan** untuk jadwal dan rentang tanggal untuk rekap; tombol **Salin Bulan Lalu** |
 | 4.15 | Titik strong point dengan peta | ✅ | `PetaPicker` satelit + pencarian alamat; modal lebar |
-| 4.16 | Tab **Strong** Android | ✅ | Daftar sesi hari ini, status per sesi, jadwal berikutnya, wizard 3 langkah, antrean offline |
+| 4.16 | Tab **Strong** Android dihapus | ✅ | Fokus absensi; sesi strong point tampil di Beranda dan digabung ke **Riwayat Absensi** per tanggal |
 | 4.17 | Web personel Strong | ✅ | `/strong` daftar sesi + tombol per jadwal; riwayat 30 hari dengan telat/pulang cepat |
 | 4.18 | Hari libur tidak mengubah strong point | ✅ | Jadwal mengikuti jadwal yang disusun; kalender libur hanya memengaruhi penilaian absensi kantor |
 | 4.19 | Penilaian tetap memakai strong point | ✅ | Telat kantor diabaikan bila check-in strong point; pulang cepat tetap dihitung (`scoring.rs`) |
@@ -142,6 +142,12 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.23 | Arsip jadwal lama | ✅ | Migrasi `0017` menandai jadwal `sesi IS NULL` sebagai `is_arsip`; query baru mengabaikannya |
 | 4.24 | Fallback & pengingat jadwal bulanan | ✅ | Bulan berjalan tanpa jadwal otomatis memakai bulan terakhir yang tersedia (`disalin_dari_bulan`); `GET /ph/jadwal/status` memberi peringatan susun bulan depan |
 | 4.25 | Daftar penempatan & ubah titik | ✅ | Tabel anggota + satker + titik; tombol **Ubah/Tempatkan** membuka modal satker/titik/anggota tanpa pilihan level |
+| 4.26 | Absensi harian check-in/out otomatis | ✅ | `POST /absensi` menentukan `checkin`/`checkout` dari catatan terbuka; `GET /absensi/konteks` menyediakan aksi, status terkunci, jendela kantor, dan sesi strong point |
+| 4.27 | Jendela waktu & radius | ✅ | Dinas Kantor dibuka `jam_masuk − 30 menit` s.d. `jam_pulang`; Piket/Operasi tanpa jadwal; Dinas Luar/Cuti/Izin/Sakit sekali/hari tanpa check-out |
+| 4.28 | Piket/Operasi lintas hari | ✅ | Check-out otomatis bila selisih ≤ 24 jam + 1 jam; lewat itu siklus lama ditutup dan scan baru menjadi check-in; telat tidak dihitung |
+| 4.29 | Strong point menggantikan absensi kantor | ✅ | Dinas Kantor ditolak bila ada jadwal; absensi PH dicerminkan ke `absensi` status `ph` sehingga hadir/telat/pulang cepat masuk rekap kehadiran |
+| 4.30 | Android satu tab Absensi | ✅ | Tab Strong dihapus; wizard status → GPS → foto → kirim; check-out berikutnya tidak memilih status |
+| 4.31 | Riwayat absensi Android per tanggal | ✅ | `riwayatHarian()` menggabungkan absensi + jadwal/absensi PH: satu baris per tanggal, status berpasangan dengan check-in/check-out, sesi strong point pagi/sore beserta realisasi; rentang mengikuti tanggal server (mendukung fake time) |
 
 ## 5. Pengingat jadwal tanpa FCM
 
@@ -208,7 +214,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 92 path; termasuk `/ph/penempatan`, `/ph/jadwal/salin`, `/ph/jadwal/status`, `/dashboard/kehadiran`, filter `dari`/`sampai` |
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 93 path; termasuk `/absensi/konteks`, `/ph/penempatan`, `/ph/jadwal/salin`, `/ph/jadwal/status`, `/dashboard/kehadiran`, filter `dari`/`sampai` |
 | 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
 | 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
 | 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
@@ -228,9 +234,9 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
 | 9.6 | `bun run check` + `bun run build` (personel) | ✅ | 0 error; build statis terbentuk |
 | 9.7 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
-| 9.8 | `bun tools/uji/api-smoke.js` | ✅ | 74/74 cek lulus |
-| 9.9 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (92 path) |
-| 9.10 | Migrasi `0017_strong_point_v2.sql` + `0018_strong_point_bulanan.sql` | ✅ | terpasang di `kinerja_db` & `kinerja_test` |
+| 9.8 | `bun tools/uji/api-smoke.js` | ✅ | 79/79 cek lulus |
+| 9.9 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (93 path) |
+| 9.10 | Migrasi `0018_strong_point_bulanan.sql`, `0019_absensi_operasi_dan_grup.sql`, `0020_absensi_ph_link.sql` | ✅ | terpasang di `kinerja_db` & `kinerja_test` |
 | 9.11 | Uji E2E strong point v2 | ✅ | penempatan tetap (upsert), salin bulan sebelumnya, status/pengingat, fallback otomatis (fake time Desember), check-in telat 25 menit, pulang cepat 30 menit, jendela sesi, radius, PDF |
 | 9.12 | Uji API titik dinas | ✅ | tambah/ubah jenis & koordinat/hapus |
 | 9.13 | Uji jam palsu development | ✅ | aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
@@ -244,6 +250,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.21 | Mock GPS policy `flag` | ✅ | API smoke: absensi `is_mock_suspect=true` → 200, `perlu_verifikasi=true` |
 | 9.22 | Mock GPS policy `reject` | ✅ | Instance sementara `APP__MOCK_LOCATION_POLICY=reject` → absensi mock 422 tanpa menyimpan data |
 | 9.23 | Android deteksi mock + build | ✅ | `:app:assembleDebug` sukses; peringatan Developer Options/mock app dan hitungan `ditolak` terkompilasi |
+| 9.24 | Riwayat absensi Android per tanggal | ✅ | emulator: 15 tanggal tampil satu baris masing-masing; 13 Nov memuat Dinas Kantor + sesi PH pagi/sore beserta jam realisasi; jam server dimundurkan ke 18 Nov → riwayat menjadi 13 tanggal sesuai rentang server |
 
 ## 10. Yang belum dikerjakan (backlog)
 

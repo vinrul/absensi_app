@@ -93,6 +93,11 @@ class Repositori(
 
     // ---------------------------------------------------------------- absensi
 
+    suspend fun konteksAbsensi(): KonteksAbsensi {
+        val teks = api.panggil("GET", "absensi/konteks")
+        return json.decodeFromString(KonteksAbsensi.serializer(), teks)
+    }
+
     suspend fun riwayatAbsensi(dari: String, sampai: String): List<Absensi> {
         val teks = api.panggil("GET", "absensi/saya?dari=$dari&sampai=$sampai")
         return json.decodeFromString(ListSerializer(Absensi.serializer()), teks)

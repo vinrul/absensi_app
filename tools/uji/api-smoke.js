@@ -773,6 +773,40 @@ try {
 		JSON.stringify(hariSetelahAbsen.data)
 	);
 
+	const konteksCheckout = await panggil(personel.access_token, "/absensi/konteks");
+	cek(
+		"konteks menawarkan check-out setelah check-in",
+		konteksCheckout.status === 200 &&
+			konteksCheckout.data.aksi === "checkout" &&
+			konteksCheckout.data.status_terkunci === "dinas_kantor",
+		JSON.stringify(konteksCheckout.data)
+	);
+	const absenPulangAuto = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "pulang",
+			status_kehadiran: "dinas_kantor",
+			captured_at: new Date().toISOString(),
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5
+		}
+	});
+	cek(
+		"scan kedua otomatis menjadi check-out",
+		absenPulangAuto.status === 200 &&
+			absenPulangAuto.data.aksi === "checkout" &&
+			absenPulangAuto.data.data.jenis === "pulang",
+		JSON.stringify(absenPulangAuto.data)
+	);
+	const konteksSelesai = await panggil(personel.access_token, "/absensi/konteks");
+	cek(
+		"konteks selesai setelah check-in dan check-out",
+		konteksSelesai.status === 200 && konteksSelesai.data.aksi === "selesai",
+		JSON.stringify(konteksSelesai.data)
+	);
+
 	await fetch(`${BASE}/dev/waktu`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
@@ -794,9 +828,58 @@ try {
 		}
 	});
 	cek(
-		"status PH (Perintah Hadir) diterima pada absensi harian",
-		absenPh.status === 200 && absenPh.data.data.status_kehadiran === "ph",
+		"status PH tidak dapat dikirim lewat absensi harian",
+		absenPh.status === 422 &&
+			String(absenPh.data?.error?.message ?? "").includes("strong point"),
 		JSON.stringify(absenPh.data)
+	);
+
+	// Piket lintas hari: check-in 23:00, scan besok 22:00 (23 jam) = check-out.
+	await fetch(`${BASE}/dev/waktu`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ tanggal: "2026-11-01", jam: "23:00" })
+	});
+	const piketMasuk = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "masuk",
+			status_kehadiran: "piket",
+			captured_at: new Date().toISOString(),
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5
+		}
+	});
+	cek(
+		"check-in piket lintas hari tercatat",
+		piketMasuk.status === 200 && piketMasuk.data.aksi === "checkin",
+		JSON.stringify(piketMasuk.data)
+	);
+	await fetch(`${BASE}/dev/waktu`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ tanggal: "2026-11-02", jam: "22:00" })
+	});
+	const piketPulang = await panggil(personel.access_token, "/absensi", {
+		method: "POST",
+		body: {
+			client_uuid: crypto.randomUUID(),
+			jenis: "masuk",
+			status_kehadiran: "piket",
+			captured_at: new Date().toISOString(),
+			latitude: titikPersonel.latitude,
+			longitude: titikPersonel.longitude,
+			akurasi_m: 5
+		}
+	});
+	cek(
+		"scan piket 23 jam kemudian menjadi check-out",
+		piketPulang.status === 200 &&
+			piketPulang.data.aksi === "checkout" &&
+			piketPulang.data.data.tanggal === "2026-11-01",
+		JSON.stringify(piketPulang.data)
 	);
 
 	const fakeReset = await fetch(`${BASE}/dev/waktu/reset`, { method: "POST" });

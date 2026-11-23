@@ -1009,6 +1009,51 @@ pub async fn exists_absensi_ph(
 }
 
 /// Waktu check-in dan check-out terakhir untuk menentukan sesi yang masih terbuka.
+pub async fn ada_absensi_ph_hari_ini(
+    pool: &PgPool,
+    personel_id: Uuid,
+    tanggal: NaiveDate,
+) -> AppResult<bool> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (
+             SELECT 1 FROM absensi_ph ap
+             JOIN jadwal_ph j ON j.id = ap.jadwal_ph_id
+              WHERE ap.personel_id = $1 AND j.tanggal = $2
+         )",
+    )
+    .bind(personel_id)
+    .bind(tanggal)
+    .fetch_one(pool)
+    .await?)
+}
+
+/// Ada sesi strong point hari ini yang sudah check-in tetapi belum check-out.
+pub async fn sesi_ph_terbuka(
+    pool: &PgPool,
+    personel_id: Uuid,
+    tanggal: NaiveDate,
+) -> AppResult<bool> {
+    Ok(sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS (
+             SELECT 1 FROM absensi_ph masuk
+             JOIN jadwal_ph j ON j.id = masuk.jadwal_ph_id
+              WHERE masuk.personel_id = $1
+                AND j.tanggal = $2
+                AND masuk.jenis = 'masuk'
+                AND NOT EXISTS (
+                    SELECT 1 FROM absensi_ph pulang
+                     WHERE pulang.personel_id = masuk.personel_id
+                       AND pulang.jadwal_ph_id = masuk.jadwal_ph_id
+                       AND pulang.jenis = 'pulang'
+                )
+         )",
+    )
+    .bind(personel_id)
+    .bind(tanggal)
+    .fetch_one(pool)
+    .await?)
+}
+
 pub async fn sesi_ph_terakhir(
     pool: &PgPool,
     jadwal_id: Uuid,

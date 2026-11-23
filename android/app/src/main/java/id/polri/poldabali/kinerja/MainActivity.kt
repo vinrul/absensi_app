@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -71,8 +70,7 @@ private data class Tab(val label: String, val judul: String, val ikon: ImageVect
 
 private val DAFTAR_TAB = listOf(
     Tab("Beranda", "Absensi & Strong Point", Icons.Filled.Home),
-    Tab("Absensi", "Absensi", Icons.Filled.Place),
-    Tab("Strong", "Strong Point", Icons.Filled.DateRange)
+    Tab("Absensi", "Absensi", Icons.Filled.Place)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -198,12 +196,10 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
             when (tabAktif) {
                 0 -> BerandaScreen(
                     vm = vm,
-                    onBukaAbsensi = { tabAktif = 1 },
-                    onBukaStrong = { tabAktif = 2 }
+                    onBukaAbsensi = { tabAktif = 1 }
                 )
 
                 1 -> AbsensiScreen(vm)
-                2 -> PhScreen(vm)
             }
         }
     }

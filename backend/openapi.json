@@ -170,10 +170,10 @@
         "type": "object",
         "properties": {
           "client_uuid": { "type": "string", "format": "uuid", "description": "Kunci idempotensi antrean offline" },
-          "jenis": { "type": "string", "enum": ["masuk", "pulang"] },
+          "jenis": { "type": "string", "enum": ["masuk", "pulang"], "description": "Dipertahankan untuk kompatibilitas; server menentukan check-in/check-out dari catatan terbuka" },
           "status_kehadiran": {
             "type": "string",
-            "enum": ["dinas_kantor", "dinas_luar", "ph", "piket", "libur_nasional", "cuti", "izin", "sakit", "tanpa_keterangan"]
+            "enum": ["dinas_kantor", "dinas_luar", "ph", "piket", "operasi", "libur_nasional", "cuti", "izin", "sakit", "tanpa_keterangan"]
           },
           "captured_at": { "type": "string", "format": "date-time" },
           "latitude": { "type": "number", "nullable": true },
@@ -924,13 +924,13 @@
     "/absensi": {
       "post": {
         "tags": ["absensi"],
-        "summary": "Catat absensi masuk/pulang",
-          "description": "Idempoten terhadap client_uuid. Menolak (422) bila di luar radius titik dinas untuk status yang membutuhkan radius. Bila server memakai `APP__MOCK_LOCATION_POLICY=reject`, permintaan dengan `is_mock_suspect=true` ditolak 422; policy `flag` menyimpan data dengan `perlu_verifikasi=true`.",
+        "summary": "Catat absensi check-in/check-out",
+          "description": "Idempoten terhadap client_uuid. Server menentukan check-in atau check-out: bila ada catatan terbuka hari ini, permintaan menjadi check-out tanpa perlu status baru; piket/operasi lintas hari dapat check-out sampai 24 jam + 1 jam. Dinas Kantor memakai jendela jam masuk − 30 menit s.d. jam pulang, strong point memakai jadwalnya, dan Dinas Kantor ditolak bila hari itu ada jadwal strong point. Menolak (422) bila di luar radius titik dinas untuk status yang membutuhkan radius. Bila server memakai `APP__MOCK_LOCATION_POLICY=reject`, permintaan dengan `is_mock_suspect=true` ditolak 422; policy `flag` menyimpan data dengan `perlu_verifikasi=true`.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AbsensiRequest" } } } },
         "responses": {
-          "200": { "description": "Tercatat (termasuk pengiriman ulang antrean offline)" },
-          "409": { "description": "Sudah absen pada tanggal dan jenis yang sama" },
-          "422": { "description": "Di luar radius / GPS tidak ada" }
+          "200": { "description": "Tercatat; field `aksi` bernilai `checkin`, `checkout`, atau `ulang`" },
+          "409": { "description": "Absensi hari ini sudah lengkap / status sekali sehari sudah tercatat" },
+          "422": { "description": "Di luar radius, GPS tidak ada, di luar jendela waktu, atau hari ini wajib strong point" }
         }
       },
       "get": {
@@ -965,6 +965,14 @@
         "tags": ["absensi"],
         "summary": "Absensi hari ini menurut jam server (termasuk jam palsu development)",
         "responses": { "200": { "description": "Tanggal server, absen masuk dan pulang" } }
+      }
+    },
+    "/absensi/konteks": {
+      "get": {
+        "tags": ["absensi"],
+        "summary": "Konteks tombol absensi (check-in/check-out dan sesi strong point)",
+        "description": "Menentukan `aksi` (checkin/checkout/selesai), status yang terkunci, jendela absensi kantor, serta daftar sesi strong point hari ini beserta status check-in/check-out-nya.",
+        "responses": { "200": { "description": "Konteks absensi" } }
       }
     },
     "/absensi/harian": {

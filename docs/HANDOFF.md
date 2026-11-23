@@ -3,10 +3,10 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 23 November 2026 (37 unit test backend; 74 cek API pada DB uji;
+Terakhir diverifikasi: 23 November 2026 (37 unit test backend; 79 cek API pada DB uji;
 seed `--reset` development menghasilkan 145 personel, 102 jadwal PH, penempatan tetap, dan
 fallback jadwal bulan sebelumnya; dashboard & web personel `bun run check`/`build`; APK debug;
-`openapi.json` 92 path).
+`openapi.json` 93 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
@@ -37,10 +37,10 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Laporan absensi & strong point berbasis **rentang tanggal** | `dari`/`sampai` di `/absensi/*`, `/ph/*`, `/dashboard/kehadiran`; UI tidak lagi memakai periode bulan |
 | **Modul kinerja/periode dinonaktifkan dari UI** | Menu Kinerja, Penilaian, Print Laporan, Kesiapan, Periode dihapus dari navigasi; route lama diarahkan ke `/dashboard`; tabel & API dibiarkan dorman |
 | Jam server palsu development (`fake`) | `/dev/waktu` + `cargo run --bin fake --`; hanya aktif dengan `APP__ALLOW_FAKE_TIME=true` |
-| Absensi Android bertahap + peta OSM | tombol besar → validasi GPS/peta → status → kirim/offline; `PetaAbsensi.kt` |
+| Absensi Android satu alur + peta OSM | status kehadiran → validasi GPS/peta → foto → kirim/offline; riwayat disusun **satu baris per tanggal**; `PetaAbsensi.kt` |
 | Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
 | Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; check-in/check-out ganda 409; rekap menandai tidak strong point / hanya check-in serta total telat & pulang cepat |
-| Tab **Strong Point** di Android | bottom nav **Beranda / Absensi / Strong**; tombol besar + riwayat, wizard 3 langkah (lokasi → dokumentasi → kirim), peta tanpa titik dinas + marker hijau, koordinat/akurasi/geocode, check-in/out offline ber-antrean |
+| Aplikasi Android dua tab + riwayat harian | bottom nav **Beranda / Absensi** (tab Strong dihapus); wizard status → lokasi → foto → kirim; riwayat bulan berjalan menggabungkan absensi masuk/pulang, status, dan sesi strong point (jadwal + realisasi) dalam satu baris per tanggal |
 | Dokumentasi foto absensi & strong point | Unggahan base64 Android disimpan sebagai `foto_path`; galeri dashboard lewat `/absensi/foto` dan `/ph/foto`; berkas `/api/v1/files/{key}` dengan cek pemilik/cakupan satker |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
@@ -59,7 +59,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
-| Dokumentasi API | `/docs` (92 path), `/api-docs/openapi.json` |
+| Dokumentasi API | `/docs` (93 path), `/api-docs/openapi.json` |
 | Backup script | `deploy/backup.sh` (belum dijadwalkan di server) |
 
 **Belum / pekerjaan lanjutan** — lihat §9 backlog.
@@ -198,10 +198,20 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     - **Pengingat**: `GET /ph/jadwal/status?bulan=&satker_id=` melaporkan jumlah jadwal bulan
       terpilih, jumlah jadwal bulan depan, dan `perlu_susun_bulan_depan`. Dashboard menampilkan
       peringatan agar jadwal bulan depan disusun sebelum tanggal 1.
-    - **Satu jadwal = satu sesi dan satu titik.** Check-in hanya sekali dan check-out hanya
-      sekali per jadwal. Check-in dibuka `jam_mulai − 30 menit` dan ditolak setelah
-      `jam_selesai`; check-out wajib setelah check-in dan maksimal `jam_selesai + 60 menit`.
+    - **Satu jadwal = satu sesi dan satu titik.** Check-in dibuka `jam_mulai − 30 menit` dan
+      ditolak setelah `jam_selesai`; check-out sesi sampai pukul **23:59** hari yang sama.
       Aturan sesi berulang/2 jam dari versi lama **dihapus**.
+    - **Absensi harian memakai state machine check-in/check-out.** `POST /absensi` menentukan
+      `checkin`/`checkout` dari catatan terbuka, bukan dari field `jenis` klien. Dinas Kantor
+      dibuka `jam_masuk − 30 menit` s.d. `jam_pulang`; Piket/Shift dan Operasi/Pam dicatat per
+      siklus tanpa jadwal (check-out otomatis bila selisih ≤ 24 jam + 1 jam); Dinas Luar/Cuti/Izin/
+      Sakit hanya check-in sekali per hari. `GET /absensi/konteks` memberi tahu aksi dan sesi strong
+      point yang aktif.
+    - **Hari strong point menggantikan Dinas Kantor.** Bila ada jadwal strong point, Dinas Kantor
+      ditolak; check-in/check-out strong point dicerminkan ke `absensi` berstatus `ph` sehingga
+      hadir, telat, dan pulang cepat ikut rekap kehadiran. Jika sesi baru sudah dibuka sedangkan
+      sesi lama belum check-out, aplikasi memprioritaskan check-in sesi baru dan sesi lama tetap
+      tercatat tanpa check-out (bukan pulang cepat).
     - `absensi_ph.menit_telat` dihitung bila check-in melewati `jam_mulai`;
       `menit_pulang_cepat` dihitung bila check-out sebelum `jam_selesai`. Rekap menjumlahkan
       keduanya.
@@ -215,8 +225,10 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     - Tab **Jadwal** berupa roster bulanan + daftar jadwal berpaginasi (Tanggal/Sesi/Jam/Titik/Regu/Anggota),
       dengan filter bulan. Seed memberi Ditreskrimsus jadwal Senin–Jumat pagi+sore dan satker lain
       contoh tanggal 3–5; seluruh personel ditempatkan ke titik induknya.
-    - Aplikasi Android & web personel menampilkan status per sesi hari ini dan tombol
-      check-in/check-out kondisional; antrean offline `AntreanPh` tetap dipakai.
+    - Aplikasi Android kini hanya memiliki tab **Beranda** dan **Absensi**. Wizard absensi:
+      pilih status → GPS/radius → foto → kirim. Saat masih ada check-in terbuka, tombol langsung
+      menjadi check-out tanpa memilih status. Tab **Strong** dihapus; jadwal strong point tampil di
+      Beranda/Absensi. Web personel tetap memiliki halaman Strong terpisah.
     - Dokumentasi foto diminta saat check-in (dapat dilewati bila kamera tidak tersedia).
     - **Penyajian foto:** `foto_url` memakai `/api/v1/files/{key}`; endpoint `/files/{*key}`
       memeriksa pemilik atau cakupan satker. Galeri memakai `/absensi/foto` dan `/ph/foto`
@@ -502,7 +514,7 @@ Polda/Polres) · `penempatan_ph` (unik `personel_id`; satu anggota = satu titik)
 `personel.nrp` hanya wajib untuk `jenis_akun='personel'`; `personel.username` hanya wajib
 untuk `jenis_akun='admin'` (constraint `personel_identitas_check`).
 
-Migrasi: `backend/migrations/0001_init.sql` … `0018_strong_point_bulanan.sql` (penempatan tetap,
+Migrasi: `backend/migrations/0001_init.sql` … `0020_absensi_ph_link.sql` (penempatan tetap,
 fallback bulanan, hapus pola mingguan). Status absensi `libur_nasional` menggantikan nama lama
 `ph` (nama `ph` sekarang khusus modul PH).
 Tambah migrasi baru = file `000N_nama.sql` lalu `sqlx migrate run` + `cargo sqlx prepare` bila
