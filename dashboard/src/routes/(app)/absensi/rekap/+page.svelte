@@ -114,6 +114,9 @@
 	        keterangan: string;
 	        tone: 'green' | 'amber' | 'red' | 'blue' | 'slate' | 'gold';
 	        orang: AbsensiMatriksPersonel[];
+	        /** Khusus kartu Jadwal PH. */
+	        phSudah?: number;
+	        phBelum?: number;
 	    };
 	    let kategoriHarian = $state<KategoriHarian | null>(null);
 
@@ -318,19 +321,7 @@
 	        },
 	        { status: 'cuti', label: 'Cuti', keterangan: 'Cuti disetujui', tone: 'amber' },
 	        { status: 'izin', label: 'Izin', keterangan: 'Izin tidak masuk', tone: 'amber' },
-	        { status: 'sakit', label: 'Sakit', keterangan: 'Sakit', tone: 'amber' },
-	        {
-	            status: 'tanpa_keterangan',
-	            label: 'Tanpa Keterangan',
-	            keterangan: 'Tidak ada keterangan',
-	            tone: 'red'
-	        },
-	        {
-	            status: 'libur_nasional',
-	            label: 'Libur',
-	            keterangan: 'Libur nasional/khusus',
-	            tone: 'slate'
-	        }
+	        { status: 'sakit', label: 'Sakit', keterangan: 'Sakit', tone: 'amber' }
 	    ];
 
 	    const kategoriHarianList = $derived.by(() => {
@@ -358,6 +349,9 @@
 	        const urut = (daftar: AbsensiMatriksPersonel[]) =>
 	            [...daftar].sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
 
+	        const sudahPhSet = new Set(sudahPh.map((orang) => orang.personel_id));
+	        const jadwalBelumPh = jadwalPh.filter((orang) => !sudahPhSet.has(orang.personel_id));
+
 	        const kartu: KategoriHarian[] = [
 	            {
 	                id: 'tidak_absen',
@@ -371,14 +365,9 @@
 	                label: 'Jadwal PH',
 	                keterangan: 'Punya jadwal strong point',
 	                tone: 'blue',
-	                orang: urut(jadwalPh)
-	            },
-	            {
-	                id: 'sudah_ph',
-	                label: 'Sudah PH',
-	                keterangan: 'Sudah check-in strong point',
-	                tone: 'green',
-	                orang: urut(sudahPh)
+	                orang: urut(jadwalPh),
+	                phSudah: jadwalPh.length - jadwalBelumPh.length,
+	                phBelum: jadwalBelumPh.length
 	            },
 	            ...STATUS_HARIAN.map((item) => ({
 	                id: item.status,
@@ -1137,6 +1126,12 @@
 							</span>
 							<span class="text-sm font-medium text-slate-700">{kategori.label}</span>
 							<span class="text-[11px] text-slate-500">{kategori.keterangan}</span>
+							{#if kategori.id === 'jadwal_ph'}
+								<span class="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] font-medium">
+									<span class="text-emerald-700">Sudah PH {kategori.phSudah ?? 0}</span>
+									<span class="text-rose-600">Belum PH {kategori.phBelum ?? 0}</span>
+								</span>
+							{/if}
 						</button>
 					{/each}
 				</div>
@@ -2014,6 +2009,13 @@
 				<p class="text-xs text-slate-500">
 					{kategoriHarian.keterangan} · {kategoriHarian.orang.length} personel
 				</p>
+				{#if kategoriHarian.id === 'jadwal_ph'}
+					<p class="text-[11px] font-medium">
+						<span class="text-emerald-700">Sudah PH {kategoriHarian.phSudah ?? 0}</span>
+						<span class="text-slate-400"> · </span>
+						<span class="text-rose-600">Belum PH {kategoriHarian.phBelum ?? 0}</span>
+					</p>
+				{/if}
 			</div>
 			{#if kategoriHarian.orang.length === 0}
 				<p

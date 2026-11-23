@@ -438,10 +438,10 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 ### FR-23 Rekap harian ringkas
 - Tab **Rekap Harian** menampilkan ringkasan satu tanggal dengan filter **tanggal** (default hari
   ini, tombol **Hari Ini**) dan **satker**.
-- Kartu ringkasan: **Tidak Absen**, **Jadwal PH**, **Sudah PH**, Dinas Kantor, Dinas Luar,
-  Piket/Shift, Operasi/Pam, Cuti, Izin, Sakit, Tanpa Keterangan, dan Libur.
-- Jumlah pada kartu dihitung dari data matriks satu hari; jadwal PH dan absensi PH dihitung
-  terpisah sehingga personel dengan jadwal tetapi tidak hadir tetap terlihat di kedua kartu.
+- Kartu ringkasan: **Tidak Absen**, **Jadwal PH** (dengan rincian **Sudah PH** dan **Belum PH**),
+  Dinas Kantor, Dinas Luar, Piket/Shift, Operasi/Pam, Cuti, Izin, dan Sakit.
+- Jumlah pada kartu dihitung dari data matriks satu hari; kartu Jadwal PH menampilkan total
+  personel yang punya jadwal sekaligus berapa yang sudah dan belum check-in PH.
 - Klik kartu membuka modal berisi daftar personel pada kategori tersebut, lengkap dengan status,
   jam, sesi strong point, penanda TA/TC, dan tombol **Detail** ke modal absensi penuh.
 

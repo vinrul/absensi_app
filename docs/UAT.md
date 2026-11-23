@@ -100,7 +100,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A68 | Check-in tanpa check-out / check-out tanpa check-in | Badge status dan **TC** tampil terpisah (mis. **DK TC**, **PH TC**); **TM** untuk check-out tanpa check-in; pada hari berjalan check-in tanpa check-out hanya menampilkan status dan jam masuk sampai tanggal berganti | ✅ | API + build |
 | A69 | Legenda dan PDF matriks | Tabel, modal detail, dan PDF memuat penanda TA/TC/TM, sesi strong point, dan keterangannya | ✅ | build + PDF |
 | A70 | Jadwal strong point pagi/sore | Sel menampilkan sesi Pagi dan Sore beserta jam jadwal/realisasi; jadwal tanpa absensi tampil **PH + TA**; jadwal dengan status Izin/Sakit/Dinas Luar/Cuti tetap menampilkan status tersebut bersama penanda **Jadwal PH** | ✅ | API + Chrome headless |
-| A71 | Tab **Rekap Harian** | Tanggal default hari ini dan dapat dipilih; filter satker; kartu Tidak Absen, Jadwal PH, Sudah PH, DK, DL, Piket, Operasi, Cuti, Izin, Sakit, TK, dan Libur menampilkan jumlah personel; klik kartu membuka daftar orang dengan status/jam/sesi dan tombol Detail | ✅ | Chrome headless |
+| A71 | Tab **Rekap Harian** | Tanggal default hari ini dan dapat dipilih; filter satker; kartu Tidak Absen, Jadwal PH (rincian Sudah/Belum PH), DK, DL, Piket, Operasi, Cuti, Izin, dan Sakit menampilkan jumlah personel; klik kartu membuka daftar orang dengan status/jam/sesi dan tombol Detail | ✅ | Chrome headless |
 
 ## B. Admin ber-scope
 

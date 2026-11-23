@@ -53,7 +53,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | Dashboard baru fokus kehadiran & strong point hari ini (filter tanggal + satker); laporan kinerja tetap ada di kode tetapi tidak dijangkau UI |
 | Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Rekap Harian**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; badge status dan **TA/TC/TM** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet dan rincian sesi. Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
-| **Rekap Harian ringkas** | Tab **Rekap Harian** dengan filter tanggal (default hari ini) + satker; kartu **Tidak Absen**, **Jadwal PH**, **Sudah PH**, DK, DL, Piket, Operasi, Cuti, Izin, Sakit, TK, dan Libur; klik kartu membuka daftar personel + tombol Detail; memakai matriks satu hari, tanpa endpoint baru |
+| **Rekap Harian ringkas** | Tab **Rekap Harian** dengan filter tanggal (default hari ini) + satker; kartu **Tidak Absen**, **Jadwal PH** (rincian **Sudah PH**/**Belum PH**), DK, DL, Piket, Operasi, Cuti, Izin, dan Sakit; klik kartu membuka daftar personel + tombol Detail; memakai matriks satu hari, tanpa endpoint baru |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
 | Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (daftar sesi hari ini + wizard), riwayat; halaman kinerja masih ada di disk tetapi tidak dijangkau navigasi; login memakai kanal `personel_web` |
 | Deteksi lokasi tiruan (fake GPS) | Android memeriksa `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/mock app; server `APP__MOCK_LOCATION_POLICY=flag|reject` (default `flag`, produksi `reject`); antrean mencatat penolakan; panduan `docs/fake-gps.md` |
@@ -319,11 +319,11 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     status tersebut tetap tampil bersama penanda Jadwal PH.
 33. **Rekap Harian memakai ulang matriks satu hari.** Tab **Rekap Harian** memanggil
     `GET /absensi/matriks?dari=<tanggal>&sampai=<tanggal>` (bukan endpoint baru), lalu
-    menghitung kartu di klien: Tidak Absen (`tidak_absen`), Jadwal PH (`jadwal_strong`),
-    Sudah PH (`ph_absen`), serta status DK/DL/Piket/Operasi/Cuti/Izin/Sakit/TK/Libur dari
-    `statusEfektif`. Kartu dapat diklik untuk modal daftar personel dan tombol **Detail**
-    menuju modal absensi penuh. Jangan menduplikasi query agregat di server kecuali kartu
-    perlu dihitung untuk periode yang lebih besar.
+    menghitung kartu di klien: Tidak Absen (`tidak_absen`), Jadwal PH (`jadwal_strong` dengan
+    rincian Sudah PH dari `ph_absen` dan Belum PH), serta status DK/DL/Piket/Operasi/Cuti/Izin/
+    Sakit dari `statusEfektif`. Kartu dapat diklik untuk modal daftar personel dan tombol
+    **Detail** menuju modal absensi penuh. Jangan menduplikasi query agregat di server kecuali
+    kartu perlu dihitung untuk periode yang lebih besar.
 
 ---
 
