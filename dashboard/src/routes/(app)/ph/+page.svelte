@@ -17,6 +17,7 @@
 		StrongPoint
 	} from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
+	import Combobox from '#lib/components/Combobox.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -103,6 +104,7 @@
 	let rekap = $state<RekapPh[]>([]);
 	let rekapRentang = $state('');
 	let personelSatker = $state<Personel[]>([]);
+	let cariPersonelJadwal = $state('');
 	let penempatan = $state<PenempatanPh[]>([]);
 	let memuat = $state(true);
 	let siap = $state(false);
@@ -132,6 +134,7 @@
 	let anggotaTempat = $state<string[]>([]);
 	let modeTempatPersonel = $state<string | null>(null);
 	let memuatTempat = $state(false);
+	let cariPersonelTempat = $state('');
 
 	type ItemGaleri = { url: string; caption: string };
 	let galeri = $state<{ nama: string; memuat: boolean; item: ItemGaleri[] } | null>(null);
@@ -190,21 +193,38 @@
 	const tampilkanRoster = $derived(rentangHari.length > 0 && rentangHari.length <= 45);
 	const satkerMap = $derived(new Map(satkerList.map((row) => [row.id, row.nama])));
 	const satkerRowMap = $derived(new Map(satkerList.map((row) => [row.id, row])));
-	const satkerTempatOptions = $derived(opsiSatkerTempat());
+	const LABEL_LEVEL: Record<Satker['level'], string> = {
+		polda: 'Polda',
+		polres: 'Polres',
+		satker: 'Satker'
+	};
+	const opsiSatker = $derived(
+		satkerList.map((s) => ({ value: s.id, label: s.nama, grup: LABEL_LEVEL[s.level] }))
+	);
+	const opsiOwner = $derived(
+		ownerOptions.map((s) => ({ value: s.id, label: s.nama, grup: LABEL_LEVEL[s.level] }))
+	);
+	const satkerTempatOptions = $derived(daftarSatkerTempat());
 	const grupSatkerTempat = $derived.by(() => {
-		const label: Record<Satker['level'], string> = {
-			polda: 'Polda',
-			polres: 'Polres',
-			satker: 'Satker'
-		};
 		return (['polda', 'polres', 'satker'] as const)
 			.map((level) => ({
 				level,
-				label: label[level],
+				label: LABEL_LEVEL[level],
 				data: satkerTempatOptions.filter((row) => row.level === level)
 			}))
 			.filter((grup) => grup.data.length > 0);
 	});
+	const opsiSatkerTempat = $derived(
+		grupSatkerTempat.flatMap((grup) =>
+			grup.data.map((s) => ({ value: s.id, label: s.nama, grup: grup.label }))
+		)
+	);
+	const personelJadwalTampil = $derived(
+		personelSatker.filter((orang) => cocokCari(orang, cariPersonelJadwal))
+	);
+	const personelTempatTampil = $derived(
+		personelTempat.filter((orang) => cocokCari(orang, cariPersonelTempat))
+	);
 
 	const roster = $derived.by(() => {
 		type Anggota = { id: string; nama: string; pangkat: string; nrp: string };
@@ -381,6 +401,7 @@
 	}
 
 	async function muatPilihanJadwal(satker: string) {
+		cariPersonelJadwal = '';
 		if (!satker) {
 			personelSatker = [];
 			return;
@@ -490,7 +511,13 @@
 		return row.personel.map((item) => item.nama).join(', ');
 	}
 
-	function opsiSatkerTempat() {
+	function cocokCari(orang: Personel, cari: string) {
+		const kunci = cari.trim().toLowerCase();
+		if (!kunci) return true;
+		return `${orang.nama} ${orang.nrp} ${orang.pangkat}`.toLowerCase().includes(kunci);
+	}
+
+	function daftarSatkerTempat() {
 		const aktif = satkerList.filter((row) => row.is_active);
 		// Satker Polda/Polres juga dapat memiliki personel sendiri, jadi ikut ditampilkan.
 		return aktif.length ? aktif : satkerList;
@@ -527,6 +554,7 @@
 	}
 
 	async function muatPilihanTempat() {
+		cariPersonelTempat = '';
 		if (!satkerTempat) {
 			titikTempatList = [];
 			personelTempat = [];
@@ -844,16 +872,14 @@
 			<div class="flex flex-wrap items-end gap-3">
 				<div class="min-w-64 flex-1">
 					<label class="label" for="owner-titik">Pemilik Titik</label>
-					<select
+					<Combobox
 						id="owner-titik"
-						class="input"
 						bind:value={titikOwnerId}
+						options={opsiOwner}
+						placeholder="Pilih pemilik titik"
+						labelKosong={null}
 						onchange={() => gantiOwnerTitik(titikOwnerId)}
-					>
-						{#each ownerOptions as owner}
-							<option value={owner.id}>{owner.nama}</option>
-						{/each}
-					</select>
+					/>
 				</div>
 				<button class="btn btn-primary" onclick={bukaTambahStrong}>
 					<Icon name="plus" size={16} /> Tambah Titik
@@ -899,15 +925,14 @@
 				{/if}
 				<div class="min-w-56 flex-1">
 					<label class="label" for="satker">Satker</label>
-					<select
+					<Combobox
 						id="satker"
-						class="input"
 						bind:value={satkerId}
+						options={opsiSatker}
+						placeholder="Semua Satker"
+						labelKosong="Semua Satker"
 						onchange={() => pilihSatker(satkerId)}
-					>
-						<option value="">Semua Satker</option>
-						{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
-					</select>
+					/>
 				</div>
 				{#if tab === 'penempatan'}
 					<span class="pb-2 text-xs text-slate-500">
@@ -1312,15 +1337,15 @@
 	<div class="grid gap-3 sm:grid-cols-2">
 		<div class="sm:col-span-2">
 			<label class="label" for="jsatker">Satker</label>
-			<select
+			<Combobox
 				id="jsatker"
-				class="input"
 				bind:value={formJadwal.satker_id}
+				options={opsiSatker}
+				placeholder="Pilih satker"
+				labelKosong={null}
 				disabled={Boolean(formJadwal.id)}
 				onchange={() => muatPilihanJadwal(formJadwal.satker_id)}
-			>
-				{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
-			</select>
+			/>
 		</div>
 		<div>
 			<label class="label" for="jsesi">Sesi</label>
@@ -1364,8 +1389,13 @@
 				Titik strong point diambil otomatis dari penempatan anggota. Anggota yang belum
 				ditempatkan akan ditolak; atur di tab <strong>Penempatan Anggota</strong>.
 			</p>
+			<input
+				class="input mb-2 py-1.5"
+				placeholder="Cari nama atau NRP…"
+				bind:value={cariPersonelJadwal}
+			/>
 			<div class="max-h-48 overflow-auto rounded-lg border border-slate-200 p-2">
-				{#each personelSatker as p (p.id)}
+				{#each personelJadwalTampil as p (p.id)}
 					<label class="flex items-center gap-2 py-1 text-xs text-slate-700">
 						<input
 							type="checkbox"
@@ -1375,7 +1405,11 @@
 						{p.nama} · {p.pangkat} · {p.nrp}
 					</label>
 				{:else}
-					<p class="text-xs text-slate-500">Belum ada personel aktif pada satker ini.</p>
+					<p class="text-xs text-slate-500">
+						{cariPersonelJadwal.trim()
+							? 'Tidak ada personel yang cocok.'
+							: 'Belum ada personel aktif pada satker ini.'}
+					</p>
 				{/each}
 			</div>
 		</div>
@@ -1406,20 +1440,14 @@
 		{:else}
 			<div>
 				<label class="label" for="tsatker">Satker</label>
-				<select
+				<Combobox
 					id="tsatker"
-					class="input"
 					bind:value={satkerTempat}
+					options={opsiSatkerTempat}
+					placeholder="Pilih satker"
+					labelKosong={null}
 					onchange={() => aturSatkerTempat(satkerTempat)}
-				>
-					{#each grupSatkerTempat as grup (grup.level)}
-						<optgroup label={grup.label}>
-							{#each grup.data as s (s.id)}
-								<option value={s.id}>{s.nama}</option>
-							{/each}
-						</optgroup>
-					{/each}
-				</select>
+				/>
 			</div>
 		{/if}
 
@@ -1448,8 +1476,13 @@
 					Satu anggota hanya boleh ditempatkan pada satu titik. Memilih anggota yang sudah punya
 					titik akan memindahkannya.
 				</p>
+				<input
+					class="input mb-2 py-1.5"
+					placeholder="Cari nama atau NRP…"
+					bind:value={cariPersonelTempat}
+				/>
 				<div class="max-h-56 overflow-auto rounded-lg border border-slate-200 p-2">
-					{#each personelTempat as p (p.id)}
+					{#each personelTempatTampil as p (p.id)}
 						<label class="flex items-center gap-2 py-1 text-xs text-slate-700">
 							<input
 								type="checkbox"
@@ -1460,7 +1493,11 @@
 						</label>
 					{:else}
 						<p class="text-xs text-slate-500">
-							{memuatTempat ? 'Memuat…' : 'Belum ada personel aktif pada satker ini.'}
+							{cariPersonelTempat.trim()
+								? 'Tidak ada personel yang cocok.'
+								: memuatTempat
+									? 'Memuat…'
+									: 'Belum ada personel aktif pada satker ini.'}
 						</p>
 					{/each}
 				</div>
@@ -1490,11 +1527,14 @@
 	<div class="grid gap-3 sm:grid-cols-2">
 		<div class="sm:col-span-2">
 			<label class="label" for="ssatker">Pemilik Titik</label>
-			<select id="ssatker" class="input" bind:value={formStrong.satker_id} disabled={Boolean(formStrong.id)}>
-				{#each ownerOptions as owner}
-					<option value={owner.id}>{owner.nama}</option>
-				{/each}
-			</select>
+			<Combobox
+				id="ssatker"
+				bind:value={formStrong.satker_id}
+				options={opsiOwner}
+				placeholder="Pilih pemilik titik"
+				labelKosong={null}
+				disabled={Boolean(formStrong.id)}
+			/>
 			<p class="mt-1 text-[11px] text-slate-500">
 				Titik dipakai otomatis oleh satker di bawah unit ini.
 			</p>

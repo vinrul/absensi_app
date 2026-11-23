@@ -29,6 +29,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Kesiapan satker per periode | Kode & API tetap ada, tetapi **menu dinonaktifkan** |
 | Kalender hari libur nasional & khusus satker | tabel `hari_libur`, halaman **Hari Libur**, otomatis netral di penilaian |
 | CRUD personel + atasan + peran/cakupan + reset password | halaman **Data Personel**; form tanpa unit/email, pangkat/satker/atasan memakai **Combobox ber-pencarian** (22 tingkat Polri + 17 pangkat ASN) |
+| **Filter satker/personel ber-pencarian** | `Combobox.svelte` dipakai di Rekap Kehadiran, Rekap Harian, Verifikasi, Detail per Orang, filter Strong Point, serta modal Jadwal/Penempatan; anggota dapat dicari lewat nama/NRP |
 | Pagination seragam di seluruh modul daftar | komponen `Pagination.svelte`; lihat CHECKLIST §3.24 |
 | CRUD akun admin + username + cakupan + reset password | halaman **Akun Admin** (`/admin`) |
 | Modul PH / Strong Point terpisah | migrasi `0006` + `0017` + `0018`; `/ph/*`; halaman **Strong Point** dengan tab Jadwal, Rekap, Penempatan Anggota, Titik |
@@ -374,10 +375,11 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
 - **Rekap Absensi** (`/absensi/rekap`) memakai tab lokal tanpa route baru: **Rekap Kehadiran**
   (periode + satker), **Rekap Harian** (satu tanggal + satker, kartu ringkasan), **Verifikasi**
   (periode + satker + personel, aksi Setujui + foto), dan **Detail per Orang** (periode + satker
-  + personel wajib). Tiap tab punya filter sendiri dan memuat data saat dibuka. Tab Verifikasi/Detail
-  memakai `GET /absensi/harian` (satu baris per personel per tanggal: masuk & pulang digabung,
-  `menit_telat` hanya untuk Dinas Kantor), rekap memakai `GET /absensi/rekap` yang juga
-  mengembalikan total `menit_telat` per personel, sedangkan Rekap Harian memakai
+  + personel wajib). Tiap tab punya filter sendiri dan memuat data saat dibuka. Filter satker dan
+  personel memakai `Combobox.svelte` (cari nama/NRP) — jangan diganti `<select>` biasa. Tab
+  Verifikasi/Detail memakai `GET /absensi/harian` (satu baris per personel per tanggal: masuk &
+  pulang digabung, `menit_telat` hanya untuk Dinas Kantor), rekap memakai `GET /absensi/rekap`
+  yang juga mengembalikan total `menit_telat` per personel, sedangkan Rekap Harian memakai
   `GET /absensi/matriks` satu hari dan menghitung kartu di klien.
   Penyetujuan dari tab Verifikasi mengulang `POST /absensi/{id}/verifikasi` untuk setiap
   `perlu_verifikasi_ids` pada baris tanggal tersebut.

@@ -21,6 +21,7 @@
 	import { adalahPimpinanSaja } from '#lib/stores/session.svelte';
 	import { LABEL_STATUS_KEHADIRAN } from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
+	import Combobox from '#lib/components/Combobox.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -159,6 +160,18 @@
 
 	function personelUntuk(satkerId: string) {
 		return satkerId ? personelList.filter((p) => p.satker_id === satkerId) : personelList;
+	}
+
+	const opsiSatker = $derived(
+		satkerList.map((s) => ({ value: s.id, label: s.nama }))
+	);
+
+	function opsiPersonel(satkerId: string) {
+		return personelUntuk(satkerId).map((orang) => ({
+			value: orang.id,
+			label: orang.nama,
+			keterangan: orang.nrp
+		}));
 	}
 
 	function tanggalSingkat(tanggal: string) {
@@ -940,30 +953,26 @@
 					</div>
 					<div class="min-w-48">
 						<label class="label" for="rekap-satker">Satker</label>
-						<select
+						<Combobox
 							id="rekap-satker"
-							class="input"
 							bind:value={filter.rekap.satker_id}
+							options={opsiSatker}
+							placeholder="Semua Satker"
+							labelKosong="Semua Satker"
 							onchange={() => ubahSatker('rekap')}
-						>
-							<option value="">Semua Satker</option>
-							{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
-						</select>
+						/>
 					</div>
 					{#if modeRekap === 'matriks'}
 						<div class="min-w-56">
 							<label class="label" for="rekap-personel">Personel</label>
-							<select
+							<Combobox
 								id="rekap-personel"
-								class="input"
 								bind:value={filter.rekap.personel_id}
+								options={opsiPersonel(filter.rekap.satker_id)}
+								placeholder="Semua Personel"
+								labelKosong="Semua Personel"
 								onchange={() => muatRekap()}
-							>
-								<option value="">Semua Personel</option>
-								{#each personelUntuk(filter.rekap.satker_id) as orang}
-									<option value={orang.id}>{orang.nama} ({orang.nrp})</option>
-								{/each}
-							</select>
+							/>
 						</div>
 					{/if}
 					<p class="pb-2 text-[11px] text-slate-500">Maksimal rentang 31 hari.</p>
@@ -983,15 +992,14 @@
 				</div>
 				<div class="min-w-48">
 					<label class="label" for="harian-satker">Satker</label>
-					<select
+					<Combobox
 						id="harian-satker"
-						class="input"
 						bind:value={filter.harian.satker_id}
+						options={opsiSatker}
+						placeholder="Semua Satker"
+						labelKosong="Semua Satker"
 						onchange={() => muatRekapHarian()}
-					>
-						<option value="">Semua Satker</option>
-						{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
-					</select>
+					/>
 				</div>
 				<button
 					type="button"
@@ -1029,29 +1037,25 @@
 				</div>
 				<div class="min-w-48">
 					<label class="label" for="verif-satker">Satker</label>
-					<select
+					<Combobox
 						id="verif-satker"
-						class="input"
 						bind:value={filter.verifikasi.satker_id}
+						options={opsiSatker}
+						placeholder="Semua Satker"
+						labelKosong="Semua Satker"
 						onchange={() => ubahSatker('verifikasi')}
-					>
-						<option value="">Semua Satker</option>
-						{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
-					</select>
+					/>
 				</div>
 				<div class="min-w-56">
 					<label class="label" for="verif-personel">Personel</label>
-					<select
+					<Combobox
 						id="verif-personel"
-						class="input"
 						bind:value={filter.verifikasi.personel_id}
+						options={opsiPersonel(filter.verifikasi.satker_id)}
+						placeholder="Semua Personel"
+						labelKosong="Semua Personel"
 						onchange={() => muatVerifikasi()}
-					>
-						<option value="">Semua Personel</option>
-						{#each personelUntuk(filter.verifikasi.satker_id) as orang}
-							<option value={orang.id}>{orang.nama} ({orang.nrp})</option>
-						{/each}
-					</select>
+					/>
 				</div>
 			</div>
 		{:else}
@@ -1078,29 +1082,25 @@
 				</div>
 				<div class="min-w-48">
 					<label class="label" for="detail-satker">Satker</label>
-					<select
+					<Combobox
 						id="detail-satker"
-						class="input"
 						bind:value={filter.detail.satker_id}
+						options={opsiSatker}
+						placeholder="Semua Satker"
+						labelKosong="Semua Satker"
 						onchange={() => ubahSatker('detail')}
-					>
-						<option value="">Semua Satker</option>
-						{#each satkerList as s}<option value={s.id}>{s.nama}</option>{/each}
-					</select>
+					/>
 				</div>
 				<div class="min-w-56">
 					<label class="label" for="detail-personel">Personel</label>
-					<select
+					<Combobox
 						id="detail-personel"
-						class="input"
 						bind:value={filter.detail.personel_id}
+						options={opsiPersonel(filter.detail.satker_id)}
+						placeholder="Pilih personel…"
+						labelKosong="Pilih personel…"
 						onchange={() => muatDetail()}
-					>
-						<option value="">Pilih personel…</option>
-						{#each personelUntuk(filter.detail.satker_id) as orang}
-							<option value={orang.id}>{orang.nama} ({orang.nrp})</option>
-						{/each}
-					</select>
+					/>
 				</div>
 			</div>
 		{/if}

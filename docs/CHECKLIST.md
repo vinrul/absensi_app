@@ -107,7 +107,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.56 | Kebijakan lokasi tiruan server | ✅ | `APP__MOCK_LOCATION_POLICY=flag|reject`; `flag` menyimpan + `perlu_verifikasi`, `reject` HTTP 422 untuk absensi dan strong point |
 | 3.57 | Deteksi & antrean fake GPS Android | ✅ | `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/aplikasi mock; antrean menghitung item `ditolak` saat 422 mock |
 | 3.58 | Dokumentasi fake GPS | ✅ | `docs/fake-gps.md`: policy, ADB/Fake GPS, uji endpoint, antrean, batasan, matriks uji |
-| 3.59 | Combobox ber-pencarian di modal personel | ✅ | `Combobox.svelte`: input pencarian, navigasi keyboard, opsi pangkat/satker/atasan; data lama tetap tampil |
+| 3.59 | Combobox ber-pencarian | ✅ | `Combobox.svelte`: input pencarian, navigasi keyboard, opsi pangkat/satker/atasan; data lama tetap tampil; dipakai juga pada filter satker/personel Rekap & Strong Point |
 | 3.60 | Peta titik dinas: perbesar, satelit, cari alamat | ✅ | tinggi peta bertambah, basemap ArcGIS World Imagery, pencarian Nominatim debounce 700 ms tanpa tombol Cari; modal `max-w-5xl` |
 | 3.61 | Dashboard fokus absensi + strong point | ✅ | filter tanggal + satker; kartu total/hadir/belum/telat/sesi strong point/cuti-izin-sakit; tabel strong point & absensi hari itu |
 | 3.62 | Rekap absensi berbasis rentang tanggal | ✅ | filter `dari`/`sampai` per tab; tidak lagi bergantung pada periode bulan |
@@ -116,6 +116,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.65 | Rekap kehadiran matriks per tanggal | ✅ | `GET /absensi/matriks`: satu baris per personel, satu kolom per tanggal, maks. 31 hari (422 bila lebih); sel memuat status, check-in/out, telat, pulang cepat; badge status dan **TC/TA** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; status Izin/Sakit/DL/Cuti tetap tampil bersama penanda Jadwal PH; klik sel membuka modal alamat Nominatim + peta Leaflet, foto, koordinat, dan rincian sesi |
 | 3.66 | Export PDF Ringkasan & Matriks Harian | ✅ | Dua tombol di tab Rekap Kehadiran: `/absensi/rekap/ekspor` (ringkasan) dan `/absensi/matriks/ekspor` (matriks per minggu, maks. 31 hari; 422 bila lebih); legenda PDF memuat TA/TC/TM dan sel menampilkan sesi strong point |
 | 3.67 | Tab Rekap Harian ringkas | ✅ | Menu sidebar **Rekap Harian**; filter tanggal (default hari ini) + satker; sub-tab **Ringkasan** berisi kartu Tidak Absen, Jadwal PH (rincian Sudah/Belum PH), DK, DL, Piket, Operasi, Cuti, Izin, Sakit; sub-tab **Peta** menampilkan marker check-in berwarna status, titik dinas + radius, strong point + radius, basemap Jalan/Satelit, legenda, dan popup; klik kartu membuka modal daftar personel + tombol Detail |
+| 3.68 | Combobox ber-pencarian pada filter & anggota Strong Point | ✅ | Rekap Kehadiran/Harian/Verifikasi/Detail: combobox satker + personel; Jadwal/Rekap Strong Point: combobox satker; modal Jadwal & Penempatan: combobox satker + pencarian nama/NRP; Titik Strong Point: combobox pemilik titik |
 
 ## 4. Modul Strong Point v2 (terpisah dari absensi harian)
 
@@ -263,6 +264,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.29 | Tampilan sesi strong point & badge matriks | ✅ | Chrome headless: 289 sel menampilkan sesi Pagi dan 48 sel Sesi Sore; contoh `PH Pagi 07:05–09:05 · T 5m`, `DK PH Jadwal PH Pagi 07:00–09:00 TA`, dan `PH TC Pagi 07:05– TC · T 5m tanpa check-out` |
 | 9.30 | Tab Rekap Harian | ✅ | Chrome headless: 9 kartu tampil (Tidak Absen 146, Jadwal PH 3 dengan rincian Sudah PH 0/Belum PH 3, status lain 0 pada data demo); klik kartu membuka modal 146 personel dengan badge TA dan tombol Detail; URL menjadi `?tab=harian` |
 | 9.31 | Peta Rekap Harian | ✅ | Chrome headless tanggal 3 Nov: 120 marker check-in, 22 titik dinas, 22 strong point, 208 layer interaktif, 27 tile OSM; lingkaran radius dan legenda status tampil; sub-tab Peta aktif |
+| 9.32 | Pencarian combobox filter | ✅ | Chrome headless: `badung` → 3 opsi satker; personel `85` pada Satlantas → 5 opsi; PH `ditreskrimsus` → 1 opsi; modal Jadwal memuat 9 anggota dan pencarian `85000001` → 1; modal Penempatan memiliki combobox satker + pencarian anggota |
 
 ## 10. Yang belum dikerjakan (backlog)
 

@@ -222,10 +222,10 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 
 ### FR-07 Dashboard & laporan
 - Sidebar dashboard memakai menu bergrup: **Dashboard**; **Master Data** (Satker & Jam Kerja,
-  Titik Dinas, Hari Libur, Data Personel); **Absensi** (Rekap Kehadiran, Detail Rekap,
-  Verifikasi Offline); **Strong Point** (Jadwal, Rekap, Penempatan Anggota, Titik); **Akun Admin**.
-  Grup Kinerja/Laporan/Pengaturan serta menu Penilaian, Print Laporan, Kesiapan Periode, dan
-  Periode dihapus; route lama dialihkan ke `/dashboard`.
+  Titik Dinas, Hari Libur, Data Personel); **Absensi** (Rekap Kehadiran, Rekap Harian, Detail
+  Rekap, Verifikasi Offline); **Strong Point** (Jadwal, Rekap, Penempatan Anggota, Titik);
+  **Akun Admin**. Grup Kinerja/Laporan/Pengaturan serta menu Penilaian, Print Laporan,
+  Kesiapan Periode, dan Periode dihapus; route lama dialihkan ke `/dashboard`.
 - Dashboard baru: filter **tanggal** + satker, kartu total personel, hadir, belum absensi,
   telat, sesi strong point, serta cuti/izin/sakit; tabel strong point hari itu dan absensi
   masuk/pulang.
@@ -259,7 +259,8 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
   (`unique personel_id`). Admin memilih **satker → titik → checkbox anggota** (tanpa pilihan
   level, termasuk unit Polda/Polres); perubahan titik memakai upsert tanpa menyimpan riwayat
   tanggal. Hanya akun personel aktif yang dapat ditempatkan dan titik harus milik induk
-  Polda/Polres satker.
+  Polda/Polres satker. Filter satker dan pencarian anggota memakai **combobox ber-pencarian**
+  pada tab Jadwal/Rekap serta pencarian nama/NRP pada modal Jadwal dan Penempatan.
 - **Salin & fallback bulanan**: `POST /ph/jadwal/salin` menyalin jadwal bulan sebelumnya ke bulan
   tujuan dengan memetakan hari + urutan minggu. Jika admin lupa menyusun jadwal bulan berjalan,
   sistem otomatis memakai jadwal bulan terakhir yang tersedia dan menandainya
@@ -411,6 +412,8 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 - Tab **Rekap Kehadiran** menampilkan matriks: satu baris per personel dan satu kolom per tanggal.
 - Rentang tanggal maksimal **31 hari**; rentang lebih panjang ditolak di klien dan server.
 - Setiap sel memuat status, jam check-in/check-out, menit telat, dan menit pulang cepat.
+- Filter **satker** dan **personel** memakai **combobox ber-pencarian** (ketik nama/NRP tanpa
+  scroll), baik di Rekap Kehadiran, Rekap Harian, Verifikasi, maupun Detail per Orang.
 - Badge status dan penanda ketidaklengkapan ditampilkan terpisah, misalnya **DK TC** atau
   **PH TC**. **TC** hanya muncul setelah tanggal berganti (check-out masih dapat dilakukan
   sampai 23.59); shift Piket/Operasi memakai toleransi 25 jam. Pada hari berjalan, check-in
@@ -437,7 +440,7 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 
 ### FR-23 Rekap harian ringkas
 - Tab **Rekap Harian** menampilkan ringkasan satu tanggal dengan filter **tanggal** (default hari
-  ini, tombol **Hari Ini**) dan **satker**.
+  ini, tombol **Hari Ini**) dan **satker** berbentuk **combobox ber-pencarian**.
 - Kartu ringkasan: **Tidak Absen**, **Jadwal PH** (dengan rincian **Sudah PH** dan **Belum PH**),
   Dinas Kantor, Dinas Luar, Piket/Shift, Operasi/Pam, Cuti, Izin, dan Sakit.
 - Jumlah pada kartu dihitung dari data matriks satu hari; kartu Jadwal PH menampilkan total

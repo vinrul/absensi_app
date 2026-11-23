@@ -367,7 +367,8 @@ Catatan penting:
 - **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 22 tingkat
   Polri termasuk Brigpol + 17 pangkat ASN/PNS)/jabatan/telepon/email, ganti password, pengaturan
   alamat server, dan antrean offline. Form personel dashboard memakai **Combobox ber-pencarian**
-  untuk pangkat, satker, dan atasan langsung.
+  untuk pangkat, satker, dan atasan langsung; filter satker/personel pada Rekap Absensi dan
+  Strong Point juga memakai combobox ber-pencarian.
 - **Profil Saya di dashboard**: halaman `/profil` untuk admin & pimpinan dengan unggah foto profil
   (JPG/PNG maks. 5 MB) dan ganti password; setiap kolom password punya ikon mata
   tampil/sembunyikan. Avatar tampil di sidebar dan header, dan ganti password mencabut seluruh

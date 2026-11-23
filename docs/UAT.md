@@ -102,6 +102,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A70 | Jadwal strong point pagi/sore | Sel menampilkan sesi Pagi dan Sore beserta jam jadwal/realisasi; jadwal tanpa absensi tampil **PH + TA**; jadwal dengan status Izin/Sakit/Dinas Luar/Cuti tetap menampilkan status tersebut bersama penanda **Jadwal PH** | ✅ | API + Chrome headless |
 | A71 | Tab **Rekap Harian** | Tanggal default hari ini dan dapat dipilih; filter satker; sub-tab **Ringkasan** berisi kartu Tidak Absen, Jadwal PH (rincian Sudah/Belum PH), DK, DL, Piket, Operasi, Cuti, Izin, dan Sakit; klik kartu membuka daftar orang dengan status/jam/sesi dan tombol Detail | ✅ | Chrome headless |
 | A72 | Sub-tab **Peta** di Rekap Harian | Marker lokasi check-in per personel berwarna sesuai status, titik dinas + radius biru, strong point + radius oranye, basemap Jalan/Satelit, legenda, dan popup detail; hanya titik aktif yang tampil dan ikut filter satker | ✅ | Chrome headless |
+| A73 | Pencarian pada combobox satker/personel | Filter satker & personel di Rekap Kehadiran, Rekap Harian, Verifikasi, dan Detail per Orang serta filter Strong Point memakai combobox dengan input **Cari…**; pencarian nama/NRP juga tersedia pada daftar anggota modal Jadwal dan Penempatan | ✅ | Chrome headless |
 
 ## B. Admin ber-scope
 
