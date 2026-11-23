@@ -354,7 +354,7 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
   dan API-nya tetap aktif bila diakses langsung.
 - **Sidebar bergrup** dengan submenu yang dapat dilipat (`(app)/+layout.svelte`):
   **Dashboard**; **Master Data** (Satker & Jam Kerja, Titik Dinas, Hari Libur, Data Personel);
-  **Absensi** (Rekap Kehadiran, Detail Rekap, Verifikasi Offline); **Strong Point**
+  **Absensi** (Rekap Kehadiran, Rekap Harian, Detail Rekap, Verifikasi Offline); **Strong Point**
   (Jadwal Strong Point, Rekap Strong Point); **Kinerja** (Rencana Kerja, Hasil Kerja, Output);
   **Laporan** (Penilaian, Print Laporan); **Pengaturan** (Akun Admin, Kesiapan Periode, Periode).
   Grup **Master Data** disembunyikan untuk pimpinan murni dan akses langsung ke

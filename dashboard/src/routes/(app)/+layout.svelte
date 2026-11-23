@@ -55,6 +55,7 @@
 			icon: 'absensi',
 			items: [
 				{ href: '/absensi/rekap?tab=rekap', label: 'Rekap Kehadiran', roles: dashboardRole },
+				{ href: '/absensi/rekap?tab=harian', label: 'Rekap Harian', roles: dashboardRole },
 				{ href: '/absensi/rekap?tab=detail', label: 'Detail Rekap', roles: dashboardRole },
 				{
 					href: '/absensi/rekap?tab=verifikasi',
