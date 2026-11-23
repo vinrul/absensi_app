@@ -92,7 +92,7 @@ fun PhScreen(vm: KinerjaViewModel) {
 @Composable
 private fun HalamanBeranda(vm: KinerjaViewModel, onMulai: () -> Unit) {
     val hariIni = tanggalHariIni()
-    val jadwal = vm.jadwalPh.firstOrNull { it.tanggal == hariIni }
+    val jadwal = pilihJadwalHariIni(vm.jadwalPh, vm.absensiPh, vm.antreanPh, hariIni)
     val status = statusStrongPoint(jadwal?.id, vm.absensiPh, vm.antreanPh)
 
     Surface(
@@ -135,13 +135,18 @@ private fun HalamanBeranda(vm: KinerjaViewModel, onMulai: () -> Unit) {
             status.sesi.isEmpty() -> "Belum check-in hari ini"
             status.terbuka ->
                 "Check-in pukul ${status.masukTerakhir?.jam.orEmpty()}" +
-                    if (status.perluCheckInBaru) " (lebih dari 2 jam, belum check-out)" else ""
+                        if (status.perluCheckInBaru) " (lebih dari 2 jam, belum check-out)" else ""
+
             else -> "Sudah check-out pukul ${status.pulangTerakhir?.jam.orEmpty()}"
         }
         JudulBagian("Status Hari Ini", keterangan)
         if (jadwal != null) {
             Spacer(Modifier.height(8.dp))
             BarisInfo("Jadwal", keteranganJadwal(jadwal.regu, jadwal.strongPointNama))
+            BarisInfo(
+                "Sesi",
+                "${if (jadwal.sesi == "sore") "Sore" else "Pagi"} ${jadwal.jamMulai}–${jadwal.jamSelesai}"
+            )
             BarisInfo("Sesi hari ini", "${status.sesi.size} catatan")
         }
         if (status.sesi.any { it.menungguKirim }) {
@@ -195,10 +200,10 @@ private fun HalamanRiwayat(vm: KinerjaViewModel, onKembali: () -> Unit) {
     }
 
     Kartu {
-        JudulBagian("Riwayat Strong Point", "${vm.absensiPh.size} catatan bulan ini")
+        JudulBagian("Riwayat Strong Point", "${vm.absensiPh.size} catatan 30 hari terakhir")
         Spacer(Modifier.height(8.dp))
         if (vm.absensiPh.isEmpty()) {
-            LayarKosong("Belum ada absensi strong point pada bulan ini.")
+            LayarKosong("Belum ada absensi strong point pada 30 hari terakhir.")
         } else {
             vm.absensiPh.sortedByDescending { it.capturedAt }.forEach { item ->
                 BarisInfo(
@@ -228,15 +233,16 @@ private fun HalamanRiwayat(vm: KinerjaViewModel, onKembali: () -> Unit) {
     }
 
     Kartu {
-        JudulBagian("Jadwal Bulan Ini", "${vm.jadwalPh.size} jadwal")
+        JudulBagian("Jadwal 30 Hari", "${vm.jadwalPh.size} jadwal")
         Spacer(Modifier.height(8.dp))
         if (vm.jadwalPh.isEmpty()) {
-            LayarKosong("Belum ada jadwal strong point pada bulan ini.")
+            LayarKosong("Belum ada jadwal strong point pada 30 hari terakhir/berikutnya.")
         } else {
             vm.jadwalPh.forEach { item ->
                 BarisInfo(
                     label = tanggalIndo(item.tanggal),
-                    nilai = keteranganJadwal(item.regu, item.strongPointNama)
+                    nilai = "${if (item.sesi == "sore") "Sore" else "Pagi"} ${item.jamMulai}–${item.jamSelesai} · " +
+                            keteranganJadwal(item.regu, item.strongPointNama)
                 )
             }
         }

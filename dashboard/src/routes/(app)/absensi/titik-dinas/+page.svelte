@@ -290,7 +290,7 @@
 <Modal
 	open={formTerbuka}
 	title={form.id ? 'Edit Titik Dinas' : 'Tambah Titik Dinas'}
-	lebar="max-w-2xl"
+	lebar="max-w-5xl"
 	onclose={() => (formTerbuka = false)}
 >
 	<form

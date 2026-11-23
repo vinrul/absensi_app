@@ -471,8 +471,10 @@ export interface JadwalPh {
 	tanggal: string;
 	jam_mulai: string;
 	jam_selesai: string;
+	sesi: 'pagi' | 'sore' | null;
 	regu: string | null;
 	catatan: string | null;
+	disalin_dari_bulan: string | null;
 	jumlah_personel: number;
 	personel: PersonelJadwalPh[];
 }
@@ -488,6 +490,7 @@ export interface JadwalPhSaya {
 	tanggal: string;
 	jam_mulai: string;
 	jam_selesai: string;
+	sesi: 'pagi' | 'sore' | null;
 	regu: string | null;
 	catatan: string | null;
 	peran: string | null;
@@ -516,6 +519,8 @@ export interface AbsensiPh {
 	perlu_verifikasi: boolean;
 	verified_at: string | null;
 	catatan_verifikator: string | null;
+	menit_telat: number;
+	menit_pulang_cepat: number;
 }
 
 export interface RekapPh {
@@ -531,6 +536,28 @@ export interface RekapPh {
 	tanggal_tidak_hadir: string[];
 	tanggal_hanya_check_in: string[];
 	menunggu_verifikasi: number;
+	total_menit_telat: number;
+	total_menit_pulang_cepat: number;
+}
+
+export interface PenempatanPh {
+	personel_id: string;
+	nama: string;
+	nrp: string;
+	pangkat: string;
+	unit: string | null;
+	satker_id: string;
+	strong_point_id: string | null;
+	strong_point_nama: string | null;
+}
+
+export interface StatusJadwalPh {
+	bulan: string;
+	bulan_depan: string;
+	jumlah_jadwal: number;
+	jumlah_bulan_depan: number;
+	perlu_susun_bulan_depan: boolean;
+	disalin_dari_bulan: string | null;
 }
 
 export interface FotoPh {

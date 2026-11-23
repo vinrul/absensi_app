@@ -1,16 +1,16 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "API Absensi & Penilaian Kinerja Personel Polda Bali",
+    "title": "API Absensi & Strong Point Personel Polda Bali",
     "version": "0.1.0",
-    "description": "REST API untuk absensi berbasis geolokasi, rencana kerja, hasil kerja, output, dan penilaian kinerja personel Polda Bali dan Polres jajaran. Autentikasi memakai bearer token (JWT). Klien browser memakai cookie refresh, klien mobile mengirim refresh_token di body."
+    "description": "REST API untuk absensi berbasis geolokasi dan strong point (jadwal bulanan, penempatan tetap, sesi pagi/sore) personel Polda Bali dan Polres jajaran. Autentikasi memakai bearer token (JWT). Klien browser memakai cookie refresh, klien mobile mengirim refresh_token di body."
   },
   "servers": [{ "url": "/api/v1" }],
   "tags": [
     { "name": "auth", "description": "Login, refresh, profil sesi" },
     { "name": "master", "description": "Satker, personel, titik dinas" },
     { "name": "absensi", "description": "Kehadiran, geofence, verifikasi" },
-    { "name": "ph", "description": "PH / Strong Point: jadwal per satker, absensi ber-lokasi, rekap" },
+    { "name": "ph", "description": "Strong Point: penempatan tetap, jadwal bulanan, salin/fallback, absensi ber-lokasi, rekap" },
     { "name": "rencana", "description": "Rencana kerja dan persetujuan" },
     { "name": "hasil", "description": "Realisasi hasil kerja" },
     { "name": "output", "description": "Bukti hasil kerja" },
@@ -80,12 +80,12 @@
         "type": "object",
         "properties": {
           "satker_id": { "type": "string", "format": "uuid" },
-          "strong_point_id": { "type": "string", "format": "uuid", "nullable": true, "description": "Opsional; jika kosong dipakai strong point aktif pertama milik satker" },
           "tanggal": { "type": "string", "format": "date" },
-          "tanggal_selesai": { "type": "string", "format": "date", "nullable": true, "description": "Opsional; satu jadwal dibuat per tanggal dalam rentang" },
-          "jam_mulai": { "type": "string", "nullable": true, "example": "20:00", "description": "Opsional; default 00:00" },
-          "jam_selesai": { "type": "string", "nullable": true, "example": "23:00", "description": "Opsional; default 23:59" },
-          "regu": { "type": "string", "nullable": true, "description": "Nama regu untuk roster, mis. Regu 1" },
+          "tanggal_selesai": { "type": "string", "format": "date", "nullable": true, "description": "Opsional; satu jadwal dibuat per titik per tanggal dalam rentang" },
+          "jam_mulai": { "type": "string", "nullable": true, "example": "07:00", "description": "Jam mulai sesi" },
+          "jam_selesai": { "type": "string", "nullable": true, "example": "09:00", "description": "Jam selesai sesi; harus setelah jam mulai" },
+          "sesi": { "type": "string", "enum": ["pagi", "sore"], "description": "Sesi jadwal; default pagi" },
+          "regu": { "type": "string", "nullable": true, "description": "Label regu opsional" },
           "catatan": { "type": "string", "nullable": true },
           "personel": {
             "type": "array",
@@ -698,12 +698,53 @@
       },
       "delete": { "tags": ["ph"], "summary": "Hapus strong point (admin)", "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } }], "responses": { "200": { "description": "Dihapus" }, "409": { "description": "Masih dipakai jadwal" } } }
     },
+    "/ph/penempatan": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Penempatan anggota pada titik strong point (satu anggota = satu titik)",
+        "parameters": [
+          { "name": "satker_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Daftar anggota + titik tetap" } }
+      },
+      "post": {
+        "tags": ["ph"],
+        "summary": "Simpan penempatan anggota (admin)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "satker_id": { "type": "string", "format": "uuid" },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "personel_id": { "type": "string", "format": "uuid" },
+                        "strong_point_id": { "type": "string", "format": "uuid" }
+                      },
+                      "required": ["personel_id", "strong_point_id"]
+                    }
+                  }
+                },
+                "required": ["satker_id", "items"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Penempatan tersimpan (upsert per anggota)" }, "422": { "description": "Titik tidak sesuai induk" } }
+      }
+    },
     "/ph/jadwal": {
       "get": {
         "tags": ["ph"],
-        "summary": "Daftar jadwal PH satu bulan (pengelola)",
+        "summary": "Daftar jadwal strong point pada rentang tanggal (pengelola)",
         "parameters": [
-          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Daftar jadwal" } }
@@ -711,17 +752,52 @@
       "post": {
         "tags": ["ph"],
         "summary": "Susun jadwal PH (admin satker)",
-        "description": "Menerima rentang tanggal (tanggal s/d tanggal_selesai) dan membuat satu jadwal per tanggal. Menolak (409) bila personel sudah punya jadwal pada salah satu tanggal.",
+        "description": "Menerima rentang tanggal (tanggal s/d tanggal_selesai) dan membuat satu jadwal per titik strong point per tanggal. Titik ditentukan otomatis dari penempatan anggota; menolak (422) bila ada anggota belum ditempatkan. Menolak (409) bila personel sudah punya jadwal pada salah satu tanggal.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/JadwalPhRequest" } } } },
         "responses": { "200": { "description": "Jadwal dibuat" }, "403": { "description": "Di luar cakupan admin" }, "422": { "description": "Jadwal bentrok / personel tidak valid" } }
+      }
+    },
+    "/ph/jadwal/salin": {
+      "post": {
+        "tags": ["ph"],
+        "summary": "Salin jadwal bulan sebelumnya ke bulan tujuan (admin)",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "satker_id": { "type": "string", "format": "uuid" },
+                  "bulan": { "type": "string", "example": "2026-12", "description": "Bulan tujuan YYYY-MM" },
+                  "timpa": { "type": "boolean", "description": "Ganti jadwal bulan tujuan yang belum memiliki absensi" }
+                },
+                "required": ["satker_id", "bulan"]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Ringkasan jadwal disalin" }, "409": { "description": "Bulan tujuan sudah memiliki jadwal/absensi" }, "422": { "description": "Bulan sebelumnya belum memiliki jadwal" } }
+      }
+    },
+    "/ph/jadwal/status": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Status jadwal bulan terpilih dan pengingat bulan depan",
+        "parameters": [
+          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" }, "description": "Default bulan berjalan" },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Status jadwal mentah tanpa memicu fallback" } }
       }
     },
     "/ph/jadwal/ekspor": {
       "get": {
         "tags": ["ph"],
-        "summary": "Ekspor jadwal strong point (roster anggota × tanggal) ke PDF",
+        "summary": "Ekspor daftar jadwal strong point pada rentang tanggal ke PDF",
         "parameters": [
-          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" } }
@@ -731,7 +807,10 @@
       "get": {
         "tags": ["ph"],
         "summary": "Jadwal PH milik pengguna",
-        "parameters": [{ "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } }],
+        "parameters": [
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" }
+        ],
         "responses": { "200": { "description": "Daftar jadwal + strong point" } }
       }
     },
@@ -750,7 +829,7 @@
       "post": {
         "tags": ["ph"],
         "summary": "Check-in / check-out Strong Point (wajib lokasi)",
-          "description": "Lokasi wajib diisi dan harus berada dalam radius strong point. Idempoten terhadap client_uuid. Satu jadwal dapat memiliki beberapa sesi check-in; check-in baru ditolak (409) bila sesi sebelumnya masih terbuka dan belum berumur 2 jam. Check-out dipasangkan ke check-in terakhir yang terbuka. Bila server memakai `APP__MOCK_LOCATION_POLICY=reject`, permintaan dengan `is_mock_suspect=true` ditolak 422.",
+          "description": "Lokasi wajib berada dalam radius titik strong point. Satu jadwal = satu sesi pagi/sore, satu check-in dan satu check-out. Check-in hanya dalam jendela sesi (30 menit sebelum mulai sampai jam selesai); keterlambatan dicatat dalam menit. Check-out setelah check-in dan dicatat sebagai pulang cepat bila sebelum jam selesai. Mock GPS ditolak bila kebijakan server reject.",
         "requestBody": {
           "required": true,
           "content": {
@@ -774,14 +853,17 @@
             }
           }
         },
-        "responses": { "200": { "description": "Tercatat" }, "403": { "description": "Bukan peserta jadwal" }, "409": { "description": "Sesi check-in masih berlangsung (< 2 jam)" }, "422": { "description": "Di luar radius / GPS tidak ada / check-out tanpa check-in" } }
+        "responses": { "200": { "description": "Tercatat" }, "403": { "description": "Bukan peserta jadwal" }, "409": { "description": "Sudah check-in/check-out pada sesi ini" }, "422": { "description": "Di luar radius / GPS tidak ada / di luar jam sesi / check-out tanpa check-in" } }
       }
     },
     "/ph/absensi/saya": {
       "get": {
         "tags": ["ph"],
         "summary": "Riwayat absensi PH sendiri",
-        "parameters": [{ "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } }],
+        "parameters": [
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" }
+        ],
         "responses": { "200": { "description": "Riwayat" } }
       }
     },
@@ -805,9 +887,10 @@
     "/ph/rekap": {
       "get": {
         "tags": ["ph"],
-        "summary": "Rekap PH per personel per bulan (dihitung sampai hari ini)",
+        "summary": "Rekap strong point per personel pada rentang tanggal (dihitung sampai hari ini)",
         "parameters": [
-          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Rekap PH" }, "403": { "description": "Di luar cakupan" } }
@@ -818,7 +901,8 @@
         "tags": ["ph"],
         "summary": "Daftar foto dokumentasi strong point (galeri rekap)",
         "parameters": [
-          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
           { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
@@ -830,7 +914,8 @@
         "tags": ["ph"],
         "summary": "Ekspor rekap strong point ke PDF (sampai hari ini)",
         "parameters": [
-          { "name": "bulan", "in": "query", "schema": { "type": "string", "example": "2026-11" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" } }
@@ -901,9 +986,10 @@
     "/absensi/rekap": {
       "get": {
         "tags": ["absensi"],
-        "summary": "Rekap kehadiran per personel",
+        "summary": "Rekap kehadiran per personel pada rentang tanggal",
         "parameters": [
-          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Rekap" } }
@@ -914,7 +1000,8 @@
         "tags": ["absensi"],
         "summary": "Daftar foto dokumentasi absensi (galeri rekap/detail)",
         "parameters": [
-          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
           { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
@@ -934,7 +1021,8 @@
         "tags": ["absensi"],
         "summary": "Ekspor rekap kehadiran ke PDF (termasuk menit telat)",
         "parameters": [
-          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" } }
@@ -945,7 +1033,8 @@
         "tags": ["absensi"],
         "summary": "Ekspor daftar absensi menunggu verifikasi ke PDF (per tanggal)",
         "parameters": [
-          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
           { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
@@ -957,7 +1046,8 @@
         "tags": ["absensi"],
         "summary": "Ekspor detail absensi per personel ke PDF (masuk & pulang digabung)",
         "parameters": [
-          { "name": "periode_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
           { "name": "personel_id", "in": "query", "required": true, "schema": { "type": "string", "format": "uuid" } }
         ],
@@ -1450,6 +1540,17 @@
           { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
         ],
         "responses": { "200": { "description": "Ringkasan" } }
+      }
+    },
+    "/dashboard/kehadiran": {
+      "get": {
+        "tags": ["dashboard"],
+        "summary": "Ringkasan kehadiran dan strong point pada satu tanggal",
+        "parameters": [
+          { "name": "tanggal", "in": "query", "schema": { "type": "string", "format": "date" } },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Ringkasan kehadiran + strong point" } }
       }
     },
     "/dashboard/capaian-indikator": { "get": { "tags": ["dashboard"], "summary": "Rata-rata per indikator", "responses": { "200": { "description": "Capaian" } } } },

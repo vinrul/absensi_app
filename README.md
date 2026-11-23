@@ -1,8 +1,9 @@
-# Aplikasi Absensi & Penilaian Kinerja Personel — Polda Bali
+# Aplikasi Absensi & Strong Point Personel — Polda Bali
 
-Sistem terintegrasi untuk mencatat kehadiran berbasis geolokasi serta menilai kinerja
-personel Polda Bali dan Polres jajaran berdasarkan empat indikator:
-**Absensi 20% · Rencana Kerja 20% · Hasil Kerja 30% · Output 30%**.
+Sistem terintegrasi untuk mencatat **kehadiran berbasis geolokasi** dan **strong point
+(perintah hadir)** personel Polda Bali dan Polres jajaran. Modul penilaian kinerja
+(bobot 20/20/30/30) masih tersimpan di kode dan database, tetapi **dinonaktifkan dari UI**
+sampai ada keputusan produk berikutnya.
 
 Kebutuhan fungsional bersumber dari `aplikasi_nilai_kerja.pdf` (7 halaman: alur per
 indikator, integrasi & bobot, Form 1–4, dan dashboard pimpinan).
@@ -125,9 +126,10 @@ bun run build                  # hasil statis di personel/build
 ```
 
 Aplikasi ini memakai desain mobile-first dengan bottom navigation dan alur yang sama dengan
-Android: Beranda, Absensi, Rencana, Hasil, Output, dan Strong Point. Untuk produksi, sajikan
-isi `personel/build` pada host/port terpisah. Contoh: salin ke `deploy/data/web-personel/`
-lalu jalankan `docker compose up -d web-personel` (port default `8089`).
+Android: Beranda, Absensi, dan Strong. Halaman Rencana/Hasil/Output/Persetujuan masih ada di
+disk tetapi tidak dijangkau navigasi. Untuk produksi, sajikan isi `personel/build` pada
+host/port terpisah. Contoh: salin ke `deploy/data/web-personel/` lalu jalankan
+`docker compose up -d web-personel` (port default `8089`).
 
 > Web personel **wajib memakai HTTPS** di produksi (kecuali `localhost`) agar browser
 > mengizinkan geolocation dan kamera.
@@ -311,74 +313,74 @@ Catatan penting:
   peringatan bila Developer Options atau aplikasi mock dipilih, lalu mengirim `is_mock_suspect`.
   Server memakai `APP__MOCK_LOCATION_POLICY=flag` (development: simpan + `perlu_verifikasi`) atau
   `reject` (produksi: HTTP 422). Detail dan cara uji ada di [`docs/fake-gps.md`](docs/fake-gps.md).
-- **PH / Strong Point terpisah**: strong point per satker, jadwal bulanan per personel,
-  check-in **dan check-out wajib lokasi**, verifikasi, serta rekap PH sendiri. Jadwal memakai
-  **roster bulanan** (anggota × tanggal 1–akhir bulan) dengan blok regu, dan input tanggal
-  mendukung rentang (disimpan satu jadwal per tanggal). Rekap menandai personel yang
-  **tidak strong point** dan yang **hanya check-in** beserta tanggalnya; absensi kantor tetap
-  wajib pada hari strong point, dan telat kantor tidak dihitung bila sudah check-in strong point.
-  Jadwal dan rekap strong point dapat diekspor PDF; PDF jadwal berbentuk roster (anggota × tanggal)
-  dan rekap tidak menampilkan kolom telat serta hanya menghitung sampai hari ini karena jadwal
-  tidak memakai jam mulai/selesai. Tab master strong point disembunyikan sementara karena
-  titiknya belum tetap. Aplikasi Android memiliki tab **Strong** dengan tombol besar menuju wizard
-  check-in/check-out: peta lokasi (marker hijau) tanpa titik dinas, koordinat, akurasi GPS, alamat
-  reverse-geocode, dokumentasi foto saat check-in, dan antrean offline untuk kondisi tanpa sinyal.
-  Foto dokumentasi absensi dan strong point dapat dibuka kembali dari dashboard (galeri rekap dan
-  detail per orang) dengan kontrol akses pemilik/cakupan satker.
+- **Strong Point v2**: titik strong point hanya dimiliki **Polda/Polres** (satker memakai titik
+  induk), **penempatan tetap satu anggota = satu titik**, dan jadwal disusun **per bulan** dengan
+  sesi pagi/sore serta jam per sesi. Tab Jadwal memakai filter **bulan** (tanggal 1–akhir bulan).
+  Titik pada jadwal ditentukan **otomatis dari penempatan anggota**; form jadwal tidak memilih
+  titik. Modal penempatan langsung memilih **satker → titik → checkbox anggota** (tanpa level).
+  `POST /ph/jadwal/salin` menyalin jadwal bulan sebelumnya (dipetakan per hari + urutan minggu).
+  Jika admin lupa menyusun jadwal bulan berjalan, sistem otomatis memakai jadwal bulan sebelumnya
+  dan menandainya di dashboard; `GET /ph/jadwal/status` mengingatkan penyusunan bulan depan.
+  Satu jadwal = satu sesi + satu titik; check-in/check-out wajib lokasi dan radius. Check-in dibuka
+  30 menit sebelum jam mulai dan ditutup di jam selesai; check-out maksimal 60 menit setelah jam
+  selesai. Server mencatat **menit telat** dan **menit pulang cepat**; rekap per rentang tanggal
+  menjumlahkan keduanya dan menandai tidak hadir/hanya check-in. Hari libur nasional tidak mengubah
+  jadwal strong point. Ekspor PDF jadwal berupa tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota. Android &
+  web personel menampilkan sesi hari ini dengan tombol kondisional dan antrean offline.
 - **Pengingat jadwal tanpa FCM**: notifikasi lokal Android (WorkManager) H-1 19:00 dan
   60 menit sebelum jadwal.
+
+**Modul kinerja/periode (Dorman — API & data tetap ada, menu dinonaktifkan):**
+
 - **Rencana kerja**: wizard 4 langkah di Android (jenis → dasar SP/TOR → rincian kegiatan →
   lampiran), target kuantitas/kualitas/waktu, beberapa rincian kegiatan per rencana,
   lampiran multi-berkas, date picker untuk semua tanggal, serta simpan draf, ajukan ke atasan,
   dan perbaiki rencana yang diminta revisi dengan catatan persetujuan.
-- **Rekap, detail & PDF dashboard**: Rencana Kerja, Hasil Kerja, dan Output punya halaman detail
-  lengkap beserta lampiran; tiap daftar mendukung filter periode/status/satker/personel dan tombol
-  **Export PDF** sesuai filter (kop Polda Bali, tabel A4 landscape) melalui Chrome/Edge headless.
-  **Rekap Kehadiran** dipecah menjadi tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang**
-  dengan filter terpisah dan **Export PDF** per tab; filter subdit/bagian dihapus dari rekap,
-  absen masuk/pulang pada tanggal yang sama digabung satu baris, dan keterlambatan Dinas Kantor
-  ditampilkan dalam menit.
 - **Persetujuan rencana**: atasan langsung — termasuk pimpinan yang ditunjuk sebagai `atasan_id` —
   dapat menyetujui, meminta revisi, atau menolak dari dashboard web maupun dari kartu
   **Persetujuan Rencana** di Beranda Android/tombol **Tinjau Persetujuan** pada tab Rencana.
   Lampiran PDF dirender langsung di aplikasi dan gambar dapat dibuka dengan pinch-zoom.
-  Akun dual-role (atasan sekaligus bawahan) melihat rencana sendiri di tab Rencana dan rencana
-  bawahannya lewat tombol persetujuan; rencana sendiri tetap diajukan ke atasannya.
 - **Hasil kerja & output**: realisasi + progres (slider 0–100), wizard 3 langkah dengan simpan
   draf dan kirim ke atasan, verifikasi berskor (slider 0–100), 8 jenis output, berkas bukti atau
   tautan, serta layar verifikasi untuk atasan langsung.
+- **Penilaian, kesiapan periode, dan dashboard capaian**: kode, API, dan data tetap ada;
+  menu Penilaian/Print Laporan/Kesiapan/Periode dihapus dari navigasi.
+
+**Fitur aktif lainnya:**
+
+- **Rekap absensi berbasis rentang tanggal**: tab **Rekap Kehadiran**, **Verifikasi**, dan
+  **Detail per Orang** dengan filter `dari`–`sampai` dan **Export PDF** per tab; absen
+  masuk/pulang pada tanggal yang sama digabung satu baris, dan keterlambatan Dinas Kantor
+  ditampilkan dalam menit.
 - **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 22 tingkat
   Polri termasuk Brigpol + 17 pangkat ASN/PNS)/jabatan/telepon/email, ganti password, pengaturan
-  alamat server, dan antrean offline.
+  alamat server, dan antrean offline. Form personel dashboard memakai **Combobox ber-pencarian**
+  untuk pangkat, satker, dan atasan langsung.
 - **Profil Saya di dashboard**: halaman `/profil` untuk admin & pimpinan dengan unggah foto profil
   (JPG/PNG maks. 5 MB) dan ganti password; setiap kolom password punya ikon mata
   tampil/sembunyikan. Avatar tampil di sidebar dan header, dan ganti password mencabut seluruh
   sesi sehingga pengguna kembali ke halaman login.
 - **Aplikasi web personel & atasan** (`personel/`): SPA mobile-first dengan bottom navigation
-  (Beranda, Absensi, Rencana, Hasil, Output, Strong) dan alur yang sama dengan Android. Mencakup
-  absensi GPS + peta OSM, status kehadiran, dokumentasi foto, antrean offline di browser, wizard
-  strong point (marker hijau, koordinat, akurasi, reverse-geocode, aturan 2 jam), wizard rencana
-  4 langkah, hasil/output 3 langkah, persetujuan rencana, verifikasi hasil/output berslider,
-  nilai kinerja di Beranda, serta profil (foto, edit, ganti password dengan tombol mata).
-- **Penilaian**: periode bulanan dibuat otomatis (penutupan manual), bobot per periode
-  (default 20/20/30/30), snapshot komponen untuk audit, hari ber-jadwal PH dikeluarkan dari
-  skor absensi harian.
-- **Kesiapan periode**: setiap admin satker menandai satkernya siap ditutup; admin global
-  melihat satker yang sudah/belum siap beserta jumlah personel yang belum dinilai.
+  **Beranda, Absensi, Strong**. Mencakup absensi GPS + peta OSM, status kehadiran, dokumentasi
+  foto, antrean offline di browser, daftar sesi strong point hari ini + wizard (marker hijau,
+  koordinat, akurasi, reverse-geocode), serta profil (foto, edit, ganti password dengan tombol
+  mata). Halaman kinerja lama tidak dijangkau navigasi.
+- **Dashboard baru**: filter tanggal + satker, kartu total/hadir/belum absen/telat/sesi strong
+  point/cuti-izin-sakit, tabel strong point dan absensi hari itu. Sidebar: Dashboard, Master Data,
+  Absensi, Strong Point (Jadwal/Rekap/Penempatan/Titik), Akun Admin.
 - **Kalender hari libur**: libur nasional/cuti bersama dan libur khusus satker; tanggal libur
   otomatis dikeluarkan dari perhitungan absensi harian.
-- **Dashboard pimpinan**: KPI, capaian per indikator, tren, sebaran kategori, rekap
-  berpaginasi, catatan & keputusan, cetak A4, ekspor CSV. Sidebar memakai menu bergrup
-  (Master Data, Absensi, Strong Point, Kinerja, Laporan, Pengaturan) dengan submenu yang dapat
-  dilipat dan otomatis terbuka saat halamannya aktif. Untuk pimpinan murni, grup **Master Data**
-  disembunyikan, submenu/tab **Verifikasi Offline** tidak ditampilkan, dan tombol
-  **Buat Rencana/Tambah Hasil/Tambah Output/Ajukan** tidak ditampilkan.
-- **Branding**: logo Polda Bali di login (terpusat), sidebar, kop laporan, aplikasi Android, dan ikon launcher. Password pada login Android dapat ditampilkan/disembunyikan lewat ikon mata.
-- **Jam server palsu (development)**: `cargo run --bin fake -- DD-MM-YYYY HH:MM` mengubah jam yang dipakai backend untuk absensi; endpoint hanya aktif bila `APP__ALLOW_FAKE_TIME=true`.
+- **Branding**: logo Polda Bali di login (terpusat), sidebar, kop laporan, aplikasi Android, dan
+  ikon launcher. Password pada login Android dapat ditampilkan/disembunyikan lewat ikon mata.
+- **Jam server palsu (development)**: `cargo run --bin fake -- DD-MM-YYYY HH:MM` mengubah jam yang
+  dipakai backend untuk absensi; endpoint hanya aktif bila `APP__ALLOW_FAKE_TIME=true`.
 - **Operasional**: audit log setiap mutasi, rate limit login 5/menit/IP, RBAC ber-scope,
   backup harian database + berkas.
 
 ## Aturan penilaian (ringkas)
+
+> Modul penilaian **dorman** (API & data tetap ada, menu dinonaktifkan). Ringkasan ini
+> dipertahankan untuk referensi bila modul diaktifkan kembali.
 
 | Indikator | Bobot | Komponen |
 |---|---|---|
@@ -393,13 +395,13 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 ## Verifikasi yang sudah dilakukan
 
 - `cargo test` → **37 test lulus** (geofence, scoring, deteksi berkas, kanal login, policy mock GPS).
-- `bun tools/uji/api-smoke.js` → **60/60 cek lulus** pada database uji `kinerja_test`:
+- `bun tools/uji/api-smoke.js` → **74/74 cek lulus** pada database uji `kinerja_test`:
   RBAC ber-scope, pembatasan login dashboard (pimpinan/admin vs atasan/personel), kanal
   `personel_web` (personel & atasan 200, admin 403), CRUD satker/personel/admin, titik dinas
   (termasuk ubah jenis & koordinat), zona waktu & jam Sabtu, kanal login Android, tutup/buka
   periode, kesiapan satker, kalender libur, jadwal & absensi PH, jam server palsu, verifikasi,
   foto dokumentasi, rekap, dan penandaan mock GPS pada policy `flag`.
-- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (88 path).
+- `bun tools/uji/openapi-check.js` → JSON valid, semua `$ref` ada (92 path).
 - `bun run check` → 0 error · `bun run build` → sukses (dashboard dan `personel/`).
 - Login `personel_web` diuji pada API: atasan & personel 200, admin 403, refresh cookie 200.
 - `gradlew :app:assembleDebug` → APK debug terbentuk (7 tab, termasuk PH).

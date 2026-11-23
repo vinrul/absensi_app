@@ -15,26 +15,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import id.polri.poldabali.kinerja.data.Absensi
+import id.polri.poldabali.kinerja.data.JadwalPhSaya
 import id.polri.poldabali.kinerja.ui.theme.Warna
 
 @Composable
 fun BerandaScreen(
     vm: KinerjaViewModel,
     onBukaAbsensi: () -> Unit,
-    onBukaPersetujuan: () -> Unit,
-    onBukaVerifikasiHasil: () -> Unit,
-    onBukaVerifikasiOutput: () -> Unit
+    onBukaStrong: () -> Unit
 ) {
-    	val pengguna = vm.pengguna
-    	val statusServer = vm.absensiHariIni
-    	val tanggalTampil = statusServer?.tanggal ?: tanggalHariIni()
-    	val dariRiwayat = vm.riwayat.filter { it.tanggal == tanggalTampil }
-    	val masuk = statusServer?.masuk ?: dariRiwayat.firstOrNull { it.jenis == "masuk" }
-    	val pulang = statusServer?.pulang ?: dariRiwayat.firstOrNull { it.jenis == "pulang" }
+    val pengguna = vm.pengguna
+    val statusServer = vm.absensiHariIni
+    val tanggalTampil = statusServer?.tanggal ?: tanggalHariIni()
+    val dariRiwayat = vm.riwayat.filter { it.tanggal == tanggalTampil }
+    val masuk = statusServer?.masuk ?: dariRiwayat.firstOrNull { it.jenis == "masuk" }
+    val pulang = statusServer?.pulang ?: dariRiwayat.firstOrNull { it.jenis == "pulang" }
+    val jadwalHariIni = vm.jadwalPh.filter { it.tanggal == tanggalTampil }
 
     Column(
         Modifier
@@ -79,7 +77,7 @@ fun BerandaScreen(
         }
 
         Kartu {
-            			JudulBagian("Kehadiran Hari Ini", tanggalIndo(tanggalTampil))
+            JudulBagian("Kehadiran Hari Ini", tanggalIndo(tanggalTampil))
             Spacer(Modifier.height(10.dp))
 
             Row(
@@ -97,145 +95,31 @@ fun BerandaScreen(
             )
         }
 
-        if (vm.bisaMenyetujuiRencana) {
-            Kartu {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Persetujuan Rencana",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Warna.Teks
-                        )
-                        Text(
-                            "Rencana kerja bawahan langsung yang menunggu keputusan Anda.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Warna.TeksLembut
-                        )
-                    }
-                    Lencana(
-                        "${vm.persetujuan.size}",
-                        if (vm.persetujuan.isEmpty()) Warna.TeksLembut else Warna.Kuning
+        Kartu {
+            JudulBagian(
+                "Strong Point Hari Ini",
+                if (jadwalHariIni.isEmpty()) "Tidak ada jadwal" else "${jadwalHariIni.size} sesi"
+            )
+            Spacer(Modifier.height(8.dp))
+            if (jadwalHariIni.isEmpty()) {
+                Text(
+                    "Tidak ada jadwal strong point pada tanggal ini.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Warna.TeksLembut
+                )
+            } else {
+                jadwalHariIni.forEach { item ->
+                    BarisInfo(
+                        label = labelSesi(item),
+                        nilai = item.strongPointNama
                     )
                 }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (vm.persetujuan.isEmpty()) {
-                        "Tidak ada rencana yang menunggu keputusan."
-                    } else {
-                        "${vm.persetujuan.size} rencana menunggu keputusan Anda."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Warna.Teks
-                )
-                Spacer(Modifier.height(10.dp))
-                TombolUtama(
-                    teks = if (vm.persetujuan.isEmpty()) {
-                        "Buka Persetujuan"
-                    } else {
-                        "Tinjau Persetujuan (${vm.persetujuan.size})"
-                    },
-                    aktif = !vm.sedangMemproses,
-                    onClick = onBukaPersetujuan
-                )
             }
-        }
-
-        if (vm.bisaMemverifikasiHasil) {
-            Kartu {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Verifikasi Hasil Kerja",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Warna.Teks
-                        )
-                        Text(
-                            "Hasil kerja bawahan langsung yang menunggu verifikasi.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Warna.TeksLembut
-                        )
-                    }
-                    Lencana(
-                        "${vm.hasilMenungguVerifikasi.size}",
-                        if (vm.hasilMenungguVerifikasi.isEmpty()) Warna.TeksLembut else Warna.Kuning
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (vm.hasilMenungguVerifikasi.isEmpty()) {
-                        "Tidak ada hasil kerja yang menunggu verifikasi."
-                    } else {
-                        "${vm.hasilMenungguVerifikasi.size} hasil kerja menunggu verifikasi Anda."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Warna.Teks
-                )
-                Spacer(Modifier.height(10.dp))
-                TombolUtama(
-                    teks = if (vm.hasilMenungguVerifikasi.isEmpty()) {
-                        "Buka Verifikasi Hasil"
-                    } else {
-                        "Tinjau Verifikasi (${vm.hasilMenungguVerifikasi.size})"
-                    },
-                    aktif = !vm.sedangMemproses,
-                    onClick = onBukaVerifikasiHasil
-                )
-            }
-        }
-
-        if (vm.bisaMemverifikasiOutput) {
-            Kartu {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            "Verifikasi Output",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = Warna.Teks
-                        )
-                        Text(
-                            "Output bawahan langsung yang menunggu verifikasi.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Warna.TeksLembut
-                        )
-                    }
-                    Lencana(
-                        "${vm.outputMenungguVerifikasi.size}",
-                        if (vm.outputMenungguVerifikasi.isEmpty()) Warna.TeksLembut else Warna.Kuning
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    if (vm.outputMenungguVerifikasi.isEmpty()) {
-                        "Tidak ada output yang menunggu verifikasi."
-                    } else {
-                        "${vm.outputMenungguVerifikasi.size} output menunggu verifikasi Anda."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Warna.Teks
-                )
-                Spacer(Modifier.height(10.dp))
-                TombolUtama(
-                    teks = if (vm.outputMenungguVerifikasi.isEmpty()) {
-                        "Buka Verifikasi Output"
-                    } else {
-                        "Tinjau Verifikasi Output (${vm.outputMenungguVerifikasi.size})"
-                    },
-                    aktif = !vm.sedangMemproses,
-                    onClick = onBukaVerifikasiOutput
-                )
-            }
+            Spacer(Modifier.height(10.dp))
+            TombolKedua(
+                teks = "Buka Strong Point",
+                onClick = onBukaStrong
+            )
         }
 
         if (vm.antrean.isNotEmpty()) {
@@ -261,46 +145,19 @@ fun BerandaScreen(
             }
         }
 
-        Kartu {
-            JudulBagian("Nilai Kinerja Saya", vm.periode?.nama ?: "Periode berjalan")
-            Spacer(Modifier.height(10.dp))
-
-            val nilai = vm.nilai?.data
-            if (nilai == null) {
-                Text(
-                    "Nilai belum dihitung pada periode ini.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Warna.TeksLembut
+        if (vm.antreanPh.isNotEmpty()) {
+            Kartu {
+                JudulBagian(
+                    "Antrean Strong Point",
+                    "${vm.antreanPh.size} data menunggu dikirim"
                 )
-                Spacer(Modifier.height(8.dp))
-                TombolKedua(teks = "Muat nilai", aktif = !vm.sedangMemproses, onClick = { vm.muatNilai() })
-            } else {
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        String.format(java.util.Locale.US, "%.2f", nilai.nilaiAkhir),
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = Warna.Teks,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Lencana(labelKategori(nilai.kategori), warnaKategori(nilai.kategori))
-                }
-                Spacer(Modifier.height(8.dp))
-                BarNilai("Absensi", nilai.skorAbsensi, Warna.Hijau)
-                BarNilai("Rencana Kerja", nilai.skorRencanaKerja, Warna.Biru)
-                BarNilai("Hasil Kerja", nilai.skorHasilKerja, Warna.Navy)
-                BarNilai("Output", nilai.skorOutput, Warna.Gold)
+                Spacer(Modifier.height(10.dp))
+                TombolKedua(
+                    teks = if (vm.sedangMemproses) "Mengirim…" else "Kirim sekarang",
+                    aktif = !vm.sedangMemproses,
+                    onClick = { vm.sinkronkanSekarang() }
+                )
             }
-        }
-
-        Kartu {
-            JudulBagian("Ringkasan Periode", vm.periode?.nama ?: "-")
-            Spacer(Modifier.height(8.dp))
-            BarisInfo("Rencana kerja saya", "${vm.rencana.size} dokumen")
-            BarisInfo("Hasil kerja", "${vm.hasil.size} laporan")
-            BarisInfo("Output", "${vm.output.size} bukti")
         }
 
         Spacer(Modifier.height(4.dp))
@@ -310,6 +167,11 @@ fun BerandaScreen(
             color = Warna.TeksLembut
         )
     }
+}
+
+private fun labelSesi(item: JadwalPhSaya): String {
+    val sesi = if (item.sesi == "sore") "Sore" else "Pagi"
+    return "$sesi ${item.jamMulai}–${item.jamSelesai}"
 }
 
 @Composable
@@ -328,5 +190,3 @@ private fun StatusKehadiranKotak(label: String, item: Absensi?) {
         }
     }
 }
-
-internal val Transparan: Color = Color.Transparent

@@ -1,6 +1,6 @@
 # Checklist Pekerjaan — Struktur Organisasi, Modul PH, dan Pengingat
 
-Terakhir diperbarui: 17 November 2026.
+Terakhir diperbarui: 23 November 2026.
 
 Legenda: ✅ selesai & terverifikasi · 🟡 selesai, butuh uji manual di lapangan · ⬜ belum dikerjakan.
 
@@ -53,7 +53,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.4 | Jam masuk & jam pulang per satker | ✅ | format `HH:MM`, divalidasi server |
 | 3.5 | Hari kerja per satker | ✅ | checkbox 1–7 (Senin–Minggu) |
 | 3.6 | Menu & halaman **Data Personel** | ✅ | `(app)/personel/+page.svelte`, hanya akun personel |
-| 3.7 | Tambah personel (NRP, nama, pangkat, jabatan, satker, atasan) | ✅ | pangkat memakai combobox 22 tingkat Polri (termasuk Brigpol) + 17 pangkat ASN/PNS (terendah→tertinggi); unit & email tidak lagi diminta |
+| 3.7 | Tambah personel (NRP, nama, pangkat, jabatan, satker, atasan) | ✅ | pangkat/satker/atasan memakai **Combobox ber-pencarian** (22 tingkat Polri + 17 pangkat ASN, ketik untuk mencari tanpa scroll); unit & email tidak lagi diminta |
 | 3.8 | Ubah personel & nonaktifkan | ✅ | |
 | 3.9 | Atur peran + cakupan satker dari UI | ✅ | `GET|POST /personel/{id}/roles` |
 | 3.10 | Reset password personel | ✅ | `POST /personel/{id}/reset-password` |
@@ -64,14 +64,14 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.15 | Reset password & nonaktifkan akun admin | ✅ | `POST /admin/{id}/reset-password` |
 | 3.16 | Zona waktu memakai combo box 3 opsi | ✅ | WIB/WITA/WIT divalidasi server |
 | 3.17 | Jam pulang Sabtu setengah hari (10:00/12:00) | ✅ | `satker.jam_pulang_sabtu`, dipakai penilaian |
-| 3.18 | Periode bulan berjalan dibuat otomatis | ✅ | `find_or_current` + `pastikan_bulan_ini` |
-| 3.19 | Admin global dapat membuka kembali periode tertutup | ✅ | `POST /periode/{id}/buka` + alasan audit |
-| 3.20 | Halaman **Kesiapan Periode** per satker | ✅ | jumlah personel, dinilai, belum, status |
-| 3.21 | Admin satker menandai siap; admin global memantau semua | ✅ | tabel `periode_satker_kesiapan` |
+| 3.18 | Periode bulan berjalan dibuat otomatis | 🟡 | kode & API tetap ada, **menu dinonaktifkan**; fokus aplikasi kini absensi + strong point |
+| 3.19 | Admin global dapat membuka kembali periode tertutup | 🟡 | API tetap ada, menu Periode tidak ditampilkan |
+| 3.20 | Halaman **Kesiapan Periode** per satker | 🟡 | halaman & API tetap ada, menu dinonaktifkan |
+| 3.21 | Admin satker menandai siap; admin global memantau semua | 🟡 | lihat 3.20 |
 | 3.22 | Halaman **Hari Libur** + kalender nasional/khusus satker | ✅ | tabel `hari_libur`, `/libur` |
 | 3.23 | Libur otomatis netral di penilaian absensi | ✅ | `service/penilaian.rs` + detail `hari_libur` |
 | 3.24 | Pagination seragam di semua modul daftar | ✅ | komponen `Pagination.svelte`; server-side: dashboard, penilaian, rencana, hasil, output, personel, admin, persetujuan, verifikasi & detail absensi; client-side: satker, libur, titik dinas, kesiapan, PH, rekap kehadiran |
-| 3.25 | Peta interaktif OpenStreetMap untuk tambah/edit titik dinas | ✅ | `PetaPicker.svelte` (Leaflet): klik peta/geser penanda mengisi lat/lng, lingkaran radius, input manual tetap bisa; edit nama/jenis/koordinat/radius/status |
+| 3.25 | Peta interaktif OpenStreetMap untuk tambah/edit titik dinas | ✅ | `PetaPicker.svelte` (Leaflet): tinggi `h-72 sm:h-96`, tombol **Peta/Satelit** (ArcGIS World Imagery), pencarian alamat **Nominatim** dengan debounce 700 ms (min. 3 huruf, cache, 1 req/detik), klik hasil → peta & koordinat terisi; modal titik dinas `max-w-5xl` |
 | 3.26 | Jam server palsu untuk development | ✅ | `cargo run --bin fake -- 20-11-2026 07:45`; endpoint `/dev/waktu` hanya aktif bila `APP__ALLOW_FAKE_TIME=true`; produksi memakai jam sistem |
 | 3.27 | Alur absensi Android bertahap | ✅ | tombol besar → validasi peta/GPS → pilihan status → kirim/simpan offline |
 | 3.28 | Tombol absen adaptif status hari ini | ✅ | hanya Masuk bila belum masuk; hanya Pulang bila sudah masuk; dua tombol bila status server tidak dapat diambil |
@@ -81,7 +81,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.32 | Wizard input rencana kerja Android 4 langkah | ✅ | `WizardRencana.kt`: jenis → dasar tugas → rincian kegiatan → lampiran; **Simpan Draf** & **Ajukan ke Atasan** |
 | 3.33 | Rincian kegiatan multi-entri dengan field lengkap | ✅ | program, kegiatan, uraian, tujuan, indikator, target kuantitas/kualitas, tanggal mulai/selesai; migrasi `0013` menambah kolom pada `rencana_tahapan`; detail dashboard menampilkan seluruh field |
 | 3.34 | Lampiran lebih dari satu berkas pada wizard | ✅ | pemilih dokumen multi-select; tiap berkas diunggah ke `POST /lampiran` setelah rencana tersimpan |
-| 3.35 | Pengaturan tab bottom nav | ✅ | **Nilai** tetap diringkas di Beranda; **Strong Point** menjadi tab ke-6 (Beranda, Absensi, Rencana, Hasil, Output, Strong) |
+| 3.35 | Pengaturan tab bottom nav | ✅ | **Beranda / Absensi / Strong** (3 tab); menu Rencana/Hasil/Output dihapus dari navigasi Android |
 | 3.36 | Ubah draft / perbaiki rencana yang diminta revisi | ✅ | tombol **Ubah Rencana** / **Perbaiki Rencana** membuka wizard terisi data lama, catatan atasan, rincian, dan lampiran; `PATCH /rencana-kerja/{id}` mengganti tahapan secara transaksional |
 | 3.37 | Date picker untuk seluruh tanggal rencana | ✅ | `FieldTanggal` + `DatePickerDialog` Material 3: tanggal dasar, tanggal mulai/selesai kegiatan; tanpa input teks |
 | 3.38 | Persetujuan rencana di Android untuk atasan/pimpinan | ✅ | kartu **Persetujuan Rencana** di Beranda + tombol **Tinjau Persetujuan** di tab Rencana; daftar `GET /rencana-kerja/persetujuan`, detail rincian + lampiran, keputusan Setujui / Minta Revisi / Tolak |
@@ -95,52 +95,53 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.44 | Tab Rekap Absensi: kehadiran, verifikasi, detail per orang | ✅ | `absensi/rekap/+page.svelte`; tiap tab punya filter sendiri; filter subdit/bagian dihapus dari rekap; kolom **Menit** menampilkan total menit telat Dinas Kantor |
 | 3.45 | Export PDF rekap, verifikasi, dan detail absensi | ✅ | `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (Chrome/Edge headless); rekap memuat baris jumlah + menit telat |
 | 3.46 | Gabung absen masuk & pulang per tanggal | ✅ | `GET /absensi/harian` (dipakai tab Verifikasi & Detail + PDF); menit telat dihitung untuk status Dinas Kantor yang melewati jam masuk satker |
-| 3.47 | Sidebar dashboard bergrup dengan submenu | ✅ | Dashboard; Master Data; Absensi (Rekap Kehadiran/Detail Rekap/Verifikasi Offline via `?tab=`); Strong Point (Jadwal/Rekap via `?tab=`); Kinerja; Laporan (Penilaian/Print Laporan); Pengaturan (Akun Admin/Kesiapan Periode/Periode); grup aktif terbuka otomatis |
+| 3.47 | Sidebar dashboard bergrup dengan submenu | ✅ | Dashboard; Master Data; Absensi (Rekap Kehadiran/Detail Rekap/Verifikasi Offline); Strong Point (Jadwal/Rekap/Penempatan Anggota/Titik); Akun Admin. Grup **Kinerja/Laporan/Pengaturan** dan menu Penilaian/Print Laporan/Kesiapan/Periode dihapus; route lama dialihkan ke `/dashboard` |
 | 3.48 | Galeri dokumentasi foto absensi | ✅ | Tombol **Lihat** di rekap membuka galeri foto per personel; detail per orang menampilkan tombol **Masuk/Pulang**; berkas disajikan `/api/v1/files/...` dengan cek kepemilikan/cakupan |
 | 3.49 | Pembatasan peran dashboard | ✅ | Login web hanya role admin/pimpinan; atasan/personel ditolak 403. Pimpinan murni tidak melihat Master Data, **Verifikasi Offline**, dan tombol Buat Rencana/Tambah Hasil/Tambah Output/Ajukan; akun multi-role tetap masuk lewat role pimpinan/admin |
 | 3.50 | Profil Saya di dashboard | ✅ | `/profil`: unggah foto (JPG/PNG maks. 5 MB, avatar di sidebar/header) dan ganti password dengan tombol mata; ganti password mencabut semua sesi lalu diarahkan ke login |
-| 3.51 | Aplikasi web personel terpisah | ✅ | `personel/` (Bun, Svelte 5, SvelteKit 3 SPA, Tailwind 4, Leaflet); desain mobile-first, bottom navigation 6 tab, port dev 5174 |
+| 3.51 | Aplikasi web personel terpisah | ✅ | `personel/` (Bun, Svelte 5, SvelteKit 3 SPA, Tailwind 4, Leaflet); desain mobile-first, bottom navigation **Beranda/Absensi/Strong**, port dev 5174 |
 | 3.52 | Login web personel `personel_web` | ✅ | Hanya akun personel (termasuk atasan/pimpinan); admin 403; access token di memori + refresh cookie httpOnly `device_id=web-personel`; API 200 |
-| 3.53 | Absensi & Strong Point web personel | ✅ | Peta OSM, radius/titik dinas, 8 status, foto via kamera/file, antrean offline browser; strong point marker hijau tanpa titik dinas, geocode, aturan 2 jam, dokumentasi hanya check-in |
-| 3.54 | Wizard & persetujuan web personel | ✅ | Rencana 4 langkah, hasil/output 3 langkah, draft/ajukan, persetujuan rencana, verifikasi hasil/output berslider; endpoint sama dengan Android |
-| 3.55 | Profil & nilai web personel | ✅ | Foto, edit nama/pangkat 22 tingkat Polri + 17 pangkat ASN/jabatan/telepon/email, ganti password dengan tombol mata; nilai periode tampil di Beranda |
+| 3.53 | Absensi & Strong Point web personel | ✅ | Peta OSM, radius/titik dinas, 8 status, foto via kamera/file, antrean offline browser; strong point marker hijau tanpa titik dinas, geocode, daftar sesi hari ini, check-in/out per jadwal |
+| 3.54 | Wizard & persetujuan web personel | 🟡 | halaman Rencana/Hasil/Output/Persetujuan masih ada di disk, tetapi **tidak dijangkau navigasi**; fokus baru absensi + strong point |
+| 3.55 | Profil & nilai web personel | ✅ | Foto, edit nama/pangkat 22 tingkat Polri + 17 pangkat ASN/jabatan/telepon/email, ganti password dengan tombol mata; kartu nilai periode di Beranda **dihapus** |
 | 3.56 | Kebijakan lokasi tiruan server | ✅ | `APP__MOCK_LOCATION_POLICY=flag|reject`; `flag` menyimpan + `perlu_verifikasi`, `reject` HTTP 422 untuk absensi dan strong point |
 | 3.57 | Deteksi & antrean fake GPS Android | ✅ | `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/aplikasi mock; antrean menghitung item `ditolak` saat 422 mock |
 | 3.58 | Dokumentasi fake GPS | ✅ | `docs/fake-gps.md`: policy, ADB/Fake GPS, uji endpoint, antrean, batasan, matriks uji |
+| 3.59 | Combobox ber-pencarian di modal personel | ✅ | `Combobox.svelte`: input pencarian, navigasi keyboard, opsi pangkat/satker/atasan; data lama tetap tampil |
+| 3.60 | Peta titik dinas: perbesar, satelit, cari alamat | ✅ | tinggi peta bertambah, basemap ArcGIS World Imagery, pencarian Nominatim debounce 700 ms tanpa tombol Cari; modal `max-w-5xl` |
+| 3.61 | Dashboard fokus absensi + strong point | ✅ | filter tanggal + satker; kartu total/hadir/belum/telat/sesi strong point/cuti-izin-sakit; tabel strong point & absensi hari itu |
+| 3.62 | Rekap absensi berbasis rentang tanggal | ✅ | filter `dari`/`sampai` per tab; tidak lagi bergantung pada periode bulan |
+| 3.63 | Modul kinerja dinonaktifkan dari UI | ✅ | menu & route diarahkan ke `/dashboard`; API/tabel tetap (lihat HANDOFF §3.30) |
 
-## 4. Modul PH / Strong Point (terpisah dari absensi harian)
+## 4. Modul Strong Point v2 (terpisah dari absensi harian)
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 4.1 | Tabel `strong_point`, `jadwal_ph`, `jadwal_ph_personel`, `absensi_ph` | ✅ | migrasi `0006_ph.sql` |
-| 4.2 | CRUD strong point per satker (titik + radius) | ✅ | API + modal tetap ada; tab master **disembunyikan sementara** karena strong point belum punya titik tetap |
-| 4.3 | Jadwal PH per satker per bulan | ✅ | filter `?bulan=YYYY-MM&satker_id=`; form dashboard hanya satker, tanggal, catatan, personel (tanpa strong point & jam) |
-| 4.4 | Satu jadwal berisi banyak personel + peran | ✅ | mis. ketua/anggota |
-| 4.5 | Deteksi bentrok jadwal personel | ✅ | `repo/ph.rs::ada_bentrok` (jam beririsan) |
-| 4.6 | Tiap personel dapat jadwal berbeda tiap bulan | ✅ | seed: 90 jadwal contoh (Ditreskrimsus Polda Bali dua regu, tanggal 1–akhir bulan) |
-| 4.7 | Check-in PH **wajib lokasi** | ✅ | HTTP 422 bila GPS kosong |
-| 4.8 | Check-out PH **wajib lokasi** | ✅ | lokasi diambil ulang saat check-out |
-| 4.9 | Validasi radius strong point sisi server | ✅ | jarak dihitung Haversine |
-| 4.10 | Idempotensi `client_uuid` | ✅ | kirim ulang tidak menggandakan |
-| 4.11 | Rekap PH terpisah (check-in/out per orang) | ✅ | `GET /ph/rekap` + tab **Rekap PH** |
-| 4.12 | Hari strong point tetap dinilai absensi kantor | ✅ | Telat kantor diabaikan bila check-in strong point; bila tidak strong point, telat dihitung; pulang cepat tetap dihitung (`skor_harian_dengan_strong_point`) |
-| 4.13 | Absensi PH tidak mengubah bobot 20/20/30/30 | ✅ | hanya rekap PH terpisah |
-| 4.14 | Verifikasi absensi PH oleh atasan/admin | ✅ | `POST /ph/absensi/{id}/verifikasi` |
-| 4.15 | Tab **Strong Point** di aplikasi Android | ✅ | Tab ke-6 (`PhScreen`): tombol besar **Strong Point** + tombol **Riwayat Strong Point**; status sesi hari ini dan antrean offline |
-| 4.25 | Wizard strong point 3 langkah | ✅ | Lokasi → Dokumentasi (khusus check-in) → Kirim; progress bar seperti wizard rencana/hasil/output; check-out melewati dokumentasi |
-| 4.26 | Peta lokasi & geocode strong point | ✅ | Peta OSM tanpa titik dinas, marker hijau lokasi saat ini, koordinat, akurasi GPS, alamat dari `https://geocode.vinrul.my.id` |
-| 4.27 | Sesi check-in berulang & aturan 2 jam | ✅ | Satu jadwal dapat beberapa sesi (pagi/sore); check-in baru ditolak 409 bila sesi terbuka < 2 jam; check-out dipasangkan ke check-in terakhir |
-| 4.28 | Check-in/out offline + dokumentasi | ✅ | Dua tombol check-in/check-out saat offline (seperti absensi), antrean `AntreanPh` dikirim WorkManager; dokumentasi hanya untuk check-in |
-| 4.29 | Galeri dokumentasi strong point | ✅ | Tombol **Lihat** di rekap strong point membuka galeri foto check-in; endpoint `GET /ph/foto`; berkas `/api/v1/files/...` |
-| 4.16 | Antrean offline untuk absensi PH | ⬜ | absensi PH saat ini butuh koneksi |
-| 4.17 | Ekspor CSV rekap PH | ⬜ | baru JSON + tampilan dashboard |
-| 4.18 | Rekap menandai tidak strong point & hanya check-in | ✅ | `hanya_check_in`, `tanggal_tidak_hadir`, `tanggal_hanya_check_in`; badge + tanggal di tab **Rekap Strong Point** |
-| 4.19 | Sesi strong point pagi & sore | ⬜ | menyusul di laporan dan Android |
-| 4.20 | Form jadwal tanpa strong point & jam | ✅ | Combo strong point dan jam mulai/selesai dihapus dari modal tambah/edit; backend memakai default (titik aktif pertama satker, 00:00–23:59) agar API lama tetap kompatibel |
-| 4.21 | Roster bulanan strong point ala spreadsheet | ✅ | Tab **Jadwal Strong Point**: kolom Anggota/Pangkat × tanggal 1–akhir bulan, blok biru berlabel regu, akhir pekan merah; daftar kelola jadwal tetap tersedia |
-| 4.22 | Input rentang tanggal jadwal | ✅ | `tanggal_selesai` membuat satu jadwal per tanggal (bukan satu baris rentang); semua tanggal divalidasi bentrok sebelum disimpan |
-| 4.23 | Ekspor PDF jadwal & rekap strong point | ✅ | `/ph/jadwal/ekspor` dan `/ph/rekap/ekspor` (Chrome/Edge headless); rekap tanpa kolom telat; tombol Export PDF di tab Jadwal/Rekap |
-| 4.24 | Seed roster sebulan Ditreskrimsus | ✅ | Dua regu: Regu 1 tanggal 1–15 dan Regu 2 tanggal 16–akhir bulan (3 anggota per regu); satker lain tetap contoh tanggal 3–5 |
+| 4.1 | Tabel inti PH/strong point | ✅ | `strong_point`, `penempatan_ph`, `jadwal_ph`, `jadwal_ph_personel`, `absensi_ph`; migrasi `0006` + `0017` + `0018` |
+| 4.2 | Titik hanya dimiliki Polda/Polres | ✅ | `POST/PATCH /ph/strong-point` menolak level `satker`; satker di bawahnya otomatis memakai titik induk (`induk_titik_ids`) |
+| 4.3 | Jadwal disusun per bulan | ✅ | Form jadwal: satker, tanggal/rentang, sesi, jam, regu, anggota; titik ditentukan otomatis dari penempatan anggota; filter bulan (tanggal 1–akhir bulan) |
+| 4.4 | Salin jadwal bulan sebelumnya | ✅ | `POST /ph/jadwal/salin`; tanggal dipetakan berdasarkan hari + urutan minggu; `timpa=true` mengganti jadwal tanpa absensi |
+| 4.5 | Penempatan anggota tetap | ✅ | `GET/POST /ph/penempatan`: unik per anggota, satu anggota = satu titik; modal langsung satker (termasuk unit Polda/Polres) → titik → checkbox anggota |
+| 4.6 | Sesi pagi & sore dengan jam per sesi | ✅ | Satu jadwal = satu sesi + satu titik; jam default form 07:00–09:00 / 16:00–18:00, dapat diubah |
+| 4.7 | Check-in/out wajib lokasi & radius | ✅ | Haversine sisi server; di luar radius 422 |
+| 4.8 | Satu check-in & satu check-out per jadwal | ✅ | Ganda 409; check-in dibuka −30 menit dan ditutup di `jam_selesai`; check-out maks. `jam_selesai + 60 menit` |
+| 4.9 | Telat & pulang cepat per sesi | ✅ | `absensi_ph.menit_telat` dan `menit_pulang_cepat`; tampil di rekap |
+| 4.10 | Rekap PH per rentang tanggal | ✅ | `GET /ph/rekap?dari&sampai&satker_id`; total telat/pulang cepat; dibatasi sampai hari ini |
+| 4.11 | Rekap menandai tidak hadir / hanya check-in | ✅ | `tanggal_tidak_hadir`, `tanggal_hanya_check_in`, `menunggu_verifikasi` |
+| 4.12 | Deteksi bentrok & validasi sesi | ✅ | Bentrok jam 409; sesi selain pagi/sore 422; jam selesai ≤ mulai 422 |
+| 4.13 | Export PDF jadwal & rekap | ✅ | `/ph/jadwal/ekspor` (tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota) dan `/ph/rekap/ekspor` |
+| 4.14 | Tab Strong Point di dashboard | ✅ | `?tab=` jadwal, rekap, penempatan, titik; filter **bulan** untuk jadwal dan rentang tanggal untuk rekap; tombol **Salin Bulan Lalu** |
+| 4.15 | Titik strong point dengan peta | ✅ | `PetaPicker` satelit + pencarian alamat; modal lebar |
+| 4.16 | Tab **Strong** Android | ✅ | Daftar sesi hari ini, status per sesi, jadwal berikutnya, wizard 3 langkah, antrean offline |
+| 4.17 | Web personel Strong | ✅ | `/strong` daftar sesi + tombol per jadwal; riwayat 30 hari dengan telat/pulang cepat |
+| 4.18 | Hari libur tidak mengubah strong point | ✅ | Jadwal mengikuti jadwal yang disusun; kalender libur hanya memengaruhi penilaian absensi kantor |
+| 4.19 | Penilaian tetap memakai strong point | ✅ | Telat kantor diabaikan bila check-in strong point; pulang cepat tetap dihitung (`scoring.rs`) |
+| 4.20 | Antrean offline absensi PH | ✅ | `AntreanPh` Android; web personel memakai antrean browser |
+| 4.21 | Ekspor CSV rekap PH | ⬜ | baru JSON + PDF |
+| 4.22 | Seed penempatan semua personel | ✅ | `seed --reset` menempatkan seluruh akun personel aktif (termasuk atasan/pimpinan) ke titik induk satkernya |
+| 4.23 | Arsip jadwal lama | ✅ | Migrasi `0017` menandai jadwal `sesi IS NULL` sebagai `is_arsip`; query baru mengabaikannya |
+| 4.24 | Fallback & pengingat jadwal bulanan | ✅ | Bulan berjalan tanpa jadwal otomatis memakai bulan terakhir yang tersedia (`disalin_dari_bulan`); `GET /ph/jadwal/status` memberi peringatan susun bulan depan |
+| 4.25 | Daftar penempatan & ubah titik | ✅ | Tabel anggota + satker + titik; tombol **Ubah/Tempatkan** membuka modal satker/titik/anggota tanpa pilihan level |
 
 ## 5. Pengingat jadwal tanpa FCM
 
@@ -161,10 +162,10 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 |---|---|---|---|
 | 6.1 | Seed baru: 1 Polda, 9 Polres, 21 Satker, 145 personel + 5 admin | ✅ | `cargo run --bin seed -- --reset` |
 | 6.2 | Akun admin per level + pimpinan + atasan + personel | ✅ | lihat tabel di bawah |
-| 6.3 | Data contoh jadwal PH (63 jadwal) | ✅ | |
-| 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–13 |
+| 6.3 | Data contoh jadwal PH | ✅ | seed development: 102 jadwal (sesi pagi/sore) + penempatan tetap seluruh personel |
+| 6.4 | Database demo `kinerja_db` direset ke skema terbaru | ✅ | migrasi 1–17 |
 | 6.5 | Database uji terpisah `kinerja_test` | ✅ | jangan dicampur dengan data demo |
-| 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (48 cek) |
+| 6.6 | Skrip uji API otomatis memakai DB uji | ✅ | `bun tools/uji/api-smoke.js` (73 cek) |
 | 6.7 | Validator OpenAPI | ✅ | `bun tools/uji/openapi-check.js` |
 | 6.8 | Pembuatan periode otomatis diuji | ✅ | `bun tools/uji/periode-auto-check.js` (menghapus periode DB uji dahulu) |
 | 6.9 | Contoh rencana draft, diajukan, dan perlu revisi untuk akun Android | ✅ | seed `--reset`: 3 dokumen + tahapan rincian + catatan revisi untuk NRP `85000001` |
@@ -207,7 +208,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 88 path; `/admin`, `/ph/*`, kesiapan, libur, buka periode, `/absensi/hari-ini`, `/absensi/harian`, `/dev/waktu`, hasil/output draf + verifikasi, profil/foto, ekspor PDF rencana/hasil/output/rekap/verifikasi/detail absensi |
+| 8.1 | `openapi.json` memuat seluruh endpoint baru | ✅ | 92 path; termasuk `/ph/penempatan`, `/ph/jadwal/salin`, `/ph/jadwal/status`, `/dashboard/kehadiran`, filter `dari`/`sampai` |
 | 8.2 | `docs/HANDOFF.md` diperbarui | ✅ | struktur, peran, PH, akun, DB uji |
 | 8.3 | `docs/PRD.md` diperbarui | ✅ | peran ber-scope, FR PH, notifikasi lokal |
 | 8.4 | `docs/penilaian.md` diperbarui | ✅ | hari PH dikecualikan |
@@ -216,7 +217,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 8.7 | Dokumen checklist ini | ✅ | `docs/CHECKLIST.md` |
 | 8.8 | Dokumentasi fake GPS | ✅ | `docs/fake-gps.md` + tautan di README/HANDOFF/AGENTS |
 
-## 9. Verifikasi teknis (dijalankan ulang 17 November 2026)
+## 9. Verifikasi teknis (dijalankan ulang 23 November 2026)
 
 | # | Perintah | Status | Hasil |
 |---|---|---|---|
@@ -225,45 +226,35 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.3 | `cargo test` | ✅ | 37 test lulus |
 | 9.4 | `bun run check` (dashboard) | ✅ | 0 error |
 | 9.5 | `bun run build` (dashboard) | ✅ | SPA statis terbentuk |
-| 9.6 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
-| 9.7 | `bun tools/uji/api-smoke.js` | ✅ | 60/60 cek lulus |
-| 9.8 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (88 path) |
-| 9.9 | Pagination & form personel (combobox pangkat) | ✅ | `bun run check` 0 error, `bun run build` sukses; verifikasi visual di browser tetap disarankan |
-| 9.10 | Uji API titik dinas (tambah/ubah jenis & koordinat/hapus) | ✅ | 3 cek tambahan pada `api-smoke.js` |
-| 9.11 | Uji jam palsu development | ✅ | 6 cek tambahan: aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
-| 9.12 | Alur absensi Android + peta + wizard izin | ✅ | diuji di emulator API 34: wizard, peta/radius, tombol adaptif, status otomatis, offline, riwayat |
-| 9.13 | Wizard rencana kerja Android | ✅ | diuji di emulator API 34: 2 kegiatan, 2 lampiran PDF, simpan draf, ajukan; data tersimpan di `rencana_tahapan` + `lampiran` |
-| 9.14 | Persetujuan rencana Android + dual-role | ✅ | emulator: `000100` melihat kartu persetujuan di Beranda dan tombol di tab Rencana; hanya rencana `85000001` yang tampil, 1 rencana sendiri tetap di daftar; revisi tanpa catatan ditolak, dengan catatan tersimpan; `000002` juga dapat membuka persetujuan |
-| 9.15 | Lampiran contoh PDF/PNG dapat diunduh | ✅ | `GET /lampiran/raw/{key}` → 200, `application/pdf`/`image/png`, signature `%PDF`/PNG valid; detail persetujuan Android menampilkan kedua berkas |
-| 9.16 | Penampil lampiran Android | ✅ | emulator: PDF `SP-123-Pengungkapan.pdf` dirender satu halaman; PNG `Bukti-Transaksi.png` tampil penuh, pinch-zoom berfungsi |
-| 9.17 | Detail rencana berstatus disetujui | ✅ | emulator: kartu disetujui menampilkan **Lihat Detail Rencana**; dialog memuat status Disetujui, rincian, dan lampiran `Laporan-Pelaksanaan-Tahap-1.pdf` yang dapat dibuka |
-| 9.18 | Wizard hasil kerja Android + slider progres | ✅ | emulator: 3 langkah, slider 0–100 default 100%, **Simpan Draf** dan **Kirim ke Atasan**; draft tampil di daftar dan dapat dikirim ulang |
-| 9.19 | Verifikasi hasil kerja Android | ✅ | emulator `000100`: kartu Beranda + tab Hasil, detail lampiran, Terverifikasi (skor kualitas) dan Perlu Revisi (catatan wajib) |
-| 9.20 | Wizard output Android + verifikasi atasan | ✅ | emulator: draf tanpa berkas, mode ubah menambah PDF, kirim ke atasan; atasan melihat 3 output, detail + PDF viewer, tolak tanpa catatan 422, setujui dengan skor 90/92 |
-| 9.21 | Data demo output | ✅ | seed: draft, dalam verifikasi (PDF+PNG), perlu revisi (catatan + PDF), dan disetujui untuk `85000001`/`85210022` |
-| 9.22 | Profil Android: foto, edit, ganti password | ✅ | emulator: avatar seed tampil, unggah PNG baru berhasil, edit nama/pangkat (combobox 22 tingkat Polri + 17 pangkat ASN)/jabatan/telepon/email tersimpan, validasi password wajib; API: ganti password mencabut sesi lama |
-| 9.23 | Slider skor verifikasi | ✅ | emulator: skor kualitas 85→62, kesesuaian 90→54 dan keabsahan 92→82 pada dialog output |
-| 9.24 | Tampil/sembunyi password & avatar Beranda | ✅ | emulator: ikon mata mengubah titik-titik menjadi `Polri#2026` dan kembali; avatar tampil di Beranda `85000001`, tidak tampil untuk `000100` |
-| 9.25 | Validasi pangkat/jabatan profil | ✅ | API: pangkat `BRIPKA`/`JENDERAL POL` diterima, `KOLONEL` ditolak 422, jabatan <3 karakter ditolak 422 |
-| 9.26 | Modal dashboard responsif | ✅ | `Modal.svelte`: tinggi maksimal `100vh-2rem`, header + tombol tutup selalu terlihat, isi digulir, footer aksi tetap tampil; modal Rencana Kerja memakai slot `footer` untuk Batal/Simpan Draft/Ajukan ke Atasan |
-| 9.27 | Filter & PDF Rencana Kerja | ✅ | API: filter satker+personel menghasilkan 2 baris; PDF 200 `application/pdf` ~89 KB (~2,2 s), semua satker ~1,0 MB dengan kolom Satker; UI: `bun run check` 0 error |
-| 9.28 | Detail & PDF Hasil/Output | ✅ | API: detail rencana (2 tahapan, 1 lampiran), detail hasil & output (lampiran terbaca); PDF hasil/output 200 `application/pdf` ~100 KB; UI: `bun run check` 0 error, `bun run build` sukses |
-| 9.29 | Aplikasi web personel | ✅ | `personel/`: `bun run check` 0 error, `bun run build` sukses; Chrome headless 500 px: login, Beranda, Absensi, Strong, wizard Rencana, Persetujuan, Profil tampil |
-| 9.30 | Kanal login `personel_web` + refresh cookie | ✅ | API: atasan/personel login 200, admin 403, refresh cookie 200; `cargo test` 37 lulus |
-| 9.31 | Mock GPS policy `flag` | ✅ | API smoke: absensi `is_mock_suspect=true` → 200, `is_mock_suspect=true`, `perlu_verifikasi=true` |
-| 9.32 | Mock GPS policy `reject` | ✅ | API: instance sementara `APP__MOCK_LOCATION_POLICY=reject` → absensi mock 422 tanpa menyimpan data |
-| 9.33 | Android deteksi mock + build | ✅ | `:app:assembleDebug` sukses; peringatan Developer Options/mock app dan hitungan `ditolak` terkompilasi |
+| 9.6 | `bun run check` + `bun run build` (personel) | ✅ | 0 error; build statis terbentuk |
+| 9.7 | `gradlew :app:assembleDebug` | ✅ | APK debug terbentuk |
+| 9.8 | `bun tools/uji/api-smoke.js` | ✅ | 74/74 cek lulus |
+| 9.9 | `bun tools/uji/openapi-check.js` | ✅ | JSON & `$ref` valid (92 path) |
+| 9.10 | Migrasi `0017_strong_point_v2.sql` + `0018_strong_point_bulanan.sql` | ✅ | terpasang di `kinerja_db` & `kinerja_test` |
+| 9.11 | Uji E2E strong point v2 | ✅ | penempatan tetap (upsert), salin bulan sebelumnya, status/pengingat, fallback otomatis (fake time Desember), check-in telat 25 menit, pulang cepat 30 menit, jendela sesi, radius, PDF |
+| 9.12 | Uji API titik dinas | ✅ | tambah/ubah jenis & koordinat/hapus |
+| 9.13 | Uji jam palsu development | ✅ | aktifkan, tanggal `hari-ini`, absen tanggal/jam palsu, deteksi masuk, status PH, reset |
+| 9.14 | Alur absensi Android + peta + wizard izin | ✅ | emulator API 34: wizard, peta/radius, tombol adaptif, status otomatis, offline, riwayat |
+| 9.15 | Modul kinerja (Rencana/Hasil/Output/Persetujuan) | 🟡 | API & data tetap; halaman tidak dijangkau navigasi baru |
+| 9.16 | UI baru dashboard & web personel | ✅ | `bun run check` 0 error, `bun run build` sukses; uji visual browser tetap disarankan |
+| 9.17 | Modal dashboard responsif | ✅ | `Modal.svelte`: tinggi maksimal `100vh-2rem`, header + tombol tutup selalu terlihat, isi digulir, footer aksi tetap tampil |
+| 9.18 | PDF modul kinerja (dorman) | ✅ | rencana/hasil/output masih dapat diekspor; tidak dijangkau UI baru |
+| 9.19 | Aplikasi web personel | ✅ | `personel/`: `bun run check` 0 error, `bun run build` sukses; Chrome headless 500 px: login, Beranda, Absensi, Strong, Profil tampil |
+| 9.20 | Kanal login `personel_web` + refresh cookie | ✅ | API: atasan/personel login 200, admin 403, refresh cookie 200; `cargo test` 37 lulus |
+| 9.21 | Mock GPS policy `flag` | ✅ | API smoke: absensi `is_mock_suspect=true` → 200, `perlu_verifikasi=true` |
+| 9.22 | Mock GPS policy `reject` | ✅ | Instance sementara `APP__MOCK_LOCATION_POLICY=reject` → absensi mock 422 tanpa menyimpan data |
+| 9.23 | Android deteksi mock + build | ✅ | `:app:assembleDebug` sukses; peringatan Developer Options/mock app dan hitungan `ditolak` terkompilasi |
 
 ## 10. Yang belum dikerjakan (backlog)
 
 | # | Item | Prioritas | Alasan |
 |---|---|---|---|
-| 10.1 | Antrean offline absensi PH | P1 | PH biasanya di lokasi dengan sinyal; perlu keputusan produk |
+| 10.1 | Ekspor CSV rekap PH | P2 | JSON + PDF sudah ada |
 | 10.2 | Pusat notifikasi & pengingat di dashboard | P2 | API `/notifikasi` sudah tersedia |
 | 10.3 | UI audit log di Pengaturan | P2 | API `GET /audit` sudah tersedia |
-| 10.4 | Peta pemilihan titik dinas/strong point | P2 | saat ini input koordinat manual |
-| 10.5 | Ekspor PDF server-side (kop + QR) | P2 | cetak A4 browser sudah jalan |
-| 10.6 | Ekspor CSV rekap PH | P2 | |
+| 10.4 | Uji lapangan penempatan tetap, salin bulanan, fallback & toleransi jam | P1 | pastikan −30/+60 menit dan pemetaan minggu sesuai kondisi lapangan |
+| 10.5 | Ekspor PDF server-side (kop + QR) | P2 | PDF sudah memakai Chrome/Edge headless |
+| 10.6 | Bersihkan halaman kinerja dorman | P3 | API/tabel sengaja dipertahankan |
 | 10.7 | Jadwalkan backup + uji restore | P1 | skrip ada, cron belum |
 | 10.8 | HTTPS produksi + `cleartextTrafficPermitted=false` | P1 | |
 | 10.9 | Uji perangkat nyata (Android 8 & 13) | P1 | emulator sudah |
@@ -275,6 +266,6 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 
 | # | Item | Status | Catatan |
 |---|---|---|---|
-| 11.1 | Seed demo VPS khusus Ditreskrimsus | ✅ | `seed --vps`: Polda + Ditreskrimsus, 40 personel, absensi/rekap PH 1–19 (tidak melewati hari ini), jadwal PH 1–30 (Regu 1 1–15, Regu 2 16–30), rencana/hasil/output draft–revisi–disetujui |
+| 11.1 | Seed demo VPS khusus Ditreskrimsus | ✅ | `seed --vps`: Polda + Ditreskrimsus, 40 personel, penempatan titik tetap, jadwal PH bulan berjalan (pagi/sore), absensi/rekap PH sampai hari ini (maks. 19), rencana/hasil/output draft–revisi–disetujui |
 | 11.2 | Dokumentasi deploy VPS native | ✅ | `docs/deploy-vps.md`: PostgreSQL, systemd `absensi-api`, nginx mTLS Cloudflare, `/var/www/absensi` & `/var/www/personel`, backup, pemecahan masalah |
 | 11.3 | Eksekusi deploy di VPS produksi | ⬜ | Ikuti `docs/deploy-vps.md`; ganti password demo, `JWT_SECRET`, dan aktifkan Authenticated Origin Pulls |

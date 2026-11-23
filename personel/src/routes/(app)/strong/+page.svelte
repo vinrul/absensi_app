@@ -5,7 +5,7 @@
 	import { api, ApiError } from '#lib/api/client';
 	import Icon from '#lib/components/Icon.svelte';
 	import Pesan from '#lib/components/Pesan.svelte';
-	import { awalBulan, tanggalHariIni, tanggalIndo } from '#lib/format';
+	import { geserTanggal, tanggalHariIni, tanggalIndo } from '#lib/format';
 	import { bacaAntreanPh, sinkronkanAntrean } from '#lib/offline';
 	import { session } from '#lib/stores/session.svelte';
 	import { keteranganJadwal, statusStrongPoint } from '#lib/strong';
@@ -20,8 +20,19 @@
 	let galat = $state<string | null>(null);
 
 	const hariIni = $derived(tanggalHariIni());
-	const jadwalHariIni = $derived(jadwal.find((item) => item.tanggal === hariIni) ?? null);
-	const status = $derived(statusStrongPoint(jadwalHariIni?.id, absensi, antrean));
+	const jadwalHariIni = $derived(jadwal.filter((item) => item.tanggal === hariIni));
+	const jadwalMendatang = $derived(
+		[...jadwal].filter((item) => item.tanggal >= hariIni).sort((a, b) => a.tanggal.localeCompare(b.tanggal) || a.jam_mulai.localeCompare(b.jam_mulai))
+	);
+
+	function statusSesi(item: JadwalPhSaya) {
+		return statusStrongPoint(item.id, absensi, antrean);
+	}
+
+	function labelSesi(item: JadwalPhSaya) {
+		const sesi = item.sesi === 'sore' ? 'Sore' : 'Pagi';
+		return `${sesi} ${item.jam_mulai}–${item.jam_selesai}`;
+	}
 
 	async function muat() {
 		const user = session.user;
@@ -29,11 +40,12 @@
 		memuat = true;
 		galat = null;
 		antrean = bacaAntreanPh(user.id);
-		const bulan = awalBulan().slice(0, 7);
+		const dari = geserTanggal(hariIni, -7);
+		const sampai = geserTanggal(hariIni, 30);
 		try {
 			[jadwal, absensi] = await Promise.all([
-				api<JadwalPhSaya[]>(`/ph/jadwal/saya?bulan=${bulan}`),
-				api<AbsensiPh[]>(`/ph/absensi/saya?bulan=${bulan}`)
+				api<JadwalPhSaya[]>(`/ph/jadwal/saya?dari=${dari}&sampai=${sampai}`),
+				api<AbsensiPh[]>(`/ph/absensi/saya?dari=${dari}&sampai=${sampai}`)
 			]);
 		} catch (err) {
 			galat = err instanceof ApiError ? err.message : 'Data strong point tidak dapat dimuat.';
@@ -77,7 +89,7 @@
 	});
 </script>
 
-<svelte:head><title>Strong Point — Absensi Kinerja</title></svelte:head>
+<svelte:head><title>Strong Point — Absensi & Strong Point</title></svelte:head>
 
 <div class="space-y-3">
 	{#if pesan}<Pesan jenis="sukses" pesan={pesan} />{/if}
@@ -101,44 +113,63 @@
 	</a>
 
 	<section class="kartu p-4">
-		<p class="judul-bagian">Status Hari Ini</p>
-		<p class="teks-kecil">
-			{#if memuat}
-				Memuat jadwal…
-			{:else if !jadwalHariIni}
-				Tidak ada jadwal strong point hari ini
-			{:else if status.sesi.length === 0}
-				Belum check-in hari ini
-			{:else if status.terbuka}
-				Check-in pukul {status.masukTerakhir?.jam}{status.perluCheckInBaru
-					? ' (lebih dari 2 jam, belum check-out)'
-					: ''}
-			{:else}
-				Sudah check-out pukul {status.pulangTerakhir?.jam}
-			{/if}
-		</p>
-
-		{#if jadwalHariIni}
-			<dl class="mt-2">
-				<div class="baris-info">
-					<dt>Jadwal</dt>
-					<dd>{keteranganJadwal(jadwalHariIni.regu, jadwalHariIni.strong_point_nama)}</dd>
-				</div>
-				<div class="baris-info">
-					<dt>Sesi hari ini</dt>
-					<dd>{status.sesi.length} catatan</dd>
-				</div>
-			</dl>
+		<p class="judul-bagian">Sesi Hari Ini</p>
+		{#if memuat}
+			<p class="mt-1 text-xs text-ink-400">Memuat jadwal…</p>
+		{:else if jadwalHariIni.length === 0}
+			<p class="mt-1 text-xs text-ink-400">Tidak ada jadwal strong point hari ini.</p>
+		{:else}
+			<ul class="mt-2 divide-y divide-ink-100">
+				{#each jadwalHariIni as item (item.id)}
+					{@const status = statusSesi(item)}
+					<li class="py-3">
+						<div class="flex items-start justify-between gap-3">
+							<div class="min-w-0">
+								<p class="text-xs font-semibold text-ink-800">{labelSesi(item)}</p>
+								<p class="truncate text-[10px] text-ink-500">
+									{keteranganJadwal(item.regu, item.strong_point_nama)}
+								</p>
+								<p class="mt-1 text-[11px] text-ink-600">
+									{#if status.sesi.length === 0}
+										Belum check-in
+									{:else if status.terbuka}
+										Check-in pukul {status.masukTerakhir?.jam} · belum check-out
+									{:else}
+										Sudah check-out pukul {status.pulangTerakhir?.jam}
+									{/if}
+								</p>
+							</div>
+							<span
+								class="chip {status.terbuka
+									? 'bg-rose-100 text-rose-700'
+									: status.sesi.length
+										? 'bg-emerald-100 text-emerald-700'
+										: 'bg-brand-50 text-brand-700'}"
+							>
+								{status.terbuka ? 'Check-out' : status.sesi.length ? 'Selesai' : 'Check-in'}
+							</span>
+						</div>
+						{#if !status.sesi.some((sesi) => sesi.jenis === 'masuk') || status.terbuka}
+							<a
+								href={`/strong/wizard?jadwal=${item.id}`}
+								class="btn btn-utama mt-2 w-full"
+							>
+								<Icon name="pin" size={17} />
+								{status.terbuka ? 'Check-out Sesi Ini' : 'Check-in Sesi Ini'}
+							</a>
+						{/if}
+					</li>
+				{/each}
+			</ul>
 		{/if}
 
-		{#if status.sesi.some((item) => item.menungguKirim)}
-			<Pesan jenis="info" pesan="Sebagian sesi strong point masih menunggu dikirim. Data tersimpan di perangkat." class="mt-2" />
+		{#if antrean.length > 0}
+			<Pesan
+				jenis="info"
+				pesan={`${antrean.length} sesi strong point masih menunggu dikirim.`}
+				class="mt-2"
+			/>
 		{/if}
-
-		<a href="/strong/wizard" class="btn btn-utama mt-3 w-full">
-			<Icon name="pin" size={17} />
-			{jadwalHariIni ? 'Mulai Strong Point' : 'Buka Wizard'}
-		</a>
 	</section>
 
 	{#if antrean.length > 0}
@@ -161,19 +192,19 @@
 	</a>
 
 	<section class="kartu p-4">
-		<p class="judul-bagian">Jadwal Bulan Ini</p>
+		<p class="judul-bagian">Jadwal Berikutnya</p>
 		{#if memuat}
 			<p class="mt-1 text-xs text-ink-400">Memuat jadwal…</p>
-		{:else if jadwal.length === 0}
-			<p class="mt-1 text-xs text-ink-400">Belum ada jadwal strong point pada bulan ini.</p>
+		{:else if jadwalMendatang.length === 0}
+			<p class="mt-1 text-xs text-ink-400">Belum ada jadwal strong point.</p>
 		{:else}
 			<ul class="mt-2 divide-y divide-ink-100">
-				{#each jadwal as item (item.id)}
+				{#each jadwalMendatang as item (item.id)}
 					<li class="flex items-center justify-between gap-3 py-2.5">
 						<div class="min-w-0">
 							<p class="text-xs font-semibold text-ink-800">{tanggalIndo(item.tanggal)}</p>
 							<p class="truncate text-[10px] text-ink-500">
-								{keteranganJadwal(item.regu, item.strong_point_nama)}
+								{labelSesi(item)} · {keteranganJadwal(item.regu, item.strong_point_nama)}
 							</p>
 						</div>
 						{#if item.tanggal === hariIni}
@@ -186,6 +217,6 @@
 	</section>
 
 	<p class="px-1 text-center text-[10px] leading-relaxed text-ink-400">
-		Strong point tidak memakai titik dinas. Lokasi saat ini diambil hanya ketika Anda membuka wizard.
+		Lokasi saat ini diambil hanya ketika Anda membuka wizard strong point.
 	</p>
 </div>

@@ -1,6 +1,7 @@
-# PRD — Aplikasi Absensi & Penilaian Kinerja Personel Polda Bali
+# PRD — Aplikasi Absensi & Strong Point Personel Polda Bali
 
-Versi: 1.1 · Status: MVP terimplementasi · Sumber kebutuhan: `aplikasi_nilai_kerja.pdf`
+Versi: 1.2 · Status: MVP terimplementasi · Fokus aktif: **absensi kehadiran + strong point**
+(modul kinerja/periode tetap ada di kode tetapi dinonaktifkan dari UI)
 
 ## 1. Latar belakang
 
@@ -8,18 +9,24 @@ Penilaian kinerja personel di lingkungan Ditreskrimsus Polda Bali masih dilakuka
 rekap kehadiran terpisah dari laporan rencana kerja, hasil kerja, dan bukti output,
 sehingga penilaian tidak jarang bersifat subjektif dan sulit dipertanggungjawabkan.
 
-Aplikasi ini menyatukan empat indikator (**Absensi 20% · Rencana Kerja 20% · Hasil Kerja 30% ·
-Output 30%**) menjadi satu alur digital dengan verifikasi berjenjang dan dashboard pimpinan.
+Aplikasi ini menyatukan **absensi kehadiran** dan **strong point** (perintah hadir) dalam satu
+alur digital: titik per satker, jadwal bulanan per sesi, penempatan anggota tetap, serta rekap
+telat/pulang cepat per sesi. Modul penilaian kinerja (bobot
+20/20/30/30, rencana/hasil/output/periode) masih tersimpan di kode dan database, tetapi
+**menu serta navigasinya dinonaktifkan** sampai ada keputusan produk berikutnya.
+
+Laporan absensi dan strong point kini memakai **rentang tanggal** (`dari`–`sampai`), bukan
+periode bulanan.
 
 ## 2. Tujuan & metrik keberhasilan
 
 | Tujuan | Metrik |
 |---|---|
 | Kehadiran tercatat objektif | ≥ 95% personel absen melalui aplikasi; penyimpangan lokasi < 2% |
-| Rencana kerja terdokumentasi | ≥ 90% personel memiliki rencana disetujui sebelum periode berjalan |
-| Penilaian transparan | 100% nilai dapat ditelusuri ke komponen perhitungan (`penilaian_detail`) |
-| Verifikasi cepat | Rata-rata waktu keputusan atasan < 2 hari kerja |
-| Laporan siap pakai | Laporan A4 & CSV dihasilkan tanpa rekap manual |
+| Strong point terlaksana sesuai jadwal | ≥ 95% sesi pagi/sore memiliki check-in & check-out dalam jendela waktu |
+| Kepatuhan jam sesi terukur | 100% check-in/check-out menghasilkan `menit_telat`/`menit_pulang_cepat` yang dapat ditelusuri |
+| Laporan siap pakai | Rekap absensi & strong point per rentang tanggal dapat diekspor PDF tanpa rekap manual |
+| (Dorman) Penilaian transparan | 100% nilai dapat ditelusuri ke `penilaian_detail` bila modul diaktifkan kembali |
 
 ## 3. Pengguna & hak akses
 
@@ -37,14 +44,14 @@ Akun dibagi menjadi dua jenis:
 
 | Peran | Cakupan data | Kemampuan utama |
 |---|---|---|
-| **Personel** | Data sendiri | Absen, PH, rencana kerja, hasil kerja, output, melihat nilai sendiri |
-| **Atasan Langsung** | Satker + bawahan | Semua di atas untuk dirinya + memutuskan rencana, memverifikasi hasil/output/absensi/PH, mengelola titik dinas |
-| **Admin Sistem** | Semua | Seluruh master, periode & bobot, hitung penilaian, audit log |
-| **Admin Polda** | Polda + seluruh turunannya | Kelola satker/personel/PH di lingkungan Polda |
-| **Admin Satker Polda** | Satu satker di level Polda | Kelola satker/personel/PH satkernya |
-| **Admin Polres** | Polres + satker di bawahnya | Kelola satker/personel/PH di lingkungan Polres |
-| **Admin Satker Polres** | Satu satker di level Polres | Kelola satker/personel/PH satkernya |
-| **Pimpinan Polda** | Polda + seluruh turunannya | Dashboard, rekap, laporan, keputusan penilaian |
+| **Personel** | Data sendiri | Absen, strong point (check-in/out per sesi), riwayat; modul kinerja dorman |
+| **Atasan Langsung** | Satker + bawahan | Semua di atas untuk dirinya + verifikasi absensi/PH, mengelola titik dinas; modul kinerja dorman |
+| **Admin Sistem** | Semua | Seluruh master, akun admin, audit log; periode/penilaian dorman |
+| **Admin Polda** | Polda + seluruh turunannya | Kelola satker/personel, titik strong point level Polda/Polres, jadwal & penempatan |
+| **Admin Satker Polda** | Satu satker di level Polda | Kelola personel, jadwal & penempatan satkernya |
+| **Admin Polres** | Polres + satker di bawahnya | Kelola satker/personel, titik strong point level Polres, jadwal & penempatan |
+| **Admin Satker Polres** | Satu satker di level Polres | Kelola personel, jadwal & penempatan satkernya |
+| **Pimpinan Polda** | Polda + seluruh turunannya | Dashboard kehadiran, rekap, laporan |
 | **Pimpinan Satker Polda** | Satu satker di level Polda | Dashboard & laporan satkernya |
 | **Pimpinan Polres** | Polres + satker di bawahnya | Dashboard & laporan lingkungan Polres |
 | **Pimpinan Satker Polres** | Satu satker di level Polres | Dashboard & laporan satkernya |
@@ -56,34 +63,32 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 
 ## 4. Ruang lingkup
 
-**Termasuk (MVP):**
+**Termasuk (MVP aktif):**
 - Autentikasi NRP (personel) atau username (admin) + password, refresh token, ganti password
 - Master organisasi 3 level (Polda → Polres → Satker) + jam kerja & hari kerja per satker,
   zona waktu (WIB/WITA/WIT) dan jam pulang Sabtu untuk hari kerja setengah hari
 - **Kalender hari libur** nasional/cuti bersama dan libur khusus satker; tanggal libur
-  otomatis dikeluarkan dari perhitungan absensi
+  otomatis dikeluarkan dari perhitungan absensi (tidak mengubah jadwal strong point)
 - 12 peran dengan cakupan satker (admin & pimpinan ber-scope)
-- Titik dinas dengan radius (default 100 m)
-- Absensi masuk/pulang: 8 status kehadiran (termasuk `libur_nasional`), validasi radius sisi server,
-  foto opsional, antrean offline di perangkat, verifikasi atasan untuk data offline/mock
-- **Modul PH/Strong Point terpisah**: strong point per satker, jadwal bulanan per personel,
-  check-in/check-out **wajib lokasi**, verifikasi, dan rekap PH
-- **Pengingat jadwal PH tanpa FCM** (notifikasi lokal WorkManager di Android)
-- Rencana kerja: dasar tugas (SP/TOR), target kuantitas/kualitas/waktu, tahapan, lampiran,
-  alur persetujuan (disetujui / perlu revisi / ditolak)
-- Hasil kerja: realisasi, progres, kendala, bukti, verifikasi + skor komponen
-- Output: 8 jenis, berkas atau tautan, verifikasi (disetujui / perlu revisi)
-- Periode bulanan + bobot indikator yang dapat diubah (total 100)
-- Perhitungan nilai otomatis + kategori + snapshot komponen
-- Dashboard pimpinan (KPI, capaian, tren, sebaran, rekap) + cetak A4 + CSV
+- Titik dinas dengan radius (default 100 m), peta OSM + mode satelit + pencarian alamat
+- Absensi masuk/pulang: 8 status kehadiran, validasi radius sisi server, foto opsional,
+  antrean offline, verifikasi atasan untuk data offline/mock; laporan per rentang tanggal
+- **Strong Point v2**: titik milik Polda/Polres, **penempatan tetap satu anggota = satu titik**,
+  jadwal disusun **per bulan** (sesi pagi/sore), **salin/fallback jadwal bulan sebelumnya**,
+  check-in/out wajib lokasi, telat & pulang cepat, rekap + PDF per rentang tanggal
+- **Pengingat jadwal tanpa FCM** (notifikasi lokal WorkManager di Android)
+- Dashboard kehadiran harian (filter tanggal + satker) dan rekap absensi/strong point
 - Audit log mutasi + pembatasan laju permintaan
 - Dokumentasi API (`/docs`, `/api-docs/openapi.json`)
+
+**Dorman (kode & data dipertahankan, menu dinonaktifkan):**
+- Rencana kerja, hasil kerja, output, persetujuan/verifikasi kinerja
+- Periode bulanan, bobot indikator, perhitungan nilai, kesiapan satker, laporan penilaian
 
 **Belum termasuk:**
 - Integrasi SSO/AD Polri, absensi via mesin sidik jari
 - Push daring (FCM) — pengingat lokal sudah tersedia; pusat notifikasi web belum ada UI
-- Antrean offline khusus absensi PH
-- Peta interaktif pemilihan titik dinas/strong point
+- Ekspor CSV rekap strong point
 - Multi-instansi/Redis untuk scaling horizontal
 - Tanda tangan digital pada laporan
 
@@ -139,6 +144,10 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   pengelola dalam cakupan satker.
 
 ### FR-03 Rencana kerja
+
+> **Dorman:** halaman, API, dan tabel tetap ada, tetapi menu Kinerja dihapus dari navigasi
+dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produk.
+
 - Wajib: program, kegiatan, uraian, tanggal mulai/selesai, periode.
 - Opsional: tujuan, indikator, dasar tugas (jenis/nomor/tanggal/perihal), target, tahapan, lampiran.
 - Android menyediakan wizard 4 langkah: jenis rencana → dasar tugas → rincian kegiatan → lampiran.
@@ -168,6 +177,9 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Notifikasi dikirim ke atasan saat diajukan dan ke personel saat diputuskan.
 
 ### FR-04 Hasil kerja
+
+> **Dorman** (lihat catatan FR-03).
+
 - Hanya dari rencana berstatus `disetujui`; progres 0–100 memakai slider (default 100%).
 - Wizard Android 3 langkah: pilih rencana → realisasi (uraian, progres, realisasi, kendala,
   tanggal) → bukti pendukung. Tersedia **Simpan Draf** dan **Kirim ke Atasan**.
@@ -181,6 +193,9 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   **Tambah Hasil** disembunyikan untuk role pimpinan.
 
 ### FR-05 Output
+
+> **Dorman** (lihat catatan FR-03).
+
 - Hanya dari hasil kerja `terverifikasi`.
 - Jenis: laporan, dokumen pendukung, foto, video, data/diagram, berita acara, surat/nota dinas,
   link/sistem.
@@ -197,38 +212,34 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   (Chrome/Edge headless). Tombol **Tambah Output** disembunyikan untuk role pimpinan.
 
 ### FR-06 Periode & penilaian
+
+> **Dorman:** periode bulanan, bobot, dan perhitungan nilai tidak lagi ditampilkan di UI.
+> Rekap absensi/strong point memakai rentang tanggal. API & tabel dipertahankan.
+
 - Periode bulanan dengan tanggal mulai/selesai; bobot default 20/20/30/30; total bobot harus 100.
 - Perhitungan dapat diulang (idempoten per personel+periode) dan menyimpan komponen mentah.
 - Periode tertutup menolak perubahan data baru.
 
 ### FR-07 Dashboard & laporan
-- Sidebar dashboard memakai menu bergrup yang dapat dilipat: **Dashboard**; **Master Data**
-  (Satker & Jam Kerja, Titik Dinas, Hari Libur, Data Personel); **Absensi** (Rekap Kehadiran,
-  Detail Rekap, Verifikasi Offline); **Strong Point** (Jadwal Strong Point, Rekap Strong Point);
-  **Kinerja** (Rencana Kerja, Hasil Kerja, Output); **Laporan** (Penilaian, Print Laporan);
-  **Pengaturan** (Akun Admin, Kesiapan Periode, Periode). Grup **Master Data** disembunyikan untuk
-  role pimpinan (tanpa admin), termasuk akses langsung ke halaman master. Submenu **Verifikasi
-  Offline** dan tab verifikasinya juga disembunyikan untuk pimpinan; akses `?tab=verifikasi`
-  dialihkan ke Rekap Kehadiran.
-- Filter periode dan satker.
-- KPI: total personel, hadir hari ini, rencana, hasil, output, rata-rata nilai.
-- Grafik: capaian per indikator, tren antar periode, sebaran kategori.
-- Tabel rekap berpaginasi + rincian komponen per personel.
-- Halaman **Rekap Absensi** (`/absensi/rekap`) memiliki tiga tab dengan filter terpisah:
-  - **Rekap Kehadiran**: periode + satker; kolom hadir, telat (hari), menit telat (khusus
-    Dinas Kantor), dinas luar, piket, cuti, izin, sakit, PH, tanpa keterangan, dan menunggu
-    verifikasi. Filter subdit/bagian dihapus.
-  - **Verifikasi**: periode + satker + personel; absen masuk dan pulang pada tanggal yang sama
-    digabung menjadi satu baris, menampilkan kedua jam dan menit telat; foto absensi dan catatan
-    verifikator tersedia, dan penyetujuan memproses seluruh catatan pada tanggal tersebut.
-  - **Detail per Orang**: periode + satker + personel (wajib dipilih); riwayat harian dengan
-    pasangan jam masuk/pulang, status, menit telat, status radius, kondisi, dan catatan verifikator.
+- Sidebar dashboard memakai menu bergrup: **Dashboard**; **Master Data** (Satker & Jam Kerja,
+  Titik Dinas, Hari Libur, Data Personel); **Absensi** (Rekap Kehadiran, Detail Rekap,
+  Verifikasi Offline); **Strong Point** (Jadwal, Rekap, Penempatan Anggota, Titik); **Akun Admin**.
+  Grup Kinerja/Laporan/Pengaturan serta menu Penilaian, Print Laporan, Kesiapan Periode, dan
+  Periode dihapus; route lama dialihkan ke `/dashboard`.
+- Dashboard baru: filter **tanggal** + satker, kartu total personel, hadir, belum absensi,
+  telat, sesi strong point, serta cuti/izin/sakit; tabel strong point hari itu dan absensi
+  masuk/pulang.
+- Halaman **Rekap Absensi** (`/absensi/rekap`) memiliki tiga tab dengan filter **rentang tanggal**:
+  - **Rekap Kehadiran**: `dari`–`sampai` + satker; kolom hadir, telat (hari), menit telat,
+    dinas luar, piket, cuti, izin, sakit, PH, tanpa keterangan, dan menunggu verifikasi.
+  - **Verifikasi**: `dari`–`sampai` + satker + personel; absen masuk dan pulang pada tanggal yang
+    sama digabung menjadi satu baris, menampilkan kedua jam dan menit telat.
+  - **Detail per Orang**: `dari`–`sampai` + satker + personel; riwayat harian dengan pasangan
+    jam masuk/pulang, status, menit telat, status radius, kondisi, dan catatan verifikator.
   Setiap tab menyediakan **Export PDF** sesuai filter aktif (kop Polda Bali, A4 landscape)
-  memakai Chrome/Edge headless di server; PDF rekap memuat baris jumlah termasuk menit telat,
-  sedangkan PDF verifikasi/detail memakai baris per tanggal yang sudah digabung.
-- Semua tabel daftar berpaginasi (10 baris/halaman); modul besar memakai pagination server-side
+  memakai Chrome/Edge headless di server.
+- Semua tabel daftar berpaginasi; modul besar memakai pagination server-side
   (`page`/`per_page` pada respons daftar).
-- Pimpinan dapat menyimpan catatan & keputusan; laporan dapat dicetak A4 atau diunduh CSV.
 
 ### FR-08 Audit & operasional
 - Setiap POST/PUT/PATCH/DELETE dicatat (aktor, aksi, entitas, entitas_id, IP, user agent, status).
@@ -236,50 +247,47 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
 - Backup harian database + berkas unggahan dengan retensi 30 hari (`deploy/backup.sh`).
 
 ### FR-09 PH / Strong Point
-- Admin satker mengelola strong point (nama, alamat, koordinat, radius). Tab master strong point di
-dashboard **disembunyikan sementara** karena strong point belum memiliki titik tetap; API-nya tetap
-aktif dan dapat diaktifkan kembali.
-- Admin satker menyusun jadwal PH per bulan; satu jadwal berisi satu atau lebih personel
-  beserta peran (mis. ketua/anggota). Sesi pagi/sore belum dipisah (menyusul di laporan & Android).
-- Form tambah/edit jadwal di dashboard hanya meminta **satker, regu, tanggal, catatan, dan
-  personel**; combo strong point serta jam mulai/selesai tidak ditampilkan. Backend memakai strong
-  point aktif pertama milik satker (kompatibilitas radius lama) dan waktu bawaan `00:00–23:59`.
-- Input tanggal mendukung **rentang** (`tanggal` s.d. `tanggal_selesai`); backend membuat satu
-  jadwal per tanggal dalam satu kali simpan, setelah memvalidasi bentrok pada seluruh tanggal.
-- Tab **Jadwal Strong Point** menampilkan **roster bulanan** seperti spreadsheet: kolom No,
-  Anggota, Pangkat, dan tanggal 1–akhir bulan; tanggal yang dijadwalkan regu ditandai blok biru
-  berlabel regu (di-merge vertikal/horizontal bila seluruh anggota regu bertugas).
-- Server menolak jadwal yang jamnya beririsan untuk personel yang sama (HTTP 422).
+- **Titik strong point** hanya dikelola pada level **Polda/Polres** (admin sesuai cakupan);
+  satker di bawahnya otomatis memakai titik induk. Setiap titik memiliki nama, alamat,
+  koordinat, radius (default 100 m), dan status aktif.
+- **Pola mingguan tidak dipakai lagi.** Jadwal disusun langsung per bulan di tab **Jadwal**
+  (tanggal/rentang, sesi, jam, regu, anggota). **Titik strong point tidak dipilih di form jadwal**;
+  server menentukan titik dari penempatan anggota dan membuat satu jadwal per titik. Filter jadwal
+  memakai **bulan berjalan** dengan rentang tanggal 1–akhir bulan; admin dapat memilih bulan lain
+  untuk menyusun lebih awal.
+- **Penempatan anggota bersifat tetap**: satu anggota hanya memiliki satu titik strong point
+  (`unique personel_id`). Admin memilih **satker → titik → checkbox anggota** (tanpa pilihan
+  level, termasuk unit Polda/Polres); perubahan titik memakai upsert tanpa menyimpan riwayat
+  tanggal. Hanya akun personel aktif yang dapat ditempatkan dan titik harus milik induk
+  Polda/Polres satker.
+- **Salin & fallback bulanan**: `POST /ph/jadwal/salin` menyalin jadwal bulan sebelumnya ke bulan
+  tujuan dengan memetakan hari + urutan minggu. Jika admin lupa menyusun jadwal bulan berjalan,
+  sistem otomatis memakai jadwal bulan terakhir yang tersedia dan menandainya
+  `disalin_dari_bulan`; bulan yang belum berjalan tidak di-fallback. `GET /ph/jadwal/status`
+  memberi peringatan agar jadwal bulan depan disusun sebelum tanggal 1.
+- **Satu jadwal = satu sesi dan satu titik.** Check-in hanya sekali dan check-out hanya sekali
+  per jadwal. Check-in dibuka `jam_mulai − 30 menit` dan ditolak setelah `jam_selesai`;
+  check-out wajib setelah check-in dan maksimal `jam_selesai + 60 menit`.
 - Personel hanya dapat check-in/check-out pada jadwal miliknya dan pada tanggal jadwal.
-- Check-in **dan check-out wajib menyertakan koordinat**; server memvalidasi radius strong point.
-  Check-out tidak boleh dilakukan dari lokasi lain (mis. rumah).
+- Check-in **dan check-out wajib menyertakan koordinat**; server memvalidasi radius titik.
+- Server mencatat `menit_telat` (check-in setelah jam mulai) dan `menit_pulang_cepat`
+  (check-out sebelum jam selesai); rekap menjumlahkan keduanya per personel.
 - Absensi PH memiliki `client_uuid` untuk idempotensi dan dapat diverifikasi atasan/admin.
-- Rekap PH per bulan menampilkan jumlah jadwal, check-in, **hanya check-in**, dan
-  **tidak strong point** beserta tanggalnya, sehingga personel yang hanya check-in atau tidak
-  menjalankan jadwal langsung terlihat (kolom telat tidak ditampilkan karena jadwal strong point
-  tidak lagi memakai jam mulai/selesai). Perhitungan rekap dibatasi **sampai hari ini**; tanggal
-  yang belum berjalan tidak dianggap tidak strong point.
-- Jadwal dan rekap strong point dapat diekspor ke **PDF** (A4 landscape) sesuai bulan dan filter
-  satker. PDF jadwal berbentuk roster (kolom anggota/pangkat × tanggal 1–akhir bulan dengan blok
-  regu), sedangkan PDF rekap memakai batas tanggal yang sama dengan dashboard.
-- Strong point dan absensi kantor tetap terpisah namun saling terkait: hari ber-jadwal strong point
-  **tetap wajib absensi kantor**. Keterlambatan absensi kantor **tidak dihitung** bila personel
-  check-in strong point pada hari itu; bila jadwal strong point tidak dijalankan, keterlambatan
-  kantor dihitung normal. Pulang cepat tetap dihitung. Detail penilaian menyimpan `hari_ph`
-  (jadwal) dan `hari_ph_dilakukan` (check-in).
-- Satu jadwal dapat memiliki **beberapa sesi check-in** (mis. pagi dan sore). Check-in baru ditolak
-  bila sesi sebelumnya masih terbuka dan belum berumur **2 jam**; check-out dipasangkan ke check-in
-  terakhir yang terbuka.
-- Di aplikasi Android, tab **Strong** menyediakan tombol besar menuju wizard: peta lokasi tanpa
-  titik dinas (marker hijau), koordinat, akurasi GPS, alamat reverse-geocode, lalu check-in/check-out.
-  Check-in dilanjutkan ke dokumentasi foto dan halaman kirim; check-out langsung ke halaman kirim.
-  Bila tidak ada sinyal, kedua tombol check-in/check-out (offline) tersedia dan data masuk antrean
-  untuk dikirim otomatis.
-- Foto dokumentasi check-in dapat dilihat pada rekap strong point dashboard melalui tombol
-  **Lihat** (galeri per personel).
+- Rekap PH memakai **rentang tanggal** dan menampilkan jumlah jadwal, check-in, hanya check-in,
+  tidak hadir beserta tanggal, menunggu verifikasi, total telat, dan total pulang cepat.
+  Perhitungan dibatasi sampai hari ini.
+- Jadwal dan rekap dapat diekspor **PDF** (A4 landscape); PDF jadwal berupa tabel
+  Tanggal/Sesi/Jam/Titik/Regu/Anggota.
+- **Hari libur nasional tidak mengubah jadwal strong point**; jadwal mengikuti tanggal yang
+  ditetapkan admin satker.
+- Strong point dan absensi kantor tetap terpisah namun terkait penilaian: hari ber-jadwal strong
+  point tetap wajib absensi kantor; telat kantor diabaikan bila check-in strong point, pulang
+  cepat tetap dihitung.
+- Di aplikasi Android & web personel, halaman **Strong** menampilkan sesi hari ini dengan status
+  per sesi dan tombol check-in/check-out kondisional; antrean offline tersedia. Dokumentasi foto
+  diminta saat check-in (dapat dilewati bila kamera tidak tersedia).
 - Absensi PH memakai kebijakan lokasi tiruan yang sama dengan absensi harian: `flag` menandai
-  `perlu_verifikasi`, `reject` menolak HTTP 422. Aplikasi menampilkan peringatan bila
-  `Location.isMock`, Developer Options aktif, atau aplikasi mock dipilih.
+  `perlu_verifikasi`, `reject` menolak HTTP 422.
 
 ### FR-10 Pengingat jadwal (tanpa FCM)
 - Aplikasi Android menjadwalkan notifikasi lokal melalui WorkManager: H-1 pukul 19:00 dan
@@ -337,17 +345,21 @@ aktif dan dapat diaktifkan kembali.
 
 ### FR-16 Data personel
 - Admin mengisi NRP, nama, pangkat, jabatan, satker, atasan langsung, telepon, dan kata sandi awal.
-- Pangkat dipilih dari combobox 22 tingkat Polri (Bharada sampai Jenderal Pol, termasuk Brigpol)
-  atau 17 pangkat ASN/PNS (Juru Muda I/a sampai Pembina Utama IV/e).
+- Pangkat, satker, dan atasan langsung dipilih lewat **combobox ber-pencarian** (ketik untuk
+  menyaring tanpa scroll); pangkat memuat 22 tingkat Polri atau 17 pangkat ASN/PNS.
 - Unit dan email tidak lagi diminta pada form personel; data lama tetap ditampilkan bila ada.
 - Atasan langsung wajib berada pada satker yang sama dan berstatus aktif.
 - Peran admin tidak dapat diberikan lewat halaman Data Personel; gunakan halaman Akun Admin.
 
 ### FR-17 Titik dinas berbasis peta
 - Admin dan atasan mengelola titik dinas per satker (nama, jenis kantor/luar, koordinat, radius).
-- Form tambah/edit menampilkan peta OpenStreetMap (Leaflet). Koordinat dapat diketik manual atau
-  dipilih dengan klik peta dan digeser melalui penanda.
+- Form tambah/edit menampilkan peta yang **lebih tinggi** dengan dua mode: **Peta** (OpenStreetMap)
+  dan **Satelit** (ArcGIS World Imagery).
+- Pencarian alamat memakai **Nominatim** tanpa tombol Cari: debounce 700 ms, minimal 3 karakter,
+  cache hasil, dan maksimal 1 permintaan/detik; memilih hasil menggeser peta dan mengisi koordinat.
+- Koordinat dapat diketik manual atau dipilih dengan klik peta dan digeser melalui penanda.
 - Lingkaran radius tampil di peta dan ikut berubah saat radius diubah; nilai valid 10–5000 meter.
+- Modal titik dinas diperlebar agar peta dan hasil pencarian nyaman dipakai.
 - Saat edit, satker tidak dipindah; nama, jenis, koordinat, radius, dan status aktif dapat diubah.
 
 ### FR-18 Jam server palsu (development)
@@ -367,20 +379,20 @@ aktif dan dapat diaktifkan kembali.
   Login memakai NRP + password dengan tombol tampil/sembunyikan password.
 - Kanal login server `personel_web` hanya menerima akun personel (termasuk atasan/pimpinan);
   akun admin ditolak. Access token berada di memori dan refresh memakai cookie httpOnly.
-- Navigasi bawah 6 tab: Beranda, Absensi, Rencana, Hasil, Output, Strong Point. Desain
-  mobile-first dan responsif, berbeda dari dashboard (tanpa sidebar desktop).
+- Navigasi bawah **3 tab**: Beranda, Absensi, Strong. Desain mobile-first dan responsif,
+  berbeda dari dashboard (tanpa sidebar desktop). Halaman Rencana/Hasil/Output/Persetujuan masih
+  ada di disk tetapi tidak dijangkau navigasi.
 - Wizard izin browser menjelaskan lokasi, kamera, notifikasi, dan antrean offline sekali
   setelah login pertama.
 - Absensi memakai GPS perangkat, peta OpenStreetMap, validasi radius ke titik dinas terdekat,
   8 status kehadiran, foto opsional, serta antrean offline di penyimpanan browser.
-- Strong Point memakai marker hijau tanpa titik dinas, koordinat, akurasi, reverse-geocode
-  `geocode.vinrul.my.id`, dokumentasi hanya saat check-in, aturan sesi baru setelah 2 jam,
-  dan antrean offline.
-- Wizard rencana (4 langkah), hasil (3 langkah), dan output (3 langkah) mendukung simpan draft,
-  lampiran/bukti, serta ajukan ke atasan. Atasan dapat menyetujui/merevisi/menolak rencana dan
-  memverifikasi hasil/output dengan slider skor.
+- Strong Point menampilkan daftar sesi hari ini (pagi/sore) dan tombol per jadwal, riwayat 30 hari
+  dengan telat/pulang cepat, peta lokasi tanpa titik dinas, koordinat, akurasi, reverse-geocode
+  `geocode.vinrul.my.id`, dokumentasi hanya saat check-in, dan antrean offline.
 - Profil menyediakan foto, edit nama/pangkat/jabatan/telepon/email, ganti password dengan
-  tombol mata, dan logout. Beranda menampilkan nilai kinerja periode berjalan.
+  tombol mata, dan logout. Kartu nilai kinerja di Beranda dihapus.
+- Atasan masih dapat memakai halaman persetujuan/verifikasi yang lama bila dibuka langsung, tetapi
+  fitur tersebut tidak lagi menjadi fokus aplikasi.
 - Keterbatasan dibanding Android: tidak ada pengingat notifikasi latar (WorkManager) dan alamat
   server mengikuti origin aplikasi, bukan dapat diubah pengguna.
 
@@ -388,19 +400,22 @@ aktif dan dapat diaktifkan kembali.
 
 | Aspek | Target |
 |---|---|
-| Waktu respons API | < 300 ms (p95) untuk endpoint daftar pada 145 personel/periode |
-| Perhitungan periode | < 60 detik untuk 200 personel |
+| Waktu respons API | < 300 ms (p95) untuk endpoint daftar pada 145 personel/rentang tanggal |
+| Perhitungan laporan | < 60 detik untuk 200 personel per rentang tanggal |
 | Keamanan | Argon2id, JWT HS256, RBAC per satker, audit log, rate limit, HTTPS di produksi |
 | Privasi | Tidak ada token di localStorage browser; berkas diunduh dengan bearer token |
 | Perangkat | Android 8.0+ (minSdk 26); web personel pada Chrome/Edge/Firefox/Safari mobile dan desktop; dashboard Chrome/Edge/Firefox terbaru |
 | Offline | Absensi tersimpan lokal dan tersinkron otomatis (WorkManager, 30 menit / manual) |
-| Kapasitas awal | 1 Polda + 9 Polres, ±200 personel, 1 periode aktif |
+| Kapasitas awal | 1 Polda + 9 Polres, ±200 personel, jadwal strong point bulanan per satker |
 
 ## 7. Batasan & asumsi
 
 - Satu server on-prem (LAN) tanpa autoscaling; pembatas laju berbasis memori satu instans.
 - Radius titik dinas dan jam kerja ditetapkan per satker (default 100 m, 08:00–16:00 WITA).
-- Bobot indikator dapat berubah antar periode, tetapi tidak dalam periode tertutup.
+- Jadwal strong point disusun per bulan; perubahan hanya memengaruhi jadwal yang dibuat setelahnya,
+  bukan jadwal/absensi lama.
+- Bobot indikator & periode bulanan tetap tersimpan, tetapi tidak dipakai UI sampai modul kinerja
+  diaktifkan kembali.
 - Foto absensi maksimal 5 MB (dikompres di perangkat), lampiran 10 MB, bukti output 50 MB.
 
 ## 8. Risiko produk
@@ -409,14 +424,16 @@ aktif dan dapat diaktifkan kembali.
 |---|---|
 | GPS melenceng di dalam gedung | toleransi akurasi + eskalasi verifikasi atasan |
 | Titik dinas belum diatur | API menolak dengan pesan jelas; admin wajib menyiapkan titik sebelum go-live |
-| Personel tidak mengisi rencana | skor rencana 0; dashboard menampilkan capaian rendah sebagai sinyal |
-| Periode dihitung sebelum data lengkap | periode berjalan hanya menghitung hari yang sudah lewat; bisa dihitung ulang |
+| Personel tidak menjalankan strong point | rekap menandai tidak hadir/hanya check-in + total telat/pulang cepat |
+| Periode/penilaian dihitung sebelum data lengkap | modul dinonaktifkan dari UI; API tetap idempoten bila diaktifkan kembali |
 
 ## 9. Roadmap lanjutan
 
-1. Pusat notifikasi web + pengingat jadwal PH di dashboard; FCM bila perlu lintas perangkat.
-2. Antrean offline absensi PH + ekspor CSV rekap PH.
-3. Peta pemilihan titik dinas/strong point di dashboard.
+1. Pusat notifikasi web + pengingat jadwal strong point di dashboard; FCM bila perlu lintas perangkat.
+2. Ekspor CSV rekap strong point.
+3. Uji lapangan penempatan tetap, salin jadwal bulanan, fallback, dan toleransi jendela sesi
+   (−30/+60 menit).
 4. Ekspor PDF server-side dengan kop resmi & QR verifikasi.
 5. Redis untuk rate limit/session bila API di-scale.
 6. Integrasi SI SDM Polri untuk sinkronisasi data personel.
+7. Keputusan produk atas modul kinerja/periode yang kini dorman (aktifkan kembali atau bersihkan).

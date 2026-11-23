@@ -3,9 +3,10 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 18 November 2026 (37 unit test backend + 60 cek API pada DB uji;
-seed `--vps` pada DB uji menghasilkan 40 personel, 30 jadwal PH, dan rekap PH sampai hari ini;
-dashboard & web personel `bun run check`/`build`; APK debug; `openapi.json` 88 path).
+Terakhir diverifikasi: 23 November 2026 (37 unit test backend; 74 cek API pada DB uji;
+seed `--reset` development menghasilkan 145 personel, 102 jadwal PH, penempatan tetap, dan
+fallback jadwal bulan sebelumnya; dashboard & web personel `bun run check`/`build`; APK debug;
+`openapi.json` 92 path).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
@@ -24,18 +25,22 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Login berkanal: admin hanya web, Android hanya akun personel | `routes/auth.rs`, `KanalLogin` |
 | CRUD satker + jam kerja + hari kerja (zona waktu & Sabtu setengah hari) | halaman **Satker & Jam Kerja** |
 | Titik dinas dengan peta OpenStreetMap interaktif (tambah/edit, radius, koordinat) | `PetaPicker.svelte` (Leaflet), halaman **Titik Dinas** |
-| Periode bulan berjalan dibuat otomatis + dapat dibuka kembali | `repo/periode.rs::pastikan_bulan_ini` / `buka`; alasan tersimpan |
-| Kesiapan satker per periode (admin satker menandai, admin global memantau) | tabel `periode_satker_kesiapan`, halaman **Kesiapan Periode** |
+| Periode bulan berjalan dibuat otomatis + dapat dibuka kembali | Kode & API tetap ada, tetapi **menu/navigasi dinonaktifkan**; laporan kini memakai rentang tanggal |
+| Kesiapan satker per periode | Kode & API tetap ada, tetapi **menu dinonaktifkan** |
 | Kalender hari libur nasional & khusus satker | tabel `hari_libur`, halaman **Hari Libur**, otomatis netral di penilaian |
-| CRUD personel + atasan + peran/cakupan + reset password | halaman **Data Personel**; form tanpa unit/email, pangkat combobox 22 tingkat Polri + 17 pangkat ASN |
+| CRUD personel + atasan + peran/cakupan + reset password | halaman **Data Personel**; form tanpa unit/email, pangkat/satker/atasan memakai **Combobox ber-pencarian** (22 tingkat Polri + 17 pangkat ASN) |
 | Pagination seragam di seluruh modul daftar | komponen `Pagination.svelte`; lihat CHECKLIST §3.24 |
 | CRUD akun admin + username + cakupan + reset password | halaman **Akun Admin** (`/admin`) |
-| Modul PH / Strong Point terpisah | migrasi `0006`, `/ph/*`, halaman **Strong Point** (tab master disembunyikan sementara) |
+| Modul PH / Strong Point terpisah | migrasi `0006` + `0017` + `0018`; `/ph/*`; halaman **Strong Point** dengan tab Jadwal, Rekap, Penempatan Anggota, Titik |
+| **Strong Point v2** | Titik hanya milik Polda/Polres (satker memakai titik induk); **satu anggota = satu titik**; jadwal disusun per bulan; sesi pagi/sore dengan jam per sesi; telat & pulang cepat per sesi |
+| **Jadwal bulanan + fallback** | Filter jadwal per bulan (tanggal 1–akhir bulan); pengingat menyusun bulan depan; `POST /ph/jadwal/salin`; jika lupa, sistem menyalin jadwal bulan sebelumnya secara otomatis (ditandai di UI) |
+| Laporan absensi & strong point berbasis **rentang tanggal** | `dari`/`sampai` di `/absensi/*`, `/ph/*`, `/dashboard/kehadiran`; UI tidak lagi memakai periode bulan |
+| **Modul kinerja/periode dinonaktifkan dari UI** | Menu Kinerja, Penilaian, Print Laporan, Kesiapan, Periode dihapus dari navigasi; route lama diarahkan ke `/dashboard`; tabel & API dibiarkan dorman |
 | Jam server palsu development (`fake`) | `/dev/waktu` + `cargo run --bin fake --`; hanya aktif dengan `APP__ALLOW_FAKE_TIME=true` |
 | Absensi Android bertahap + peta OSM | tombol besar → validasi GPS/peta → status → kirim/offline; `PetaAbsensi.kt` |
 | Wizard izin pertama kali sebelum login | `WizardIzinScreen.kt` + DataStore `wizard_izin_selesai` |
-| Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; rekap menandai tidak strong point / hanya check-in |
-| Tab **Strong Point** di Android | bottom nav 6 tab; tombol besar + riwayat, wizard 3 langkah (lokasi → dokumentasi → kirim), peta tanpa titik dinas + marker hijau, koordinat/akurasi/geocode, check-in/out offline ber-antrean |
+| Absensi PH check-in/out wajib lokasi + rekap PH | e2e: GPS kosong 422, di luar radius 422; check-in/check-out ganda 409; rekap menandai tidak strong point / hanya check-in serta total telat & pulang cepat |
+| Tab **Strong Point** di Android | bottom nav **Beranda / Absensi / Strong**; tombol besar + riwayat, wizard 3 langkah (lokasi → dokumentasi → kirim), peta tanpa titik dinas + marker hijau, koordinat/akurasi/geocode, check-in/out offline ber-antrean |
 | Dokumentasi foto absensi & strong point | Unggahan base64 Android disimpan sebagai `foto_path`; galeri dashboard lewat `/absensi/foto` dan `/ph/foto`; berkas `/api/v1/files/{key}` dengan cek pemilik/cakupan satker |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo Polda Bali di dashboard, cetak, Android (login terpusat), ikon launcher | login/sidebar/top bar/launcher; password dapat ditampilkan/disembunyikan |
@@ -45,16 +50,16 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Hasil kerja + verifikasi | e2e API + wizard Android 3 langkah (pilih rencana → realisasi → bukti), draf, kirim, perbaikan; progres memakai slider 0–100 |
 | Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
-| Dashboard pimpinan + cetak + CSV | UI diverifikasi di browser; Rencana/Hasil/Output memiliki halaman detail + lampiran, filter periode/status/satker/personel, dan **Export PDF** lewat Chrome/Edge headless |
+| Dashboard pimpinan + cetak + CSV | Dashboard baru fokus kehadiran & strong point hari ini (filter tanggal + satker); laporan kinerja tetap ada di kode tetapi tidak dijangkau UI |
 | Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; absen masuk/pulang digabung per tanggal lewat `GET /absensi/harian` (beserta menit telat Dinas Kantor); filter subdit/bagian dihapus; PDF `/absensi/rekap/ekspor`, `/absensi/verifikasi/ekspor`, `/absensi/detail/ekspor` (uji API) |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
-| Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (aturan 2 jam), wizard Rencana/Hasil/Output, persetujuan & verifikasi, profil; login memakai kanal `personel_web` |
+| Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (daftar sesi hari ini + wizard), riwayat; halaman kinerja masih ada di disk tetapi tidak dijangkau navigasi; login memakai kanal `personel_web` |
 | Deteksi lokasi tiruan (fake GPS) | Android memeriksa `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/mock app; server `APP__MOCK_LOCATION_POLICY=flag|reject` (default `flag`, produksi `reject`); antrean mencatat penolakan; panduan `docs/fake-gps.md` |
-| Strong Point: roster + Export PDF | Jadwal memakai roster bulanan (anggota × tanggal, blok regu) dengan input rentang tanggal satu-per-satu; rekap menandai tidak strong point/hanya check-in beserta tanggal, tanpa kolom telat, dan hanya menghitung sampai hari ini; PDF `/ph/jadwal/ekspor` (roster) & `/ph/rekap/ekspor` (uji API + Chrome headless) |
+| Strong Point: rekap + Export PDF | Rekap per rentang tanggal dengan kolom telat & pulang cepat; PDF `/ph/jadwal/ekspor` berupa tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota dan `/ph/rekap/ekspor` (uji API + Chrome headless) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
 | Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
-| Dokumentasi API | `/docs` (88 path), `/api-docs/openapi.json` |
+| Dokumentasi API | `/docs` (92 path), `/api-docs/openapi.json` |
 | Backup script | `deploy/backup.sh` (belum dijadwalkan di server) |
 
 **Belum / pekerjaan lanjutan** — lihat §9 backlog.
@@ -169,38 +174,54 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
 16. **Peran ber-scope, bukan peran datar.** `personel_role.scope_satker_id` menentukan
     cakupan admin/pimpinan. `AuthUser` memuat `role_scopes` + `satker_akses` yang dihitung
     per request; jangan menggantinya dengan pengecekan `roles.contains()` saja.
-17. **PH/Strong Point terpisah tetapi terkait absensi kantor.** Hari ber-jadwal PH tetap
-    dihitung sebagai absensi kantor; **keterlambatan kantor diabaikan hanya bila personel
-    check-in strong point** (`repo/ph.rs::tanggal_personel_hadir` +
-    `scoring::skor_harian_dengan_strong_point`). Bila jadwal tidak dijalankan, telat dihitung
-    normal; pulang cepat tetap dihitung. Rekap PH menyimpan `hanya_check_in`,
-    `tanggal_tidak_hadir`, dan `tanggal_hanya_check_in`. Check-in dan **check-out** sama-sama
-    wajib lokasi & radius agar tidak bisa absen pulang dari rumah. Tab master strong point
-    disembunyikan sementara karena strong point belum punya titik tetap. Form jadwal dashboard
-    hanya meminta satker/tanggal/catatan/personel; `JadwalRequest.strong_point_id` dan jam
-    bersifat opsional — backend memakai strong point aktif pertama satker dan waktu bawaan
-    `00:00–23:59`, sedangkan edit tanpa jam mempertahankan nilai lama. Jadwal juga menyimpan
-    `regu`; `tanggal_selesai` membuat satu baris jadwal per tanggal dalam rentang (divalidasi
-    bentrok untuk seluruh tanggal sebelum disimpan). Tab **Jadwal Strong Point** menampilkan
-    roster bulanan ala spreadsheet: anggota × tanggal 1–akhir bulan, blok biru berlabel regu untuk
-    rentang tanggal yang dijadwalkan. Jadwal dan rekap dapat diekspor PDF lewat Chrome/Edge
-    headless (`/ph/jadwal/ekspor`, `/ph/rekap/ekspor`); rekap tidak lagi menampilkan telat karena
-    jadwal dashboard tidak memakai jam mulai/selesai, dan perhitungannya dibatasi sampai hari ini.
-    PDF jadwal berbentuk roster seperti dashboard (No, Anggota, Pangkat, tanggal 1–akhir bulan,
-    blok biru regu). Seed memberi Ditreskrimsus dua regu penuh sebulan (Regu 1 tanggal 1–15,
-    Regu 2 tanggal 16–akhir bulan) sebagai contoh roster.
-    **Sesi strong point:** satu jadwal dapat memiliki beberapa check-in (pagi/sore). Check-in
-    baru ditolak 409 bila sesi terakhir masih terbuka dan belum berumur 2 jam (dihitung dari
-    `captured_at`, sehingga aman untuk antrean offline). Check-out dipasangkan ke check-in
-    terakhir yang terbuka; migrasi `0016_absensi_ph_sesi.sql` menghapus unique
-    `(jadwal_ph_id, personel_id, jenis)`. Aplikasi Android memakai wizard 3 langkah, peta OSM
-    tanpa titik dinas dengan marker hijau, alamat dari Nominatim mandiri
-    (`https://geocode.vinrul.my.id`), serta antrean `AntreanPh` untuk check-in/out offline.
-    Dokumentasi foto diminta saat check-in (dapat dilewati bila kamera tidak tersedia).
-    **Penyajian foto:** `foto_url` memakai `/api/v1/files/{key}`; endpoint `/files/{*key}`
-    memeriksa pemilik atau cakupan satker. Galeri rekap memakai `/absensi/foto` (satu personel
-    per periode) dan `/ph/foto`; detail per orang memakai `foto_masuk_url`/`foto_pulang_url`
-    dari `GET /absensi/harian`.
+17. **Strong Point v2 dipisah dari absensi kantor, tetapi tetap terkait penilaian.**
+    - Titik strong point hanya boleh dimiliki satker level **Polda/Polres**. Satker di bawahnya
+      otomatis memakai titik induk lewat `repo/ph.rs::induk_titik_ids` (recursive CTE);
+      `POST /ph/strong-point` menolak pemilik level `satker`.
+    - **Jadwal disusun langsung per bulan**, tanpa pola mingguan. Admin memilih bulan lalu
+      menambah jadwal (tanggal/rentang, sesi, jam, regu, anggota). **Titik tidak dipilih di
+      form**; server mengelompokkan anggota berdasarkan `penempatan_ph` dan membuat satu jadwal
+      per titik (422 bila ada anggota belum ditempatkan). Tombol **Salin Bulan Lalu**
+      (`POST /ph/jadwal/salin`) menyalin jadwal bulan sebelumnya dengan memetakan tanggal
+      berdasarkan hari dan urutan minggu (Senin ke-1, Selasa ke-2, dst.).
+    - **Penempatan anggota bersifat tetap**: `penempatan_ph(personel_id, strong_point_id)`
+      dengan unique `personel_id`. Satu anggota hanya punya satu titik; perpindahan titik
+      dilakukan lewat upsert (tanpa riwayat tanggal). Modal penempatan langsung memilih
+      **satker → titik → checkbox anggota** (tanpa pilihan level; satker Polda/Polres ikut
+      ditampilkan karena dapat memiliki personel sendiri). Hanya akun `jenis_akun='personel'`
+      yang dapat ditempatkan; titik harus milik Polda/Polres induk satker.
+    - **Fallback bulan sebelumnya**: bila bulan yang sudah berjalan belum memiliki jadwal,
+      `pastikan_jadwal_scope` menyalin jadwal bulan terakhir yang tersedia ke bulan tersebut
+      (maks. satu kali per satker, dilindungi advisory lock). Baris hasil salinan ditandai
+      `disalin_dari_bulan` agar dashboard memperingatkan admin. Bulan yang belum berjalan
+      tidak di-fallback supaya admin masih bisa menyusun lebih awal.
+    - **Pengingat**: `GET /ph/jadwal/status?bulan=&satker_id=` melaporkan jumlah jadwal bulan
+      terpilih, jumlah jadwal bulan depan, dan `perlu_susun_bulan_depan`. Dashboard menampilkan
+      peringatan agar jadwal bulan depan disusun sebelum tanggal 1.
+    - **Satu jadwal = satu sesi dan satu titik.** Check-in hanya sekali dan check-out hanya
+      sekali per jadwal. Check-in dibuka `jam_mulai − 30 menit` dan ditolak setelah
+      `jam_selesai`; check-out wajib setelah check-in dan maksimal `jam_selesai + 60 menit`.
+      Aturan sesi berulang/2 jam dari versi lama **dihapus**.
+    - `absensi_ph.menit_telat` dihitung bila check-in melewati `jam_mulai`;
+      `menit_pulang_cepat` dihitung bila check-out sebelum `jam_selesai`. Rekap menjumlahkan
+      keduanya.
+    - Laporan memakai **rentang tanggal** `dari`–`sampai` (default 30 hari, maks. 366), bukan
+      `bulan`. Rekap PH dibatasi sampai hari ini agar tanggal yang belum berjalan tidak
+      dihitung tidak hadir.
+    - **Hari libur nasional tidak mengubah jadwal strong point**; jadwal mengikuti jadwal yang
+      ditetapkan admin satker.
+    - Jam kerja kantor & penilaian tetap: telat kantor diabaikan bila check-in strong point;
+      pulang cepat tetap dihitung (`service/scoring.rs`).
+    - Tab **Jadwal** berupa roster bulanan + daftar jadwal berpaginasi (Tanggal/Sesi/Jam/Titik/Regu/Anggota),
+      dengan filter bulan. Seed memberi Ditreskrimsus jadwal Senin–Jumat pagi+sore dan satker lain
+      contoh tanggal 3–5; seluruh personel ditempatkan ke titik induknya.
+    - Aplikasi Android & web personel menampilkan status per sesi hari ini dan tombol
+      check-in/check-out kondisional; antrean offline `AntreanPh` tetap dipakai.
+    - Dokumentasi foto diminta saat check-in (dapat dilewati bila kamera tidak tersedia).
+    - **Penyajian foto:** `foto_url` memakai `/api/v1/files/{key}`; endpoint `/files/{*key}`
+      memeriksa pemilik atau cakupan satker. Galeri memakai `/absensi/foto` dan `/ph/foto`
+      (filter `dari`/`sampai`); detail per orang memakai `foto_masuk_url`/`foto_pulang_url`
+      dari `GET /absensi/harian`.
 18. **Pengingat jadwal tanpa FCM.** Android memakai WorkManager + notifikasi lokal
     (H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum).
     Tidak ada ketergantungan layanan push eksternal.
@@ -249,6 +270,13 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     memblokir berdasarkan `BuildConfig.DEBUG`/`device_id` karena bisa dipalsukan. Developer
     Options/aplikasi mock terpilih hanya peringatan UI, bukan penolakan. Detail:
     `docs/fake-gps.md`.
+30. **Modul kinerja/periode dinonaktifkan dari UI, bukan dihapus.** Aplikasi kini fokus pada
+    **absensi kehadiran + strong point**. Menu Kinerja, Penilaian, Print Laporan, Kesiapan,
+    dan Periode dihapus dari navigasi dashboard; route lama diarahkan ke `/dashboard`.
+    Tabel dan endpoint (`/rencana-kerja`, `/hasil-kerja`, `/output`, `/periode`, `/penilaian`,
+    `/laporan`) tetap ada agar data lama tidak hilang. Laporan absensi/strong point memakai
+    **rentang tanggal**, bukan periode bulanan. Jangan menambah fitur baru ke modul dorman
+    ini tanpa keputusan produk; jangan `DROP TABLE`.
 
 ---
 
@@ -420,10 +448,15 @@ GET    /admin             POST /admin             GET|PATCH /admin/{id}   POST /
 GET    /personel          POST /personel          GET|PATCH /personel/{id}
 GET|POST /personel/{id}/roles    POST /personel/{id}/reset-password
 GET    /titik-dinas       POST /titik-dinas       PATCH|DELETE /titik-dinas/{id}
-GET|POST /ph/strong-point PATCH|DELETE /ph/strong-point/{id}
-GET|POST /ph/jadwal       GET /ph/jadwal/saya     GET|PUT|DELETE /ph/jadwal/{id}
-POST   /ph/absensi        GET /ph/absensi/saya    GET /ph/absensi/jadwal/{id}
-POST   /ph/absensi/{id}/verifikasi                 GET /ph/rekap
+GET|POST /ph/strong-point?satker_id=   PATCH|DELETE /ph/strong-point/{id}
+GET|POST /ph/penempatan?satker_id=        # satu anggota = satu titik
+GET|POST /ph/jadwal?dari&sampai&satker_id= POST /ph/jadwal/salin
+GET    /ph/jadwal/status?bulan&satker_id=  # pengingat bulan depan + fallback
+GET    /ph/jadwal/saya?dari&sampai=        GET|PUT|DELETE /ph/jadwal/{id}
+GET    /ph/jadwal/ekspor?dari&sampai&satker_id=      # PDF tabel jadwal
+POST   /ph/absensi        GET /ph/absensi/saya?dari&sampai=   GET /ph/absensi/jadwal/{id}
+POST   /ph/absensi/{id}/verifikasi                 GET /ph/rekap?dari&sampai&satker_id=
+GET    /ph/rekap/ekspor?dari&sampai&satker_id=      GET /ph/foto?dari&sampai&personel_id=
 POST   /absensi           GET  /absensi?dari&sampai&personel_id&perlu_verifikasi   GET /absensi/saya
 GET    /absensi/harian?dari&sampai&personel_id&perlu_verifikasi   # masuk+pulang digabung
 GET    /absensi/rekap     GET  /absensi/rekap/ekspor      GET /absensi/verifikasi/ekspor
@@ -441,9 +474,10 @@ GET    /periode           POST /periode           PUT /periode/{id}/bobot
 POST   /periode/{id}/tutup   POST /periode/{id}/buka
 GET    /periode/{id}/kesiapan     POST /periode/{id}/kesiapan/{satker_id}
 GET    /libur              POST /libur             PATCH|DELETE /libur/{id}
-GET    /penilaian         POST /penilaian/{periode_id}/hitung
+GET    /penilaian          POST /penilaian/{periode_id}/hitung      # dorman (UI dinonaktifkan)
 GET    /penilaian/personel/{personel_id}          POST /penilaian/{id}/keputusan
-GET    /dashboard/{ringkasan,capaian-indikator,tren,sebaran-kategori,rekap}
+GET    /dashboard/{ringkasan,capaian-indikator,tren,sebaran-kategori,rekap}   # dorman
+GET    /dashboard/kehadiran?tanggal=&satker_id=    # dipakai UI baru
 GET    /laporan/penilaian[?format=csv]
 GET    /notifikasi        POST /notifikasi/{id}/baca
 GET    /audit             # admin
@@ -457,17 +491,20 @@ GET    /docs              # di luar /api/v1
 
 `satker` (3 level, +`jam_pulang_sabtu`) · `personel` (+`atasan_id`, `jenis_akun`, `username`; kolom `unit`/`email` lama, tidak diisi UI baru) ·
 `personel_role` (+`scope_satker_id`) · `refresh_token` · `titik_dinas` ·
-`absensi` (unik personel+tanggal+jenis, `client_uuid` unik) · `strong_point` · `jadwal_ph` ·
-`jadwal_ph_personel` · `absensi_ph` · `rencana_kerja` · `rencana_tahapan` · `hasil_kerja` ·
-`output` · `lampiran` · `periode` · `bobot_indikator` · `periode_satker_kesiapan` ·
-`hari_libur` · `penilaian` (unik personel+periode) · `penilaian_detail` (jsonb komponen) ·
-`notifikasi` · `audit_log`.
+`absensi` (unik personel+tanggal+jenis, `client_uuid` unik) · `strong_point` (+`satker_id` induk
+Polda/Polres) · `penempatan_ph` (unik `personel_id`; satu anggota = satu titik) ·
+`jadwal_ph` (+`sesi` pagi/sore, `is_arsip`, `disalin_dari_bulan`) ·
+`jadwal_ph_personel` · `absensi_ph` (+`menit_telat`, `menit_pulang_cepat`) · `rencana_kerja` ·
+`rencana_tahapan` · `hasil_kerja` · `output` · `lampiran` · `periode` · `bobot_indikator` ·
+`periode_satker_kesiapan` · `hari_libur` · `penilaian` (unik personel+periode) ·
+`penilaian_detail` (jsonb komponen) · `notifikasi` · `audit_log`.
 
 `personel.nrp` hanya wajib untuk `jenis_akun='personel'`; `personel.username` hanya wajib
 untuk `jenis_akun='admin'` (constraint `personel_identitas_check`).
 
-Migrasi: `backend/migrations/0001_init.sql` … `0016_absensi_ph_sesi.sql` (sesi check-in strong point berulang). Status absensi
-`libur_nasional` menggantikan nama lama `ph` (nama `ph` sekarang khusus modul PH).
+Migrasi: `backend/migrations/0001_init.sql` … `0018_strong_point_bulanan.sql` (penempatan tetap,
+fallback bulanan, hapus pola mingguan). Status absensi `libur_nasional` menggantikan nama lama
+`ph` (nama `ph` sekarang khusus modul PH).
 Tambah migrasi baru = file `000N_nama.sql` lalu `sqlx migrate run` + `cargo sqlx prepare` bila
 memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).
 
@@ -479,13 +516,14 @@ memakai `query!` (saat ini semua runtime query, jadi `.sqlx` belum diperlukan).
 |---|---|---|
 | Unit | `cd backend; cargo test` | geofence, scoring, deteksi berkas, kanal login, policy mock GPS |
 | Lint Rust | `cargo clippy --all-targets -- -D warnings` | — |
-| API e2e | `bun tools/uji/api-smoke.js` (DB `kinerja_test`, API :8091) | RBAC ber-scope, CRUD satker/personel/admin/titik dinas, kesiapan, libur, PH, jam palsu, mock GPS flag, 60 cek |
+| API e2e | `bun tools/uji/api-smoke.js` (DB `kinerja_test`, API :8091) | RBAC ber-scope, CRUD satker/personel/admin/titik dinas, kesiapan, libur, **penempatan tetap**, **salin jadwal bulanan**, **status & fallback jadwal bulan sebelumnya**, sesi, check-in telat/pulang cepat, rekap rentang, PDF, jam palsu, mock GPS flag, **73 cek** |
 | OpenAPI | `bun tools/uji/openapi-check.js` | JSON valid + seluruh `$ref` ada |
 | Periode otomatis | `bun tools/uji/periode-auto-check.js` | Hapus periode DB uji → dashboard memicu pembuatan bulan berjalan |
 | Type-check UI | `cd dashboard; bun run check` | 0 error |
+| Type-check web personel | `cd personel; bun run check` | 0 error |
 | Build UI | `bun run build` | SPA statis |
 | Android | `.\gradlew.bat :app:assembleDebug` | APK debug |
-| Seed VPS | `cargo run --bin seed -- --reset --vps` (DB uji) | 40 personel, jadwal PH 1–30 (Regu 1 1–15, Regu 2 16–30), absensi & rekap PH sampai hari ini (maks. 19), status rencana/hasil/output lengkap |
+| Seed VPS | `cargo run --bin seed -- --reset --vps` (DB uji) | 40 personel, penempatan titik tetap, jadwal PH bulan berjalan, absensi & rekap PH sampai hari ini (maks. 19), status rencana/hasil/output lengkap |
 
 Jangan menjalankan skrip e2e pada `kinerja_db` (data demo untuk uji manual). Skrip men-spawn
 API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunci `target/debug`.
@@ -562,6 +600,27 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
   dan seluruh berkas sementara dibersihkan setelah PDF terbentuk.
 - `kinerja-api.exe` yang sedang berjalan mengunci `target/debug` → matikan dulu sebelum
   `cargo build` (lihat §8).
+- **Strong point v2:** `strong_point` hanya boleh dimiliki level Polda/Polres; saat menambah
+  `JOIN satker`, kualifikasi semua kolom (mis. `sp.id`, `sp.nama`) — `id`/`nama` di kedua tabel
+  membuat PostgreSQL menolak dengan "column reference is ambiguous".
+- `personel.nrp` NULL untuk akun admin; query daftar penempatan/penjadwalan yang menampilkan
+  personel wajib menambahkan `jenis_akun = 'personel'`, kalau tidak decoding `nrp: String` gagal 500.
+- Rekap PH sengaja dibatasi `sampai = min(sampai_diminta, hari_ini_wita())`; saat menguji dengan
+  tanggal masa depan, rekap akan kosong (bukan bug). Gunakan tanggal hari ini/lampau.
+- **Fallback jadwal** hanya berjalan untuk bulan yang **sudah berjalan** (`awal_bulan <= awal bulan
+  hari ini`). Bulan depan tetap kosong sampai disusun/salin agar admin bisa menyiapkan lebih awal.
+  Baris hasil fallback punya `disalin_dari_bulan`; salinan manual tidak diberi tanda.
+- `salin_jadwal` memetakan tanggal berdasarkan **hari + urutan minggu**; tanggal ke-5 yang tidak
+  ada di bulan tujuan akan dilewati. `timpa=true` hanya menghapus jadwal tanpa absensi.
+- `penempatan_ph` sekarang unik per `personel_id`; simpan penempatan bersifat upsert. Jangan
+  menambahkan kolom tanggal kembali tanpa memigrasikan semua query/repo.
+- **Titik jadwal berasal dari penempatan**: `JadwalRequest` tidak menerima `strong_point_id`.
+  Jangan mengembalikan field itu ke form jadwal; `create_jadwal`/`update_jadwal` memakai
+  `kelompokkan_titik` dan dapat membuat beberapa jadwal (satu per titik) dari satu permintaan.
+- `status_jadwal` membaca jadwal **mentah** dan tidak memicu fallback; jangan menambahkan
+  `pastikan_jadwal_*` di endpoint status agar peringatan tetap muncul.
+- Saat menguji jam palsu, pilih tanggal yang tidak punya absensi seed (mis. 1 November atau
+  akhir pekan); seed development mengisi absensi kantor semua hari kerja sampai kemarin.
 - **Fake GPS:** `APP__MOCK_LOCATION_POLICY=flag` untuk development agar emulator + Fake GPS
   tetap bisa menguji alur; `reject` untuk produksi. Antrean absensi/PH yang ditolak mock
   dihapus dan dihitung `ditolak`, sedangkan kegagalan lain dipertahankan. `adb emu geo fix`
@@ -583,26 +642,31 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
 
 **P2 — peningkatan kualitas**
 6. Audit log menyimpan `before`/`after` untuk entitas kritikal (personel, periode, bobot).
-7. Pusat notifikasi + pengingat jadwal PH di dashboard web.
-8. Antrean offline untuk absensi PH.
-9. Ekspor CSV rekap PH.
-10. Peta pemilihan titik dinas/strong point di dashboard (Leaflet/MapLibre).
-11. Ekspor PDF server-side dengan kop & QR verifikasi.
-12. `GET /audit` UI di halaman Pengaturan (saat ini hanya API).
-13. Rate limit berbasis Redis bila API di-scale.
-14. **Play Integrity** (`APP__PLAY_INTEGRITY_MODE=off|log|enforce`) untuk memastikan APK asli;
+7. Pusat notifikasi + pengingat jadwal strong point di dashboard web.
+8. Ekspor CSV rekap PH (JSON + PDF sudah ada).
+9. **Uji lapangan strong point**: penempatan tetap, salin jadwal bulanan, fallback, dan toleransi
+   jendela sesi (−30/+60 menit).
+10. **Bersihkan modul kinerja dorman** (halaman `/rencana-kerja`, `/hasil-kerja`, `/output`,
+    `/penilaian`, `/laporan`, `/kesiapan`, `/pengaturan`) bila produk memastikan tidak dipakai;
+    API dan tabel sengaja dipertahankan sampai keputusan itu.
+11. **Pengingat Android per sesi**: saat ini WorkManager memakai jadwal (satu baris per sesi),
+    tetapi label notifikasi belum membedakan pagi/sore secara eksplisit.
+12. Ekspor PDF server-side dengan kop & QR verifikasi.
+13. `GET /audit` UI di halaman Pengaturan (saat ini hanya API).
+14. Rate limit berbasis Redis bila API di-scale.
+15. **Play Integrity** (`APP__PLAY_INTEGRITY_MODE=off|log|enforce`) untuk memastikan APK asli;
     bukan pengganti deteksi koordinat.
-15. **Validasi plausibilitas server**: lompatan koordinat, kecepatan tidak wajar, dan jarak/waktu
+16. **Validasi plausibilitas server**: lompatan koordinat, kecepatan tidak wajar, dan jarak/waktu
     antarabsensi.
-16. Deteksi lokasi tiruan di web personel tidak tersedia di browser; pertimbangkan kebijakan
+17. Deteksi lokasi tiruan di web personel tidak tersedia di browser; pertimbangkan kebijakan
     foto wajib + verifikasi atasan.
 
 **P3 — teknis**
-14. Pindahkan antrean offline Android ke Room (butuh KSP) agar query lebih kaya.
-15. CI (GitHub Actions self-hosted) untuk `api-smoke.js` + `openapi-check.js`.
-16. Utoipa/OpenAPI otomatis sebagai pengganti `openapi.json` manual.
-17. Uji beban: 200 personel × 1 bulan, target hitung < 60 detik.
-18. Push FCM bila kelak butuh notifikasi daring lintas perangkat.
+18. Pindahkan antrean offline Android ke Room (butuh KSP) agar query lebih kaya.
+19. CI (GitHub Actions self-hosted) untuk `api-smoke.js` + `openapi-check.js`.
+20. Utoipa/OpenAPI otomatis sebagai pengganti `openapi.json` manual.
+21. Uji beban: 200 personel × 1 bulan, target hitung < 60 detik.
+22. Push FCM bila kelak butuh notifikasi daring lintas perangkat.
 
 ---
 

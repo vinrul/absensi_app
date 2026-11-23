@@ -7,7 +7,6 @@
 		AbsensiHarian,
 		FotoAbsensi,
 		ListResponse,
-		Periode,
 		Personel,
 		RekapAbsensi,
 		Satker,
@@ -44,19 +43,38 @@
 	const tabTampil = $derived(
 		TAB.filter((item) => !(item.id === 'verifikasi' && adalahPimpinanSaja()))
 	);
-	let periodeList = $state<Periode[]>([]);
 	let satkerList = $state<Satker[]>([]);
 	let personelList = $state<Personel[]>([]);
+	let siapMuat = $state(false);
+
+	function tanggalHariIni() {
+		const bagian = new Intl.DateTimeFormat('en-CA', {
+			timeZone: 'Asia/Makassar',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		}).formatToParts(new Date());
+		const ambil = (jenis: string) => bagian.find((item) => item.type === jenis)?.value ?? '';
+		return `${ambil('year')}-${ambil('month')}-${ambil('day')}`;
+	}
+
+	function awalBulan() {
+		return `${tanggalHariIni().slice(0, 7)}-01`;
+	}
+
+	function rentangBawaan() {
+		return { dari: awalBulan(), sampai: tanggalHariIni() };
+	}
 
 	// Filter dipisah per tab agar tidak saling mengubah.
 	let filter = $state({
-		rekap: { periode_id: '', satker_id: '', personel_id: '' },
-		verifikasi: { periode_id: '', satker_id: '', personel_id: '' },
-		detail: { periode_id: '', satker_id: '', personel_id: '' }
+		rekap: { ...rentangBawaan(), satker_id: '', personel_id: '' },
+		verifikasi: { ...rentangBawaan(), satker_id: '', personel_id: '' },
+		detail: { ...rentangBawaan(), satker_id: '', personel_id: '' }
 	});
 
 	let rekap = $state<RekapAbsensi[]>([]);
-	let rekapPeriodeNama = $state('');
+	let rekapRentang = $state('');
 	let halamanRekap = $state(1);
 
 	let daftarVerifikasi = $state<ListResponse<AbsensiHarian> | null>(null);
@@ -94,9 +112,12 @@
 		return satkerId ? personelList.filter((p) => p.satker_id === satkerId) : personelList;
 	}
 
-	function rentangPeriode(periodeId: string) {
-		const periode = periodeList.find((p) => p.id === periodeId);
-		return periode ? { dari: periode.tanggal_mulai, sampai: periode.tanggal_selesai } : null;
+	function tanggalSingkat(tanggal: string) {
+		return new Date(`${tanggal}T00:00:00`).toLocaleDateString('id-ID', {
+			day: '2-digit',
+			month: 'short',
+			year: 'numeric'
+		});
 	}
 
 	function namaSatker(row: AbsensiHarian) {
@@ -109,14 +130,6 @@
 
 	function telatHarian(row: AbsensiHarian) {
 		return row.menit_telat > 0 ? `${row.menit_telat} mnt` : '-';
-	}
-
-	function tanggalSingkat(tanggal: string) {
-		return new Date(`${tanggal}T00:00:00`).toLocaleDateString('id-ID', {
-			day: '2-digit',
-			month: 'short',
-			year: 'numeric'
-		});
 	}
 
 	function waktuLengkap(nilai: string) {
@@ -143,19 +156,26 @@
 		return 'blue';
 	}
 
+	function rentangTeks(dari: string, sampai: string) {
+		return `${tanggalSingkat(dari)} – ${tanggalSingkat(sampai)}`;
+	}
+
 	async function muatRekap() {
 		memuat = true;
 		error = null;
 		try {
-			const params = new URLSearchParams();
-			if (filter.rekap.periode_id) params.set('periode_id', filter.rekap.periode_id);
+			const params = new URLSearchParams({
+				dari: filter.rekap.dari,
+				sampai: filter.rekap.sampai
+			});
 			if (filter.rekap.satker_id) params.set('satker_id', filter.rekap.satker_id);
 
-			const hasil = await api<{ periode: { nama: string }; data: RekapAbsensi[] }>(
-				`/absensi/rekap?${params}`
-			);
+			const hasil = await api<{
+				rentang: { dari: string; sampai: string };
+				data: RekapAbsensi[];
+			}>(`/absensi/rekap?${params}`);
 			rekap = hasil.data;
-			rekapPeriodeNama = hasil.periode.nama;
+			rekapRentang = rentangTeks(hasil.rentang.dari, hasil.rentang.sampai);
 			halamanRekap = 1;
 		} catch (err) {
 			error = err instanceof ApiError ? err.message : 'Gagal memuat rekap kehadiran';
@@ -173,11 +193,8 @@
 			params.set('page', String(page));
 			params.set('per_page', String(perPage));
 
-			const rentang = rentangPeriode(filter.verifikasi.periode_id);
-			if (rentang) {
-				params.set('dari', rentang.dari);
-				params.set('sampai', rentang.sampai);
-			}
+			params.set('dari', filter.verifikasi.dari);
+			params.set('sampai', filter.verifikasi.sampai);
 			if (filter.verifikasi.satker_id) params.set('satker_id', filter.verifikasi.satker_id);
 			if (filter.verifikasi.personel_id) params.set('personel_id', filter.verifikasi.personel_id);
 
@@ -205,11 +222,8 @@
 			params.set('page', String(page));
 			params.set('per_page', String(perPage));
 
-			const rentang = rentangPeriode(filter.detail.periode_id);
-			if (rentang) {
-				params.set('dari', rentang.dari);
-				params.set('sampai', rentang.sampai);
-			}
+			params.set('dari', filter.detail.dari);
+			params.set('sampai', filter.detail.sampai);
 			if (filter.detail.satker_id) params.set('satker_id', filter.detail.satker_id);
 
 			const hasil = await api<ListResponse<AbsensiHarian>>(`/absensi/harian?${params}`);
@@ -253,7 +267,7 @@
 		if (nilai === 'rekap' || nilai === 'verifikasi' || nilai === 'detail') {
 			if (nilai !== tab) {
 				tab = nilai;
-				if (periodeList.length) muatTab(nilai);
+				if (siapMuat) muatTab(nilai);
 			}
 		}
 	});
@@ -277,8 +291,10 @@
 		mengekspor = true;
 		error = null;
 		try {
-			const params = new URLSearchParams();
-			if (aktif.periode_id) params.set('periode_id', aktif.periode_id);
+			const params = new URLSearchParams({
+				dari: aktif.dari,
+				sampai: aktif.sampai
+			});
 			if (aktif.satker_id) params.set('satker_id', aktif.satker_id);
 			if (tab !== 'rekap' && aktif.personel_id) params.set('personel_id', aktif.personel_id);
 
@@ -334,8 +350,11 @@
 		tutupGaleri();
 		galeri = { nama: row.nama, memuat: true, item: [] };
 		try {
-			const params = new URLSearchParams({ personel_id: row.personel_id });
-			if (filter.rekap.periode_id) params.set('periode_id', filter.rekap.periode_id);
+			const params = new URLSearchParams({
+				personel_id: row.personel_id,
+				dari: filter.rekap.dari,
+				sampai: filter.rekap.sampai
+			});
 			if (filter.rekap.satker_id) params.set('satker_id', filter.rekap.satker_id);
 
 			const hasil = await api<{ data: FotoAbsensi[] }>(`/absensi/foto?${params}`);
@@ -391,29 +410,23 @@
 	}
 
 	onMount(async () => {
-		const [p, s, orang] = await Promise.all([
-			api<Periode[]>('/periode'),
+		const [s, orang] = await Promise.all([
 			api<Satker[]>('/satker'),
 			api<ListResponse<Personel>>('/personel?per_page=200')
 		]);
-		periodeList = p;
 		satkerList = s;
 		personelList = orang.data;
-
-		const periodeAwal = p[0]?.id ?? '';
-		filter.rekap.periode_id = periodeAwal;
-		filter.verifikasi.periode_id = periodeAwal;
-		filter.detail.periode_id = periodeAwal;
 
 		const tabAwal = page.url.searchParams.get('tab');
 		if (tabAwal === 'detail') tab = 'detail';
 		else if (tabAwal === 'verifikasi') tab = adalahPimpinanSaja() ? 'rekap' : 'verifikasi';
 
+		siapMuat = true;
 		await muatTab(tab);
 	});
 </script>
 
-<svelte:head><title>Rekap Absensi — Penilaian Kinerja</title></svelte:head>
+<svelte:head><title>Rekap Absensi — Absensi & Strong Point</title></svelte:head>
 
 <div class="space-y-4">
 	<div class="card space-y-3 p-4">
@@ -447,16 +460,25 @@
 
 		{#if tab === 'rekap'}
 			<div class="flex flex-wrap items-end gap-3">
-				<div class="min-w-44">
-					<label class="label" for="rekap-periode">Periode</label>
-					<select
-						id="rekap-periode"
+				<div>
+					<label class="label" for="rekap-dari">Dari Tanggal</label>
+					<input
+						id="rekap-dari"
+						type="date"
 						class="input"
-						bind:value={filter.rekap.periode_id}
+						bind:value={filter.rekap.dari}
 						onchange={() => muatRekap()}
-					>
-						{#each periodeList as p}<option value={p.id}>{p.nama}</option>{/each}
-					</select>
+					/>
+				</div>
+				<div>
+					<label class="label" for="rekap-sampai">Sampai Tanggal</label>
+					<input
+						id="rekap-sampai"
+						type="date"
+						class="input"
+						bind:value={filter.rekap.sampai}
+						onchange={() => muatRekap()}
+					/>
 				</div>
 				<div class="min-w-48">
 					<label class="label" for="rekap-satker">Satker</label>
@@ -473,16 +495,25 @@
 			</div>
 		{:else if tab === 'verifikasi'}
 			<div class="flex flex-wrap items-end gap-3">
-				<div class="min-w-44">
-					<label class="label" for="verif-periode">Periode</label>
-					<select
-						id="verif-periode"
+				<div>
+					<label class="label" for="verif-dari">Dari Tanggal</label>
+					<input
+						id="verif-dari"
+						type="date"
 						class="input"
-						bind:value={filter.verifikasi.periode_id}
+						bind:value={filter.verifikasi.dari}
 						onchange={() => muatVerifikasi()}
-					>
-						{#each periodeList as p}<option value={p.id}>{p.nama}</option>{/each}
-					</select>
+					/>
+				</div>
+				<div>
+					<label class="label" for="verif-sampai">Sampai Tanggal</label>
+					<input
+						id="verif-sampai"
+						type="date"
+						class="input"
+						bind:value={filter.verifikasi.sampai}
+						onchange={() => muatVerifikasi()}
+					/>
 				</div>
 				<div class="min-w-48">
 					<label class="label" for="verif-satker">Satker</label>
@@ -513,16 +544,25 @@
 			</div>
 		{:else}
 			<div class="flex flex-wrap items-end gap-3">
-				<div class="min-w-44">
-					<label class="label" for="detail-periode">Periode</label>
-					<select
-						id="detail-periode"
+				<div>
+					<label class="label" for="detail-dari">Dari Tanggal</label>
+					<input
+						id="detail-dari"
+						type="date"
 						class="input"
-						bind:value={filter.detail.periode_id}
+						bind:value={filter.detail.dari}
 						onchange={() => muatDetail()}
-					>
-						{#each periodeList as p}<option value={p.id}>{p.nama}</option>{/each}
-					</select>
+					/>
+				</div>
+				<div>
+					<label class="label" for="detail-sampai">Sampai Tanggal</label>
+					<input
+						id="detail-sampai"
+						type="date"
+						class="input"
+						bind:value={filter.detail.sampai}
+						onchange={() => muatDetail()}
+					/>
 				</div>
 				<div class="min-w-48">
 					<label class="label" for="detail-satker">Satker</label>
@@ -562,7 +602,7 @@
 		<div class="card overflow-hidden">
 			<div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
 				<h2 class="text-sm font-semibold text-slate-700">
-					Rekap Kehadiran {rekapPeriodeNama}
+					Rekap Kehadiran {rekapRentang}
 				</h2>
 				<span class="text-xs text-slate-500">{rekap.length} personel</span>
 			</div>

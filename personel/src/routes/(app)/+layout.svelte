@@ -19,15 +19,12 @@
 	const tab = [
 		{ href: '/beranda', label: 'Beranda', icon: 'home' },
 		{ href: '/absensi', label: 'Absensi', icon: 'pin' },
-		{ href: '/rencana', label: 'Rencana', icon: 'list' },
-		{ href: '/hasil', label: 'Hasil', icon: 'checkCircle' },
-		{ href: '/output', label: 'Output', icon: 'star' },
 		{ href: '/strong', label: 'Strong', icon: 'calendar' }
 	];
 
 	const halamanIzin = [
 		{
-			judul: 'Selamat datang di Absensi Kinerja',
+			judul: 'Selamat datang di Absensi & Strong Point',
 			deskripsi:
 				'Sebelum masuk, aplikasi perlu menjelaskan izin yang digunakan. Izin hanya diminta sesuai kebutuhan dan tidak dipakai untuk melacak Anda di luar absensi.',
 			alasan:

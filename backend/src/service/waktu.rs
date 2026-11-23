@@ -60,6 +60,21 @@ pub fn rentang_bulan(tanggal: NaiveDate) -> (NaiveDate, NaiveDate) {
     (awal_bulan(tanggal), akhir_bulan(tanggal))
 }
 
+/// Menggeser bulan dari tanggal mana pun, selalu kembali ke tanggal 1.
+pub fn geser_bulan(tanggal: NaiveDate, jumlah: i32) -> NaiveDate {
+    let total = tanggal.year() * 12 + tanggal.month0() as i32 + jumlah;
+    let tahun = total.div_euclid(12);
+    let bulan = total.rem_euclid(12) as u32 + 1;
+    NaiveDate::from_ymd_opt(tahun, bulan, 1).unwrap_or(tanggal)
+}
+
+/// Membaca label `YYYY-MM` menjadi tanggal 1 bulan tersebut.
+pub fn parse_bulan(label: &str) -> Option<NaiveDate> {
+    NaiveDate::parse_from_str(&format!("{}-01", label.trim()), "%Y-%m-%d")
+        .ok()
+        .map(awal_bulan)
+}
+
 pub fn nama_bulan(bulan: u32) -> &'static str {
     match bulan {
         1 => "Januari",

@@ -452,6 +452,7 @@ data class JadwalPhSaya(
     val tanggal: String,
     val jamMulai: String,
     val jamSelesai: String,
+    val sesi: String? = null,
     val regu: String? = null,
     val catatan: String? = null,
     val peran: String? = null
@@ -480,7 +481,9 @@ data class AbsensiPh(
     val isMockSuspect: Boolean = false,
     val perluVerifikasi: Boolean = false,
     val verifiedAt: String? = null,
-    val catatanVerifikator: String? = null
+    val catatanVerifikator: String? = null,
+    val menitTelat: Int = 0,
+    val menitPulangCepat: Int = 0
 )
 
 @Serializable

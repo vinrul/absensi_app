@@ -428,7 +428,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
              VALUES ($1, $2, $3, $4, $5::float8::numeric, $6::float8::numeric, 100)",
         )
         .bind(uid(&format!("strong-{}", node.kode)))
-        .bind(uid(node.kode))
+        .bind(uid(node.parent.unwrap_or(POLDA.0)))
         .bind(format!("Strong Point {}", node.nama))
         .bind(format!("Pos penjagaan {}", node.nama))
         .bind(node.latitude + 0.0002)
@@ -743,6 +743,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         personel_per_satker.entry(satker_id).or_default().push(id);
     }
 
+    // -------------------------------------------- penempatan strong point
+    // Titik anggota bersifat tetap: satu anggota = satu titik. Semua akun
+    // personel aktif pada satker (termasuk atasan/pimpinan) ditempatkan ke
+    // titik induknya masing-masing.
+    for node in &satker_nodes {
+        let satker_id = uid(node.kode);
+        let anggota: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM personel
+              WHERE satker_id = $1 AND jenis_akun = 'personel'
+                AND deleted_at IS NULL AND is_active",
+        )
+        .bind(satker_id)
+        .fetch_all(&pool)
+        .await?;
+        for personel_id in anggota {
+            sqlx::query(
+                "INSERT INTO penempatan_ph
+                     (id, personel_id, strong_point_id, created_by)
+                 VALUES ($1, $2, $3, $4)
+                 ON CONFLICT (personel_id) DO NOTHING",
+            )
+            .bind(uid(&format!("penempatan-{personel_id}")))
+            .bind(personel_id)
+            .bind(uid(&format!("strong-{}", node.kode)))
+            .bind(uid("admin-polda"))
+            .execute(&pool)
+            .await?;
+        }
+    }
+
     // -------------------------------------------------------------- periode
     let today = hari_ini_wita();
     let awal_bulan =
@@ -884,8 +914,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         .collect(),
                 )]
             };
-        let jam_mulai = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
-        let jam_selesai = NaiveTime::from_hms_opt(16, 0, 0).unwrap();
         for (regu, anggota_regu, hari_jadwal) in &rencana_regu {
             if anggota_regu.is_empty() {
                 continue;
@@ -894,44 +922,59 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let hari = *hari;
                 let tanggal = NaiveDate::from_ymd_opt(awal_bulan.year(), awal_bulan.month(), hari)
                     .expect("tanggal PH valid");
-                let id = uid(&format!("jadwal-ph-{satker_id}-{regu}-{hari}"));
-                sqlx::query(
-                    "INSERT INTO jadwal_ph (id, satker_id, strong_point_id, tanggal, jam_mulai,
-                                        jam_selesai, regu, catatan, created_by)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-                )
-                .bind(id)
-                .bind(satker_id)
-                .bind(strong_point_id)
-                .bind(tanggal)
-                .bind(jam_mulai)
-                .bind(jam_selesai)
-                .bind(regu)
-                .bind(format!("Jadwal Strong Point {}", node.nama))
-                .bind(uid("admin-polda"))
-                .execute(&pool)
-                .await?;
-
-                for personel_id in anggota_regu {
+                if tanggal.weekday().number_from_monday() > 5 {
+                    continue;
+                }
+                let sesi_hari: &[(&str, u32, u32)] = if node.kode == "DITRESKRIMSUS" {
+                    &[("pagi", 7, 9), ("sore", 16, 18)]
+                } else {
+                    &[("pagi", 7, 9)]
+                };
+                for (sesi, jam_mulai, jam_selesai) in sesi_hari {
+                    let jam_mulai =
+                        NaiveTime::from_hms_opt(*jam_mulai, 0, 0).expect("jam PH valid");
+                    let jam_selesai =
+                        NaiveTime::from_hms_opt(*jam_selesai, 0, 0).expect("jam PH valid");
+                    let id = uid(&format!("jadwal-ph-{satker_id}-{regu}-{sesi}-{hari}"));
                     sqlx::query(
-                        "INSERT INTO jadwal_ph_personel (jadwal_ph_id, personel_id, peran)
-                     VALUES ($1, $2, $3)",
+                        "INSERT INTO jadwal_ph (id, satker_id, strong_point_id, tanggal, jam_mulai,
+                         jam_selesai, sesi, regu, catatan, created_by)
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
                     )
                     .bind(id)
-                    .bind(personel_id)
-                    .bind("Anggota")
+                    .bind(satker_id)
+                    .bind(strong_point_id)
+                    .bind(tanggal)
+                    .bind(jam_mulai)
+                    .bind(jam_selesai)
+                    .bind(*sesi)
+                    .bind(regu)
+                    .bind(format!("Jadwal Strong Point {} ({sesi})", node.nama))
+                    .bind(uid("admin-polda"))
                     .execute(&pool)
                     .await?;
-                    ph_dates.entry(*personel_id).or_default().insert(tanggal);
+
+                    for personel_id in anggota_regu {
+                        sqlx::query(
+                            "INSERT INTO jadwal_ph_personel (jadwal_ph_id, personel_id, peran)
+                             VALUES ($1, $2, $3)",
+                        )
+                        .bind(id)
+                        .bind(personel_id)
+                        .bind("Anggota")
+                        .execute(&pool)
+                        .await?;
+                        ph_dates.entry(*personel_id).or_default().insert(tanggal);
+                    }
+                    jadwal_ph_rows.push((
+                        id,
+                        satker_id,
+                        strong_point_id,
+                        tanggal,
+                        jam_mulai,
+                        jam_selesai,
+                    ));
                 }
-                jadwal_ph_rows.push((
-                    id,
-                    satker_id,
-                    strong_point_id,
-                    tanggal,
-                    jam_mulai,
-                    jam_selesai,
-                ));
             }
         }
     }
@@ -1072,14 +1115,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .unwrap_or(*jam_mulai);
                 let captured = wita_to_utc(*tanggal, jam.hour(), jam.minute());
+                let menit_telat = if jenis == "masuk" { 5 } else { 0 };
+                let menit_pulang_cepat = 0;
                 sqlx::query(
                     "INSERT INTO absensi_ph (
                          id, client_uuid, jadwal_ph_id, personel_id, strong_point_id, satker_id,
                          jenis, captured_at, jam, latitude, longitude, akurasi_m, jarak_m,
-                         dalam_radius, is_offline, is_mock_suspect, perlu_verifikasi
+                         dalam_radius, is_offline, is_mock_suspect, perlu_verifikasi,
+                         menit_telat, menit_pulang_cepat
                      )
                      VALUES ($1, $2, $3, $4, $5, $6, $7::absensi_jenis, $8, $9,
-                             $10::float8::numeric, $11::float8::numeric, 8, 2, true, false, false, false)",
+                             $10::float8::numeric, $11::float8::numeric, 8, 2, true, false, false, false,
+                             $12, $13)",
                 )
                 .bind(uid(&format!("absen-ph-{jadwal_id}-{personel_id}-{jenis}")))
                 .bind(Uuid::new_v5(
@@ -1095,6 +1142,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .bind(jam)
                 .bind(-8.65610_f64)
                 .bind(115.22164_f64)
+                .bind(menit_telat)
+                .bind(menit_pulang_cepat)
                 .execute(&pool)
                 .await?;
             }

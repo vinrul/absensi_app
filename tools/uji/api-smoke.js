@@ -491,17 +491,96 @@ try {
 	});
 	cek("admin_polres tidak dapat membuat admin global", roleTerlarang.status === 403);
 
-	const jadwalBulan = await panggil(adminToken, "/ph/jadwal?bulan=2026-11");
-	cek("jadwal PH admin termuat", jadwalBulan.status === 200 && jadwalBulan.data.length >= 60);
-	const strongPoints = await panggil(adminToken, "/ph/strong-point");
+	// Penempatan tetap: satu anggota = satu titik, tanpa tanggal.
+	const satkerPh = personelBaru.data.satker_id;
+	const titikInduk = await panggil(adminToken, `/ph/strong-point?satker_id=${satkerPh}`);
+	cek("satker memakai titik induk polda/polres", titikInduk.status === 200 && titikInduk.data.length > 0);
+	const tempatPh = await panggil(adminToken, "/ph/penempatan", {
+		method: "POST",
+		body: {
+			satker_id: satkerPh,
+			items: [{ personel_id: personelBaru.data.id, strong_point_id: titikInduk.data[0].id }]
+		}
+	});
+	cek("admin menempatkan anggota ke titik", tempatPh.status === 200, JSON.stringify(tempatPh.data));
+	const tempatBaca = await panggil(adminToken, `/ph/penempatan?satker_id=${satkerPh}`);
+	const barisTempat = tempatBaca.data.filter((p) => p.personel_id === personelBaru.data.id);
+	cek(
+		"penempatan anggota terbaca tepat satu baris",
+		barisTempat.length === 1 && barisTempat[0].strong_point_id === titikInduk.data[0].id,
+		JSON.stringify(barisTempat)
+	);
+	const tempatUlang = await panggil(adminToken, "/ph/penempatan", {
+		method: "POST",
+		body: {
+			satker_id: satkerPh,
+			items: [{ personel_id: personelBaru.data.id, strong_point_id: titikInduk.data[0].id }]
+		}
+	});
+	const tempatBacaUlang = await panggil(adminToken, `/ph/penempatan?satker_id=${satkerPh}`);
+	cek(
+		"simpan ulang penempatan tidak menggandakan baris",
+		tempatUlang.status === 200 &&
+			tempatBacaUlang.data.filter((p) => p.personel_id === personelBaru.data.id).length === 1
+	);
+
+	const statusBulan = await panggil(
+		adminToken,
+		`/ph/jadwal/status?bulan=2026-11&satker_id=${satkerPh}`
+	);
+	cek(
+		"status jadwal memberi peringatan susun bulan depan",
+		statusBulan.status === 200 &&
+			statusBulan.data.jumlah_jadwal > 0 &&
+			statusBulan.data.perlu_susun_bulan_depan === true,
+		JSON.stringify(statusBulan.data)
+	);
+
+	const salin = await panggil(adminToken, "/ph/jadwal/salin", {
+		method: "POST",
+		body: { satker_id: satkerPh, bulan: "2026-12" }
+	});
+	cek(
+		"salin jadwal bulan sebelumnya",
+		salin.status === 200 && salin.data.dibuat > 0,
+		JSON.stringify(salin.data)
+	);
+	const salinUlang = await panggil(adminToken, "/ph/jadwal/salin", {
+		method: "POST",
+		body: { satker_id: satkerPh, bulan: "2026-12" }
+	});
+	cek("salin ulang tanpa timpa ditolak", salinUlang.status === 409, `status ${salinUlang.status}`);
+	const jadwalDes = await panggil(
+		adminToken,
+		`/ph/jadwal?dari=2026-12-01&sampai=2026-12-31&satker_id=${satkerPh}`
+	);
+	cek(
+		"jadwal bulan baru hasil salinan tidak ditandai fallback",
+		jadwalDes.status === 200 &&
+			jadwalDes.data.length > 0 &&
+			jadwalDes.data.every((j) => j.disalin_dari_bulan === null),
+		JSON.stringify(jadwalDes.data?.slice(0, 2))
+	);
+	const statusDes = await panggil(
+		adminToken,
+		`/ph/jadwal/status?bulan=2026-12&satker_id=${satkerPh}`
+	);
+	cek(
+		"status bulan baru tersusun tanpa peringatan salinan",
+		statusDes.status === 200 &&
+			statusDes.data.jumlah_jadwal > 0 &&
+			statusDes.data.disalin_dari_bulan === null,
+		JSON.stringify(statusDes.data)
+	);
+
+	const jadwalRentang = await panggil(adminToken, "/ph/jadwal?dari=2026-11-01&sampai=2026-11-30");
+	cek("jadwal PH admin termuat", jadwalRentang.status === 200 && jadwalRentang.data.length >= 60);
 	const detailPersonel = await panggil(adminToken, `/personel/${personel.user.id}`);
-	const sp = strongPoints.data.find((s) => s.satker_id === detailPersonel.data.satker_id);
 	const hariIni = new Date().toISOString().slice(0, 10);
 	const jadwalBaru = await panggil(adminToken, "/ph/jadwal", {
 		method: "POST",
 		body: {
 			satker_id: detailPersonel.data.satker_id,
-			strong_point_id: sp.id,
 			tanggal: hariIni,
 			jam_mulai: "09:00",
 			jam_selesai: "10:00",
@@ -510,8 +589,20 @@ try {
 		}
 	});
 	cek("admin membuat jadwal PH hari ini", jadwalBaru.status === 200, JSON.stringify(jadwalBaru.data));
-	const jadwalSaya = await panggil(personel.access_token, "/ph/jadwal/saya?bulan=2026-11");
+	const tempatPersonel = await panggil(
+		adminToken,
+		`/ph/penempatan?satker_id=${detailPersonel.data.satker_id}`
+	);
+	const titikTerpasang = tempatPersonel.data.find((p) => p.personel_id === personel.user.id)?.strong_point_id;
+	cek(
+		"jadwal memakai titik dari penempatan anggota",
+		Boolean(titikTerpasang) && jadwalBaru.data?.strong_point_id === titikTerpasang,
+		`${jadwalBaru.data?.strong_point_id} vs ${titikTerpasang}`
+	);
+	const jadwalSaya = await panggil(personel.access_token, "/ph/jadwal/saya?dari=2026-11-01&sampai=2026-11-30");
 	cek("personel melihat jadwal PH sendiri", jadwalSaya.status === 200 && jadwalSaya.data.some((j) => j.id === jadwalBaru.data.id));
+	// Koordinat check-in harus mengikuti titik pada jadwal yang dibuat server.
+	const sp = jadwalSaya.data.find((j) => j.id === jadwalBaru.data.id) ?? { latitude: 0, longitude: 0 };
 
 	const diLuar = await panggil(personel.access_token, "/ph/absensi", {
 		method: "POST",
@@ -519,7 +610,7 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "masuk",
-			captured_at: `${hariIni}T00:05:00Z`,
+			captured_at: `${hariIni}T01:05:00Z`,
 			latitude: sp.latitude + 0.1,
 			longitude: sp.longitude,
 			akurasi_m: 5
@@ -533,7 +624,7 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "masuk",
-			captured_at: `${hariIni}T00:05:00Z`,
+			captured_at: `${hariIni}T01:10:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
 			akurasi_m: 5,
@@ -541,13 +632,14 @@ try {
 		}
 	});
 	cek("check-in PH di dalam radius berhasil", masuk.status === 200 && masuk.data.dalam_radius === true, JSON.stringify(masuk.data));
+	cek("check-in PH mencatat telat 10 menit", masuk.data?.menit_telat === 10, JSON.stringify(masuk.data?.menit_telat));
 	const ulang = await panggil(personel.access_token, "/ph/absensi", {
 		method: "POST",
 		body: {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "masuk",
-			captured_at: `${hariIni}T00:10:00Z`,
+			captured_at: `${hariIni}T01:15:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
 			akurasi_m: 5
@@ -567,7 +659,7 @@ try {
 			akurasi_m: 5
 		}
 	});
-	cek("check-in sesi baru setelah 2 jam berhasil", masukKedua.status === 200, JSON.stringify(masukKedua.data));
+	cek("check-in sesi baru pada jadwal yang sama ditolak", masukKedua.status === 409, JSON.stringify(masukKedua.data));
 
 	const pulangLuar = await panggil(personel.access_token, "/ph/absensi", {
 		method: "POST",
@@ -575,7 +667,7 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "pulang",
-			captured_at: `${hariIni}T02:20:00Z`,
+			captured_at: `${hariIni}T01:25:00Z`,
 			latitude: sp.latitude + 0.1,
 			longitude: sp.longitude,
 			akurasi_m: 5
@@ -589,28 +681,29 @@ try {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "pulang",
-			captured_at: `${hariIni}T02:25:00Z`,
+			captured_at: `${hariIni}T01:30:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
 			akurasi_m: 5
 		}
 	});
 	cek("check-out PH di dalam radius berhasil", pulang.status === 200, JSON.stringify(pulang.data));
+	cek("check-out PH mencatat pulang cepat 30 menit", pulang.data?.menit_pulang_cepat === 30, JSON.stringify(pulang.data?.menit_pulang_cepat));
 	const pulangUlang = await panggil(personel.access_token, "/ph/absensi", {
 		method: "POST",
 		body: {
 			client_uuid: crypto.randomUUID(),
 			jadwal_ph_id: jadwalBaru.data.id,
 			jenis: "pulang",
-			captured_at: `${hariIni}T02:30:00Z`,
+			captured_at: `${hariIni}T01:35:00Z`,
 			latitude: sp.latitude,
 			longitude: sp.longitude,
 			akurasi_m: 5
 		}
 	});
-	cek("check-out tanpa sesi terbuka ditolak", pulangUlang.status === 422, `status ${pulangUlang.status}`);
+	cek("check-out ganda ditolak", pulangUlang.status === 409, `status ${pulangUlang.status}`);
 
-	const fotoPh = await panggil(adminToken, `/ph/foto?bulan=2026-11&personel_id=${personel.user.id}`);
+	const fotoPh = await panggil(adminToken, `/ph/foto?dari=${hariIni}&sampai=${hariIni}&personel_id=${personel.user.id}`);
 	cek(
 		"galeri foto strong point memuat dokumentasi",
 		fotoPh.status === 200 && fotoPh.data.length > 0,
@@ -625,26 +718,26 @@ try {
 	);
 	const tanpaToken = await fetch(`http://127.0.0.1:${PORT}${fotoPh.data[0].foto_url}`);
 	cek("foto tanpa token ditolak", tanpaToken.status === 401, `status ${tanpaToken.status}`);
-	const rekapPh = await panggil(adminToken, "/ph/rekap?bulan=2026-11");
+	const rekapPh = await panggil(adminToken, `/ph/rekap?dari=2026-11-01&sampai=${hariIni}`);
 	cek("rekap PH memuat personel uji", rekapPh.status === 200 && rekapPh.data.data.some((r) => r.personel_id === personel.user.id));
 
 	// ------------------------------------------------------------ jam palsu dev
 	const fakeSet = await fetch(`${BASE}/dev/waktu`, {
 		method: "POST",
 		headers: { "content-type": "application/json" },
-		body: JSON.stringify({ tanggal: "2026-11-20", jam: "07:45" })
+		body: JSON.stringify({ tanggal: "2026-11-01", jam: "07:45" })
 	});
 	const fakeData = await fakeSet.json();
 	cek(
 		"jam server palsu development dapat diaktifkan",
-		fakeSet.status === 200 && fakeData.aktif === true && fakeData.tanggal === "2026-11-20",
+		fakeSet.status === 200 && fakeData.aktif === true && fakeData.tanggal === "2026-11-01",
 		JSON.stringify(fakeData)
 	);
 
 	const hariFake = await panggil(personel.access_token, "/absensi/hari-ini");
 	cek(
 		"hari ini mengikuti tanggal server palsu",
-		hariFake.status === 200 && hariFake.data.tanggal === "2026-11-20" && hariFake.data.masuk === null,
+		hariFake.status === 200 && hariFake.data.tanggal === "2026-11-01" && hariFake.data.masuk === null,
 		JSON.stringify(hariFake.data)
 	);
 
@@ -668,7 +761,7 @@ try {
 	cek(
 		"absen masuk memakai tanggal dan jam palsu",
 		absenFake.status === 200 &&
-			absenFake.data.data.tanggal === "2026-11-20" &&
+			absenFake.data.data.tanggal === "2026-11-01" &&
 			absenFake.data.data.jam === "07:45",
 		JSON.stringify(absenFake.data?.data)
 	);
@@ -709,6 +802,37 @@ try {
 	const fakeReset = await fetch(`${BASE}/dev/waktu/reset`, { method: "POST" });
 	const resetData = await fakeReset.json();
 	cek("jam server palsu dapat dikembalikan", fakeReset.status === 200 && resetData.aktif === false);
+
+	// ------------------------------------------- fallback jadwal bulan sebelumnya
+	const satkerFallback = semuaSatker.data.find(
+		(s) => s.level === "satker" && s.id !== satkerPh
+	);
+	await fetch(`${BASE}/dev/waktu`, {
+		method: "POST",
+		headers: { "content-type": "application/json" },
+		body: JSON.stringify({ tanggal: "2026-12-01", jam: "08:00" })
+	});
+	const jadwalFallback = await panggil(
+		adminToken,
+		`/ph/jadwal?dari=2026-12-01&sampai=2026-12-31&satker_id=${satkerFallback.id}`
+	);
+	cek(
+		"jadwal bulan berjalan memakai jadwal bulan sebelumnya bila kosong",
+		jadwalFallback.status === 200 &&
+			jadwalFallback.data.length > 0 &&
+			jadwalFallback.data.every((j) => j.disalin_dari_bulan === "2026-11-01"),
+		JSON.stringify(jadwalFallback.data?.slice(0, 2))
+	);
+	const statusFallback = await panggil(
+		adminToken,
+		`/ph/jadwal/status?bulan=2026-12&satker_id=${satkerFallback.id}`
+	);
+	cek(
+		"status menandai jadwal sebagai salinan bulan sebelumnya",
+		statusFallback.status === 200 && statusFallback.data.disalin_dari_bulan === "2026-11-01",
+		JSON.stringify(statusFallback.data)
+	);
+	await fetch(`${BASE}/dev/waktu/reset`, { method: "POST" });
 
 	// ------------------------------------------------- kebijakan mock GPS (flag)
 	await fetch(`${BASE}/dev/waktu`, {

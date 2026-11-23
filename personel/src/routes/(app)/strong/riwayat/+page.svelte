@@ -3,7 +3,7 @@
 	import { api, ApiError } from '#lib/api/client';
 	import Icon from '#lib/components/Icon.svelte';
 	import Pesan from '#lib/components/Pesan.svelte';
-	import { awalBulan, jamTeks, tanggalIndo } from '#lib/format';
+	import { geserTanggal, jamTeks, tanggalHariIni, tanggalIndo } from '#lib/format';
 	import { bacaAntreanPh, sinkronkanAntrean } from '#lib/offline';
 	import { session } from '#lib/stores/session.svelte';
 	import { keteranganJadwal } from '#lib/strong';
@@ -20,11 +20,12 @@
 	async function muat() {
 		memuat = true;
 		galat = null;
-		const bulan = awalBulan().slice(0, 7);
+		const dari = geserTanggal(tanggalHariIni(), -30);
+		const sampai = tanggalHariIni();
 		try {
 			[absensi, jadwal] = await Promise.all([
-				api<AbsensiPh[]>(`/ph/absensi/saya?bulan=${bulan}`),
-				api<JadwalPhSaya[]>(`/ph/jadwal/saya?bulan=${bulan}`)
+				api<AbsensiPh[]>(`/ph/absensi/saya?dari=${dari}&sampai=${sampai}`),
+				api<JadwalPhSaya[]>(`/ph/jadwal/saya?dari=${dari}&sampai=${sampai}`)
 			]);
 		} catch (err) {
 			galat = err instanceof ApiError ? err.message : 'Riwayat strong point tidak dapat dimuat.';
@@ -64,7 +65,7 @@
 	});
 </script>
 
-<svelte:head><title>Riwayat Strong Point — Absensi Kinerja</title></svelte:head>
+<svelte:head><title>Riwayat Strong Point — Absensi & Strong Point</title></svelte:head>
 
 <div class="space-y-3">
 	<a href="/strong" class="btn btn-hantu -ml-2 px-2 py-1"><Icon name="left" size={16} /> Kembali</a>
@@ -99,7 +100,7 @@
 		<div class="flex items-center justify-between">
 			<div>
 				<p class="judul-bagian">Riwayat Strong Point</p>
-				<p class="teks-kecil">{absensi.length} catatan bulan ini</p>
+				<p class="teks-kecil">{absensi.length} catatan 30 hari terakhir</p>
 			</div>
 			<button class="btn btn-hantu px-2 py-1 text-xs" onclick={muat} disabled={memuat}>
 				<Icon name="refresh" size={15} /> Muat ulang
@@ -109,7 +110,7 @@
 		{#if memuat}
 			<p class="mt-4 text-sm text-ink-400">Memuat riwayat…</p>
 		{:else if absensi.length === 0}
-			<p class="mt-4 text-sm text-ink-400">Belum ada absensi strong point pada bulan ini.</p>
+			<p class="mt-4 text-sm text-ink-400">Belum ada absensi strong point pada 30 hari terakhir.</p>
 		{:else}
 			<ul class="mt-2 divide-y divide-ink-100">
 				{#each absensi.slice().sort((a, b) => b.captured_at.localeCompare(a.captured_at)) as item (item.id)}
@@ -121,6 +122,13 @@
 									{item.jenis === 'masuk' ? 'Check-in' : 'Check-out'}
 								</p>
 								<p class="truncate text-[11px] text-ink-500">{item.strong_point_nama}</p>
+								{#if item.menit_telat > 0 || item.menit_pulang_cepat > 0}
+									<p class="text-[10px] text-amber-600">
+										{#if item.menit_telat > 0}Telat {item.menit_telat} mnt{/if}
+										{#if item.menit_telat > 0 && item.menit_pulang_cepat > 0} · {/if}
+										{#if item.menit_pulang_cepat > 0}Pulang cepat {item.menit_pulang_cepat} mnt{/if}
+									</p>
+								{/if}
 								{#if item.perlu_verifikasi && !item.verified_at}
 									<p class="text-[10px] font-semibold text-amber-600">Menunggu verifikasi atasan</p>
 								{/if}
@@ -139,14 +147,19 @@
 	</section>
 
 	<section class="kartu p-4">
-		<p class="judul-bagian">Jadwal Bulan Ini</p>
+		<p class="judul-bagian">Jadwal 30 Hari</p>
 		<p class="teks-kecil">{jadwal.length} jadwal</p>
 		{#if jadwal.length > 0}
 			<ul class="mt-2 divide-y divide-ink-100">
 				{#each jadwal as item (item.id)}
 					<li class="flex items-center justify-between gap-3 py-2.5">
-						<p class="text-xs font-semibold text-ink-700">{tanggalIndo(item.tanggal)}</p>
-						<p class="text-[10px] text-ink-500">{keteranganJadwal(item.regu, item.strong_point_nama)}</p>
+						<div class="min-w-0">
+							<p class="text-xs font-semibold text-ink-700">{tanggalIndo(item.tanggal)}</p>
+							<p class="truncate text-[10px] text-ink-500">
+								{item.sesi === 'sore' ? 'Sore' : 'Pagi'} {item.jam_mulai}–{item.jam_selesai} ·
+								{keteranganJadwal(item.regu, item.strong_point_nama)}
+							</p>
+						</div>
 					</li>
 				{/each}
 			</ul>

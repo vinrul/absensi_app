@@ -57,6 +57,12 @@ export function awalBulan(): string {
 	return `${tanggalHariIni().slice(0, 7)}-01`;
 }
 
+export function geserTanggal(tanggal: string, hari: number): string {
+	const nilai = new Date(`${tanggal.slice(0, 10)}T00:00:00Z`);
+	nilai.setUTCDate(nilai.getUTCDate() + hari);
+	return nilai.toISOString().slice(0, 10);
+}
+
 export function jamTeks(iso: string | null | undefined): string {
 	if (!iso) return '-';
 	const cocok = iso.match(/T(\d{2}):(\d{2})/);

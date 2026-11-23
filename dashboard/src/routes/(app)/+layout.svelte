@@ -68,24 +68,9 @@
 			basis: '/ph',
 			items: [
 				{ href: '/ph?tab=jadwal', label: 'Jadwal Strong Point', roles: dashboardRole },
-				{ href: '/ph?tab=rekap', label: 'Rekap Strong Point', roles: dashboardRole }
-			]
-		},
-		{
-			label: 'Kinerja',
-			icon: 'trend',
-			items: [
-				{ href: '/rencana-kerja', label: 'Rencana Kerja', roles: semuaRole },
-				{ href: '/hasil-kerja', label: 'Hasil Kerja', roles: semuaRole },
-				{ href: '/output', label: 'Output', roles: semuaRole }
-			]
-		},
-		{
-			label: 'Laporan',
-			icon: 'laporan',
-			items: [
-				{ href: '/penilaian', label: 'Penilaian', roles: dashboardRole },
-				{ href: '/laporan', label: 'Print Laporan', roles: dashboardRole }
+				{ href: '/ph?tab=rekap', label: 'Rekap Strong Point', roles: dashboardRole },
+				{ href: '/ph?tab=penempatan', label: 'Penempatan Anggota', roles: adminRole },
+				{ href: '/ph?tab=titik', label: 'Titik Strong Point', roles: adminRole }
 			]
 		},
 		{
@@ -96,9 +81,7 @@
 					href: '/admin',
 					label: 'Akun Admin',
 					roles: ['admin_sistem', 'admin_polda', 'admin_polres']
-				},
-				{ href: '/kesiapan', label: 'Kesiapan Periode', roles: adminRole },
-				{ href: '/pengaturan', label: 'Periode', roles: ['admin_sistem'] }
+				}
 			]
 		}
 	];
@@ -174,7 +157,7 @@
 		if (cocok) return cocok;
 		if (page.url.pathname.startsWith('/profil')) return 'Profil Saya';
 		if (page.url.pathname.startsWith('/ph')) return 'Strong Point';
-		return 'Penilaian Kinerja';
+		return 'Absensi & Strong Point';
 	});
 
 	/** Konteks satker: admin global melihat semua satker, bukan satker asalnya. */
@@ -203,6 +186,24 @@
 			return;
 		}
 		const jalurMaster = ['/satker', '/personel', '/libur', '/absensi/titik-dinas'];
+		const jalurNonaktif = [
+			'/rencana-kerja',
+			'/hasil-kerja',
+			'/output',
+			'/penilaian',
+			'/laporan',
+			'/kesiapan',
+			'/pengaturan'
+		];
+		if (
+			jalurNonaktif.some(
+				(jalur) =>
+					page.url.pathname === jalur || page.url.pathname.startsWith(jalur + '/')
+			)
+		) {
+			await goto('/dashboard', { replaceState: true });
+			return;
+		}
 		if (
 			pimpinanSaja &&
 			jalurMaster.some(
@@ -245,7 +246,7 @@
 					/>
 				</div>
 				<div class="min-w-0">
-					<p class="truncate text-sm font-semibold text-white">Penilaian Kinerja</p>
+					<p class="truncate text-sm font-semibold text-white">Absensi & Strong Point</p>
 					<p class="truncate text-[11px] text-navy-300">Polda Bali</p>
 				</div>
 			</div>

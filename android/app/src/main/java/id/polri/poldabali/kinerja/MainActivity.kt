@@ -16,13 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,13 +50,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import id.polri.poldabali.kinerja.R
 import id.polri.poldabali.kinerja.ui.AbsensiScreen
 import id.polri.poldabali.kinerja.ui.BerandaScreen
-import id.polri.poldabali.kinerja.ui.HasilScreen
 import id.polri.poldabali.kinerja.ui.KinerjaViewModel
 import id.polri.poldabali.kinerja.ui.LoginScreen
-import id.polri.poldabali.kinerja.ui.OutputScreen
 import id.polri.poldabali.kinerja.ui.PhScreen
 import id.polri.poldabali.kinerja.ui.ProfilScreen
-import id.polri.poldabali.kinerja.ui.RencanaScreen
 import id.polri.poldabali.kinerja.ui.WizardIzinScreen
 import id.polri.poldabali.kinerja.ui.theme.KinerjaTheme
 import id.polri.poldabali.kinerja.ui.theme.Warna
@@ -76,11 +70,8 @@ class MainActivity : ComponentActivity() {
 private data class Tab(val label: String, val judul: String, val ikon: ImageVector)
 
 private val DAFTAR_TAB = listOf(
-    Tab("Beranda", "Absensi Kinerja", Icons.Filled.Home),
+    Tab("Beranda", "Absensi & Strong Point", Icons.Filled.Home),
     Tab("Absensi", "Absensi", Icons.Filled.Place),
-    Tab("Rencana", "Rencana Kerja", Icons.AutoMirrored.Filled.List),
-    Tab("Hasil", "Hasil Kerja", Icons.Filled.CheckCircle),
-    Tab("Output", "Output", Icons.Filled.Star),
     Tab("Strong", "Strong Point", Icons.Filled.DateRange)
 )
 
@@ -102,28 +93,25 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
         }
     }
 
-    	if (vm.memuatSesi || vm.wizardIzinSelesai == null) {
-    		Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    			CircularProgressIndicator(color = Warna.Navy)
-    		}
-    		return
-    	}
+    if (vm.memuatSesi || vm.wizardIzinSelesai == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Warna.Navy)
+        }
+        return
+    }
 
-    	if (vm.wizardIzinSelesai == false) {
-    		WizardIzinScreen(onSelesai = vm::tandaiWizardIzinSelesai)
-    		return
-    	}
+    if (vm.wizardIzinSelesai == false) {
+        WizardIzinScreen(onSelesai = vm::tandaiWizardIzinSelesai)
+        return
+    }
 
     var tabAktif by rememberSaveable { mutableStateOf(0) }
     var bukaProfil by rememberSaveable { mutableStateOf(false) }
-    var bukaPersetujuanRencana by rememberSaveable { mutableStateOf(false) }
-    var bukaVerifikasiHasil by rememberSaveable { mutableStateOf(false) }
-    var bukaVerifikasiOutput by rememberSaveable { mutableStateOf(false) }
 
-    	if (vm.pengguna == null) {
-    		LoginScreen(vm) { bukaProfil = false }
-    		return
-    	}
+    if (vm.pengguna == null) {
+        LoginScreen(vm) { bukaProfil = false }
+        return
+    }
 
     if (bukaProfil) {
         Scaffold(
@@ -136,7 +124,11 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                     ),
                     navigationIcon = {
                         IconButton(onClick = { bukaProfil = false }) {
-                            Text("‹", color = Color.White, style = androidx.compose.material3.MaterialTheme.typography.headlineSmall)
+                            Text(
+                                "‹",
+                                color = Color.White,
+                                style = androidx.compose.material3.MaterialTheme.typography.headlineSmall
+                            )
                         }
                     }
                 )
@@ -207,36 +199,11 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
                 0 -> BerandaScreen(
                     vm = vm,
                     onBukaAbsensi = { tabAktif = 1 },
-                    onBukaPersetujuan = {
-                        bukaPersetujuanRencana = true
-                        tabAktif = 2
-                    },
-                    onBukaVerifikasiHasil = {
-                        bukaVerifikasiHasil = true
-                        tabAktif = 3
-                    },
-                    onBukaVerifikasiOutput = {
-                        bukaVerifikasiOutput = true
-                        tabAktif = 4
-                    }
+                    onBukaStrong = { tabAktif = 2 }
                 )
+
                 1 -> AbsensiScreen(vm)
-                2 -> RencanaScreen(
-                    vm = vm,
-                    mintaBukaPersetujuan = bukaPersetujuanRencana,
-                    onPersetujuanDibuka = { bukaPersetujuanRencana = false }
-                )
-                3 -> HasilScreen(
-                    vm = vm,
-                    mintaBukaVerifikasi = bukaVerifikasiHasil,
-                    onVerifikasiDibuka = { bukaVerifikasiHasil = false }
-                )
-                4 -> OutputScreen(
-                    vm = vm,
-                    mintaBukaVerifikasi = bukaVerifikasiOutput,
-                    onVerifikasiDibuka = { bukaVerifikasiOutput = false }
-                )
-                5 -> PhScreen(vm)
+                2 -> PhScreen(vm)
             }
         }
     }

@@ -142,6 +142,7 @@ export interface JadwalPhSaya {
 	tanggal: string;
 	jam_mulai: string;
 	jam_selesai: string;
+	sesi: 'pagi' | 'sore' | null;
 	regu: string | null;
 	catatan: string | null;
 	peran: string | null;
@@ -170,6 +171,8 @@ export interface AbsensiPh {
 	perlu_verifikasi: boolean;
 	verified_at: string | null;
 	catatan_verifikator: string | null;
+	menit_telat: number;
+	menit_pulang_cepat: number;
 }
 
 export interface AbsensiPhRequest {

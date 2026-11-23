@@ -345,13 +345,13 @@ class Repositori(
 
     // ---------------------------------------------------------------------- PH
 
-    suspend fun jadwalPhSaya(bulan: String): List<JadwalPhSaya> {
-        val teks = api.panggil("GET", "ph/jadwal/saya?bulan=$bulan")
+    suspend fun jadwalPhSaya(dari: String, sampai: String): List<JadwalPhSaya> {
+        val teks = api.panggil("GET", "ph/jadwal/saya?dari=$dari&sampai=$sampai")
         return json.decodeFromString(ListSerializer(JadwalPhSaya.serializer()), teks)
     }
 
-    suspend fun absensiPhSaya(bulan: String): List<AbsensiPh> {
-        val teks = api.panggil("GET", "ph/absensi/saya?bulan=$bulan")
+    suspend fun absensiPhSaya(dari: String, sampai: String): List<AbsensiPh> {
+        val teks = api.panggil("GET", "ph/absensi/saya?dari=$dari&sampai=$sampai")
         return json.decodeFromString(ListSerializer(AbsensiPh.serializer()), teks)
     }
 

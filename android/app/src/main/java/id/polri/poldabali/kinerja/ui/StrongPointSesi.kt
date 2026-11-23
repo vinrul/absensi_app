@@ -2,7 +2,7 @@ package id.polri.poldabali.kinerja.ui
 
 import id.polri.poldabali.kinerja.data.AbsensiPh
 import id.polri.poldabali.kinerja.data.AbsensiPhRequest
-import java.time.Duration
+import id.polri.poldabali.kinerja.data.JadwalPhSaya
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -22,18 +22,10 @@ internal data class StatusStrongPoint(
 
     val terbuka: Boolean =
         masukTerakhir != null &&
-            (pulangTerakhir == null || masukTerakhir.waktu.isAfter(pulangTerakhir.waktu))
+                (pulangTerakhir == null || masukTerakhir.waktu.isAfter(pulangTerakhir.waktu))
 
-    val durasiTerbuka: Duration? =
-        if (terbuka && masukTerakhir != null) {
-            Duration.between(masukTerakhir.waktu, Instant.now())
-        } else {
-            null
-        }
-
-    /** Check-in terbuka lebih dari 2 jam dianggap sesi pagi yang tidak check-out. */
-    val perluCheckInBaru: Boolean =
-        terbuka && (durasiTerbuka?.toMinutes() ?: 0) >= 120
+    /** Satu jadwal = satu sesi pagi/sore; check-in hanya sekali. */
+    val perluCheckInBaru: Boolean = false
 }
 
 private val ZONA_WITA: ZoneId = ZoneId.of("Asia/Makassar")
@@ -72,4 +64,21 @@ internal fun statusStrongPoint(
         }
 
     return StatusStrongPoint((dariServer + dariAntrean).sortedBy { it.waktu })
+}
+
+/** Sesi yang masih perlu ditindaklanjuti hari ini: yang sedang terbuka atau
+ * belum check-in sama sekali. Bila semua selesai, pakai jadwal pertama. */
+internal fun pilihJadwalHariIni(
+    jadwal: List<JadwalPhSaya>,
+    absensi: List<AbsensiPh>,
+    antrean: List<AbsensiPhRequest>,
+    tanggal: String = tanggalHariIni()
+): JadwalPhSaya? {
+    val daftar = jadwal
+        .filter { it.tanggal == tanggal }
+        .sortedBy { it.jamMulai }
+    return daftar.firstOrNull { item ->
+        val status = statusStrongPoint(item.id, absensi, antrean)
+        status.terbuka || status.sesi.none { it.jenis == "masuk" }
+    } ?: daftar.firstOrNull()
 }

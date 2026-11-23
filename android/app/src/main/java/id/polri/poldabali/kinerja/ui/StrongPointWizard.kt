@@ -72,7 +72,7 @@ private const val HIJAU_STRONG_POINT = 0xFF2E7D32.toInt()
 fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
     val konteks = LocalContext.current
     val skop = rememberCoroutineScope()
-    val jadwal = vm.jadwalPh.firstOrNull { it.tanggal == tanggalHariIni() }
+    val jadwal = pilihJadwalHariIni(vm.jadwalPh, vm.absensiPh, vm.antreanPh)
 
     var langkah by rememberSaveable { mutableIntStateOf(LANGKAH_LOKASI) }
     var jenis by rememberSaveable { mutableStateOf("masuk") }
@@ -356,15 +356,11 @@ fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
                             keteranganJadwal(jadwal.regu, jadwal.strongPointNama)
                         )
                         Spacer(Modifier.height(6.dp))
+                        BarisInfo(
+                            "Sesi",
+                            "${if (jadwal.sesi == "sore") "Sore" else "Pagi"} ${jadwal.jamMulai}–${jadwal.jamSelesai}"
+                        )
                         BarisInfo("Status", statusHariIni(status))
-                        if (status.perluCheckInBaru) {
-                            Spacer(Modifier.height(6.dp))
-                            KotakPesan(
-                                "Check-in pukul ${status.masukTerakhir?.jam.orEmpty()} belum check-out " +
-                                        "(lebih dari 2 jam). Check-in baru akan dicatat sebagai sesi berikutnya.",
-                                JenisPesan.Info
-                            )
-                        }
                     }
 
                     if (!daring) {
@@ -376,31 +372,37 @@ fun WizardStrongPoint(vm: KinerjaViewModel, onTutup: () -> Unit) {
                             Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            TombolAbsenStrong(
-                                "CHECK-IN",
-                                "(Offline)",
-                                Warna.Hijau,
-                                Modifier.weight(1f)
-                            ) { mulai("masuk", true) }
-                            TombolAbsenStrong(
-                                "CHECK-OUT",
-                                "(Offline)",
-                                Warna.Merah,
-                                Modifier.weight(1f)
-                            ) { mulai("pulang", true) }
+                            if (status.sesi.none { it.jenis == "masuk" }) {
+                                TombolAbsenStrong(
+                                    "CHECK-IN",
+                                    "(Offline)",
+                                    Warna.Hijau,
+                                    Modifier.weight(1f)
+                                ) { mulai("masuk", true) }
+                            }
+                            if (status.terbuka) {
+                                TombolAbsenStrong(
+                                    "CHECK-OUT",
+                                    "(Offline)",
+                                    Warna.Merah,
+                                    Modifier.weight(1f)
+                                ) { mulai("pulang", true) }
+                            }
                         }
-                    } else if (status.terbuka && !status.perluCheckInBaru) {
+                    } else if (status.terbuka) {
                         TombolAbsenStrong(
                             "CHECK-OUT",
                             "(Check Out)",
                             Warna.Merah
                         ) { mulai("pulang", false) }
-                    } else {
+                    } else if (status.sesi.none { it.jenis == "masuk" }) {
                         TombolAbsenStrong(
                             "CHECK-IN",
                             "(Check In)",
                             Warna.Hijau
                         ) { mulai("masuk", false) }
+                    } else {
+                        KotakPesan("Sesi strong point ini sudah selesai.", JenisPesan.Sukses)
                     }
                 }
             }

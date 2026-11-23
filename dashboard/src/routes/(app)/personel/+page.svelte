@@ -4,6 +4,7 @@
 	import { adalahAdmin, session } from '#lib/stores/session.svelte';
 	import type { ListResponse, Personel, Role, RoleScope, Satker } from '#lib/types';
 	import Badge from '#lib/components/Badge.svelte';
+	import Combobox from '#lib/components/Combobox.svelte';
 	import Icon from '#lib/components/Icon.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 
@@ -128,6 +129,46 @@
 				p.id !== form.id
 		)
 	);
+	const opsiPangkat = $derived.by(() => {
+		const daftar = [
+			...PANGKAT_POLRI.map((p) => ({ ...p, grup: 'Polri' })),
+			...PANGKAT_ASN.map((p) => ({ ...p, grup: 'ASN (PNS)' }))
+		];
+		if (form.pangkat && !daftar.some((p) => p.value === form.pangkat)) {
+			daftar.push({ value: form.pangkat, label: form.pangkat, grup: 'Data lama' });
+		}
+		return daftar;
+	});
+	const opsiSatker = $derived.by(() => {
+		const daftar: { value: string; label: string; keterangan?: string }[] = satkerOptions.map(
+			(s) => ({ value: s.id, label: s.nama, keterangan: s.kode })
+		);
+		if (form.satker_id && !daftar.some((s) => s.value === form.satker_id)) {
+			const satker = satkerList.find((s) => s.id === form.satker_id);
+			daftar.push(
+				satker
+					? { value: satker.id, label: satker.nama, keterangan: satker.kode }
+					: { value: form.satker_id, label: 'Satker tidak dikenal' }
+			);
+		}
+		return daftar;
+	});
+	const opsiAtasan = $derived.by(() => {
+		const daftar: { value: string; label: string; keterangan?: string }[] = atasanOptions.map((p) => ({
+			value: p.id,
+			label: p.nama,
+			keterangan: `${p.nrp} · ${p.pangkat}`
+		}));
+		if (form.atasan_id && !daftar.some((p) => p.value === form.atasan_id)) {
+			const atasan = semuaPersonel.find((p) => p.id === form.atasan_id);
+			daftar.push(
+				atasan
+					? { value: atasan.id, label: atasan.nama, keterangan: `${atasan.nrp} · ${atasan.pangkat}` }
+					: { value: form.atasan_id, label: 'Atasan tidak dikenal' }
+			);
+		}
+		return daftar;
+	});
 	const totalHalaman = $derived(Math.max(1, Math.ceil(meta.total / meta.per_page)));
 
 	function kosong(): FormPersonel {
@@ -492,38 +533,24 @@
 	<div class="grid gap-3 sm:grid-cols-2">
 		<div><label class="label" for="nrp">NRP</label><input id="nrp" class="input" bind:value={form.nrp} disabled={Boolean(form.id)} /></div>
 		<div><label class="label" for="nama">Nama</label><input id="nama" class="input" bind:value={form.nama} /></div>
-		<div><label class="label" for="pangkat">Pangkat</label>
-			<select id="pangkat" class="input" bind:value={form.pangkat}>
-				<optgroup label="Polri">
-					{#each PANGKAT_POLRI as p}
-						<option value={p.value}>{p.label}</option>
-					{/each}
-				</optgroup>
-				<optgroup label="ASN (PNS)">
-					{#each PANGKAT_ASN as p}
-						<option value={p.value}>{p.label}</option>
-					{/each}
-				</optgroup>
-				{#if !PANGKAT_POLRI.some((p) => p.value === form.pangkat) && !PANGKAT_ASN.some((p) => p.value === form.pangkat)}
-					<option value={form.pangkat}>{form.pangkat} (data lama)</option>
-				{/if}
-			</select>
+		<div>
+			<label class="label" for="pangkat">Pangkat</label>
+			<Combobox id="pangkat" bind:value={form.pangkat} options={opsiPangkat} placeholder="Pilih pangkat" />
 		</div>
 		<div><label class="label" for="jabatan">Jabatan</label><input id="jabatan" class="input" bind:value={form.jabatan} /></div>
 		<div>
 			<label class="label" for="psatker">Satker</label>
-			<select id="psatker" class="input" bind:value={form.satker_id}>
-				{#each satkerOptions as s}<option value={s.id}>{s.nama}</option>{/each}
-			</select>
+			<Combobox id="psatker" bind:value={form.satker_id} options={opsiSatker} placeholder="Pilih satker" />
 		</div>
 		<div>
 			<label class="label" for="patasan">Atasan Langsung</label>
-			<select id="patasan" class="input" bind:value={form.atasan_id}>
-				<option value="">Belum ditetapkan</option>
-				{#each atasanOptions as p}
-					<option value={p.id}>{p.nama} · {p.nrp}</option>
-				{/each}
-			</select>
+			<Combobox
+				id="patasan"
+				bind:value={form.atasan_id}
+				options={opsiAtasan}
+				placeholder="Pilih atasan langsung"
+				labelKosong="Belum ditetapkan"
+			/>
 		</div>
 		<div><label class="label" for="phone">Telepon</label><input id="phone" class="input" bind:value={form.phone} /></div>
 		{#if !form.id}

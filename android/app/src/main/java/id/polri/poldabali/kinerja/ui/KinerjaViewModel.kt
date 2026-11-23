@@ -36,6 +36,7 @@ import id.polri.poldabali.kinerja.sync.Pengingat
 import id.polri.poldabali.kinerja.sync.Sinkronisasi
 import kotlinx.coroutines.launch
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 
 class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
@@ -852,9 +853,10 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     // ---------------------------------------------------------------------- PH
 
     private suspend fun muatPhLangsung() {
-        val bulan = awalBulan().take(7)
-        jadwalPh = repo.jadwalPhSaya(bulan)
-        absensiPh = repo.absensiPhSaya(bulan)
+        val dari = LocalDate.now().minusDays(7).toString()
+        val sampai = LocalDate.now().plusDays(30).toString()
+        jadwalPh = repo.jadwalPhSaya(dari, sampai)
+        absensiPh = repo.absensiPhSaya(dari, sampai)
         antreanPh = repo.daftarAntreanPh()
         Pengingat.jadwalkan(getApplication(), jadwalPh)
     }

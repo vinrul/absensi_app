@@ -73,9 +73,8 @@ export function statusStrongPoint(
 	const terbuka =
 		masukTerakhir !== null &&
 		(pulangTerakhir === null || masukTerakhir.waktu > pulangTerakhir.waktu);
-	const perluCheckInBaru = terbuka && sekarang - (masukTerakhir?.waktu ?? sekarang) >= 2 * 60 * 60 * 1000;
 
-	return { sesi, masukTerakhir, pulangTerakhir, terbuka, perluCheckInBaru };
+	return { sesi, masukTerakhir, pulangTerakhir, terbuka, perluCheckInBaru: false };
 }
 
 export function keteranganJadwal(regu: string | null, strongPoint: string): string {

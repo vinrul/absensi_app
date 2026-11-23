@@ -1,4 +1,10 @@
-# Checklist UAT — Absensi & Penilaian Kinerja Personel Polda Bali
+# Checklist UAT — Absensi & Strong Point Personel Polda Bali
+
+> **Catatan (23 November 2026):** Fokus aplikasi kini **absensi + strong point**. Skenario
+> Rencana/Hasil/Output/Penilaian/Periode di dokumen ini **tidak berlaku untuk UI baru** (modul
+> dorman). Aturan strong point “2 jam” diganti jendela sesi: check-in dibuka 30 menit sebelum
+> jam mulai dan ditutup di jam selesai; check-out maksimal 60 menit setelah jam selesai.
+> Satu jadwal = satu sesi pagi/sore. Lihat `HANDOFF.md` §3.17 dan `CHECKLIST.md` §4.
 
 Status: ✅ = sudah diverifikasi otomatis (API/e2e) · ⬜ = perlu diuji manual di lapangan.
 
@@ -12,7 +18,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 
 | # | Skenario | Hasil yang diharapkan | Status | Catatan |
 |---|---|---|---|---|
-| A1 | Buka `/docs` | Daftar seluruh operasi (88 path) tampil, filter tag berfungsi | ✅ | |
+| A1 | Buka `/docs` | Daftar seluruh operasi (92 path) tampil, filter tag berfungsi | ✅ | |
 | A2 | Login memakai username `superuser` | Berhasil; `jenis_akun=admin`, `nrp=null` | ✅ | API |
 | A3 | Login memakai NRP `000001` | Gagal (admin tidak punya NRP) | ✅ | API |
 | A4 | Login `superuser` dengan `client=android` | 403 "Akun admin hanya dapat masuk melalui dashboard web" | ✅ | API |
@@ -61,12 +67,15 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | A47 | Buka `/ph?tab=strong` | Dialihkan ke `?tab=jadwal`; tombol master **Strong Point** tidak tampil; tab hanya Jadwal Strong Point & Rekap Strong Point | ✅ | UI (Chrome headless) |
 | A48 | Hari kerja dengan jadwal strong point; personel check-in strong point lalu absen kantor 08:30 | Menit telat absensi kantor pada hari itu **0** (dikecualikan) dan detail menandai **Strong point** | ✅ | API + seed |
 | A49 | Personel punya jadwal strong point tetapi tidak check-in, lalu absen kantor 08:30 | Menit telat tetap dihitung (60 menit bila jam masuk 07:30) | ✅ | API + seed |
-| A50 | Rekap Strong Point | Kolom Check-in, **Hanya Check-in**, **Tidak Strong Point** beserta tanggal; badge per personel (Hanya check-in / Tidak strong point / Lengkap); kolom telat tidak ada; jadwal setelah hari ini **tidak dihitung** | ✅ | UI (Chrome headless) |
-| A51 | Tambah/Edit Jadwal Strong Point | Form hanya berisi Satker, Regu, Tanggal, Catatan, dan Personel; tidak ada combo strong point maupun jam mulai/selesai; simpan/ubah berhasil | ✅ | UI (Chrome headless) + API |
-| A52 | Isi tanggal mulai 1 dan selesai 6 lalu simpan | Terbentuk **6 jadwal** (satu per tanggal) dengan regu & anggota yang sama, bukan satu baris rentang | ✅ | API + UI |
-| A53 | Buka tab Jadwal Strong Point | Roster bulanan: kolom tanggal 1–akhir bulan, anggota × pangkat, dan blok biru berlabel regu pada tanggal yang dijadwalkan; daftar kelola jadwal dapat dibuka | ✅ | UI (Chrome headless) |
-| A54 | **Export PDF** pada tab Jadwal Strong Point | `jadwal-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh sesuai bulan & satker; berbentuk **roster** seperti dashboard: No, Anggota, Pangkat, dan kolom tanggal 1–akhir bulan dengan blok biru berlabel regu | ✅ | API + Chrome headless |
-| A55 | **Export PDF** pada tab Rekap Strong Point | `rekap-strong-point-YYYYMMDD-YYYYMMDD.pdf` terunduh; perhitungan dibatasi sampai hari ini (tanggal setelahnya tidak dianggap tidak strong point); memuat Check-in, Hanya Check-in + tanggal, Tidak Strong Point + tanggal, Menunggu (tanpa telat) | ✅ | API |
+| A50 | Rekap Strong Point (rentang tanggal) | Kolom Check-in, **Hanya Check-in**, **Tidak Strong Point**, total telat, total pulang cepat; jadwal setelah hari ini tidak dihitung | ✅ | API + UI |
+| A51 | Tambah/Edit Jadwal Strong Point | Form memuat satker, tanggal/rentang, **sesi pagi/sore**, jam mulai/selesai, regu, personel; **tanpa pilihan titik**; titik diambil otomatis dari penempatan anggota | ✅ | UI + API |
+| A52 | Salin jadwal bulan sebelumnya | `POST /ph/jadwal/salin` menyalin jadwal dengan pemetaan hari + urutan minggu; jadwal tujuan tanpa absensi diganti jika `timpa=true` | ✅ | API + UI |
+| A53 | Buka tab Jadwal Strong Point | Daftar jadwal berpaginasi (Tanggal/Sesi/Jam/Titik/Regu/Anggota), bukan roster bulanan | ✅ | UI + API |
+| A54 | **Export PDF** pada tab Jadwal Strong Point | PDF tabel jadwal sesuai rentang & satker | ✅ | API + Chrome headless |
+| A55 | **Export PDF** pada tab Rekap Strong Point | PDF rekap per rentang; memuat telat & pulang cepat; perhitungan dibatasi sampai hari ini | ✅ | API |
+| A55a | Bulan berjalan belum punya jadwal (fake time Desember) | Sistem menyalin jadwal November secara otomatis dan menandai `disalin_dari_bulan` di dashboard | ✅ | API + smoke |
+| A55b | Penempatan anggota: satker (termasuk Polda/Polres) → titik → checkbox anggota (tanpa level) | Simpan membuat satu baris per anggota; simpan ulang tidak menggandakan | ✅ | API + UI |
+| A55c | Menyusun jadwal untuk anggota yang belum ditempatkan | Server menolak 422 dan meminta anggota ditempatkan lebih dulu | ✅ | API |
 | A56 | Tombol **Lihat** dokumentasi di Rekap Absensi | Galeri foto absensi per personel tampil (tanggal, masuk/pulang, jam, status); hanya pengelola sesuai cakupan yang dapat membuka | ✅ | API + build |
 | A57 | Dokumentasi di **Detail per Orang** | Tombol **Masuk** dan **Pulang** tampil pada tanggal yang memiliki foto; modal menampilkan gambar penuh | ✅ | API + build |
 | A58 | Tombol **Lihat** dokumentasi di Rekap Strong Point | Galeri foto check-in strong point per personel tampil; foto tanpa token ditolak 401, di luar cakupan 403 | ✅ | API |
@@ -114,7 +123,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | C9b | Check-in → dokumentasi → kirim | Progress "Langkah 2 dari 3", foto/documentasi (dapat dilewati bila kamera tidak tersedia), lalu kirim; status berubah menjadi Check-in pukul HH:mm | ✅ | emulator |
 | C9c | Check-out | Langsung ke "Langkah 2 dari 2" tanpa dokumentasi; status menjadi Sudah check-out pukul HH:mm | ✅ | emulator |
 | C9d | Offline (mode pesawat) | Dua tombol CHECK-IN/CHECK-OUT (Offline) muncul; kirim menampilkan “Kirim Strong Point (Offline)”, antrean tersimpan, lalu terkirim otomatis saat jaringan kembali | ✅ | emulator + API |
-| C9e | Check-in lagi setelah check-out | Tombol berubah menjadi CHECK-IN untuk sesi sore/berikutnya | ✅ | emulator |
+| C9e | Setelah check-out sesi pagi | Sesi pagi terkunci (check-in/out hanya sekali); sesi sore tampil sebagai jadwal terpisah dengan tombol check-in sendiri | ✅ | emulator |
 | C10 | Check-in PH tanpa GPS | 422 "Lokasi GPS wajib diambil untuk absensi PH" | ✅ | API |
 | C11 | Check-in PH di luar radius strong point | 422 dengan jarak aktual | ✅ | API |
 | C12 | Check-out PH dari lokasi berbeda (mis. rumah) | Ditolak 422 (wajib lokasi & radius) | ✅ | API |
@@ -209,7 +218,7 @@ Akun demo: lihat tabel di `docs/CHECKLIST.md` §6 (admin global `superuser / Sup
 | F3 | `bun run check` | 0 error, 0 warning (dashboard & personel) | ✅ | |
 | F4 | `bun run build` | SPA statis terbentuk di `dashboard/build` dan `personel/build` | ✅ | |
 | F5 | `.gradlew :app:assembleDebug` | APK debug terbentuk | ✅ | |
-| F6 | `bun tools/uji/api-smoke.js` | 60/60 cek lulus (DB `kinerja_test`) | ✅ | |
+| F6 | `bun tools/uji/api-smoke.js` | 74/74 cek lulus (DB `kinerja_test`) | ✅ | |
 | F7 | `bun tools/uji/openapi-check.js` | JSON valid, semua `$ref` ada | ✅ | |
 | F8 | Restore backup di lingkungan uji | Data & berkas kembali utuh | ⬜ | |
 | F9 | Uji 1 bulan data riil | Hitung periode < 60 detik | ⬜ | |
@@ -243,11 +252,11 @@ Bukti: screenshot / log
 | W1 | Login `85000001` / `000100` di `localhost:5174` | Berhasil masuk ke Beranda; tombol mata pada password berfungsi | ✅ | API + Chrome headless (sesi uji) |
 | W2 | Login akun admin (`superuser`) di web personel | Ditolak 403 dengan pesan kanal login | ✅ | API |
 | W3 | Buka aplikasi pertama kali setelah login | Wizard izin browser tampil (lokasi, kamera, notifikasi, antrean), dapat dilewati | ✅ | build |
-| W4 | Beranda | Salam + avatar, status masuk/pulang hari ini, kartu strong point, nilai periode, ringkasan dokumen, bottom navigation 6 tab | ✅ | Chrome headless |
+| W4 | Beranda | Salam + avatar, status masuk/pulang hari ini, kartu strong point, antrean offline, bottom navigation **Beranda/Absensi/Strong** | ✅ | Chrome headless |
 | W5 | Absensi → ambil lokasi → pilih status → kirim | Peta OSM, koordinat/akurasi/jarak/titik dinas tampil; Dinas Kantor/Piket ditolak di luar radius; foto opsional | ⬜ | perlu GPS perangkat |
 | W6 | Absensi saat server tidak terjangkau | Kedua tombol Masuk/Pulang tampil; data dapat disimpan offline dan dikirim lewat antrean | ✅ | build + API antrean |
 | W7 | Strong Point tanpa jadwal hari ini | Pesan “tidak ada jadwal” tampil; wizard tidak mengirim data | ✅ | Chrome headless |
-| W8 | Strong Point check-in > 2 jam tanpa check-out | Tombol check-in kembali tampil dengan catatan sesi baru; check-out tanpa dokumentasi | ✅ | build (logika) |
+| W8 | Strong Point: sesi sudah check-out | Tombol check-in tidak tampil untuk jadwal itu; sesi lain (sore) dapat dipilih dari daftar; check-out tanpa dokumentasi | ✅ | build (logika) |
 | W9 | Wizard Rencana 4 langkah | Jenis → dasar SP/TOR/lisan → rincian kegiatan (multi) → lampiran; simpan draft, ajukan, dan ubah/perbaiki | ✅ | Chrome headless (tampilan) + endpoint Android |
 | W10 | Wizard Hasil 3 langkah & Output 3 langkah | Pilih rencana disetujui/hasil terverifikasi, isi data, unggah bukti, simpan draft/ajukan | ✅ | build + endpoint Android |
 | W11 | Atasan membuka Persetujuan Rencana | Dua rencana tampil; detail + lampiran; Setujui/Minta Revisi/Tolak dengan catatan wajib untuk non-setuju | ✅ | Chrome headless (daftar) + endpoint Android |

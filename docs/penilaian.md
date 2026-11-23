@@ -4,6 +4,11 @@ Dokumen ini merinci implementasi `backend/src/service/scoring.rs` dan
 `backend/src/service/penilaian.rs`. Semua bobot dibaca dari tabel
 `bobot_indikator` per periode (default 20/20/30/30).
 
+> **Status modul:** penilaian/periode **dorman** — API, tabel, dan rumus di bawah tetap ada,
+> tetapi menu Penilaian/Periode/Kesiapan dinonaktifkan dari dashboard. Aplikasi kini fokus pada
+> absensi kehadiran dan strong point dengan laporan per rentang tanggal. Dokumen ini dipertahankan
+> untuk menjaga kompatibilitas bila modul diaktifkan kembali.
+
 ## 1. Absensi (bobot 20%)
 
 Perhitungan dilakukan per hari kerja efektif dalam periode. Akun dengan
@@ -31,7 +36,9 @@ personel yang dinilai.
   diabaikan (pulang cepat tetap dihitung). Bila jadwal strong point tidak dijalankan sama sekali,
   absensi kantor dihitung normal termasuk keterlambatan. Detail perhitungan menyimpan
   `detail.hari_ph` (jumlah hari ber-jadwal) dan `detail.hari_ph_dilakukan` (jumlah hari dengan
-  check-in strong point).
+  check-in strong point). Catatan: pada strong point v2, satu hari dapat memiliki sesi pagi dan
+  sore; `menit_telat`/`menit_pulang_cepat` per sesi dipakai di rekap strong point, sedangkan
+  penilaian absensi kantor tetap memakai aturan netralisasi di atas.
 - Hari kerja tanpa catatan absensi dihitung **0** (dianggap tanpa keterangan).
 - Periode berjalan hanya menghitung hari sampai kemarin agar personel tidak
   dihukum untuk hari yang belum terjadi.

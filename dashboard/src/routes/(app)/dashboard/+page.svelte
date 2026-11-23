@@ -1,99 +1,97 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api, ApiError } from '#lib/api/client';
-	import { adalahPimpinan, session } from '#lib/stores/session.svelte';
 	import type {
-		Kategori,
-		Penilaian,
-		Periode,
-		RingkasanDashboard,
-		Satker
+		AbsensiHarian,
+		JadwalPh,
+		ListResponse,
+		Satker,
+		StatusJadwalPh,
+		StatusKehadiran
 	} from '#lib/types';
-	import { LABEL_KATEGORI, LABEL_STATUS_KEHADIRAN } from '#lib/types';
+	import { LABEL_STATUS_KEHADIRAN } from '#lib/types';
 	import StatCard from '#lib/components/StatCard.svelte';
-	import Donut from '#lib/components/Donut.svelte';
-	import TrendChart from '#lib/components/TrendChart.svelte';
-	import CategoryPie from '#lib/components/CategoryPie.svelte';
-	import Badge from '#lib/components/Badge.svelte';
 	import Icon from '#lib/components/Icon.svelte';
-	import Modal from '#lib/components/Modal.svelte';
 
-	interface Capaian {
-		absensi: number;
-		rencana_kerja: number;
-		hasil_kerja: number;
-		output: number;
-		nilai_akhir: number;
+	interface RingkasanKehadiran {
+		tanggal: string;
+		total_personel: number;
+		hadir: number;
+		belum_absensi: number;
+		telat: number;
+		cuti: number;
+		izin: number;
+		sakit: number;
+		persen_hadir: number;
+		sesi_strong_point: number;
+		personel_strong_point: number;
+		hadir_strong_point: number;
 	}
 
-	interface SebaranItem {
-		kategori: Kategori;
-		jumlah: number;
-		persen: number;
-	}
+	const hariIni = () => {
+		const sekarang = new Date();
+		const bagian = new Intl.DateTimeFormat('en-CA', {
+			timeZone: 'Asia/Makassar',
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		}).formatToParts(sekarang);
+		const ambil = (jenis: string) => bagian.find((item) => item.type === jenis)?.value ?? '';
+		return `${ambil('year')}-${ambil('month')}-${ambil('day')}`;
+	};
 
-	let periodeList = $state<Periode[]>([]);
-	let satkerList = $state<Satker[]>([]);
-
-	let periodeId = $state('');
+	let tanggal = $state(hariIni());
 	let satkerId = $state('');
-	let unit = $state('');
-
-	let ringkasan = $state<RingkasanDashboard | null>(null);
-	let capaian = $state<Capaian | null>(null);
-	let tren = $state<{ nama: string; rata_rata: number }[]>([]);
-	let sebaran = $state<SebaranItem[]>([]);
-	let rekap = $state<Penilaian[]>([]);
-	let meta = $state({ page: 1, per_page: 10, total: 0 });
-
+	let satkerList = $state<Satker[]>([]);
+	let ringkasan = $state<RingkasanKehadiran | null>(null);
+	let jadwal = $state<JadwalPh[]>([]);
+	let absensi = $state<AbsensiHarian[]>([]);
+	let statusJadwal = $state<StatusJadwalPh | null>(null);
 	let memuat = $state(true);
 	let error = $state<string | null>(null);
-	let infoHitung = $state<string | null>(null);
 
-	let panelPimpinan = $state(false);
-	let dipilih = $state<Penilaian | null>(null);
-	let catatanPimpinan = $state('');
-	let keputusan = $state<'disetujui' | 'perlu_perbaikan'>('disetujui');
-	let menyimpan = $state(false);
+	const satkerMap = $derived(new Map(satkerList.map((row) => [row.id, row.nama])));
 
-	const bisaNilai = $derived(adalahPimpinan() || session.user?.roles.includes('admin_sistem'));
-	const totalHalaman = $derived(Math.max(1, Math.ceil(meta.total / meta.per_page)));
-
-	function query(page = 1) {
-		const params = new URLSearchParams();
-		if (periodeId) params.set('periode_id', periodeId);
-		if (satkerId) params.set('satker_id', satkerId);
-		if (unit.trim()) params.set('unit', unit.trim());
-		params.set('page', String(page));
-		params.set('per_page', String(meta.per_page));
-		return params.toString();
+	function tanggalPanjang(nilai: string) {
+		return new Date(`${nilai}T00:00:00`).toLocaleDateString('id-ID', {
+			weekday: 'long',
+			day: '2-digit',
+			month: 'long',
+			year: 'numeric'
+		});
 	}
 
-	async function muatSemua(page = 1) {
+	function statusHarian(row: AbsensiHarian): StatusKehadiran | null {
+		return row.status_masuk ?? row.status_pulang;
+	}
+
+	async function muat() {
 		memuat = true;
 		error = null;
 		try {
-			const dasar = new URLSearchParams();
-			if (periodeId) dasar.set('periode_id', periodeId);
-			if (satkerId) dasar.set('satker_id', satkerId);
-			if (unit.trim()) dasar.set('unit', unit.trim());
+			const params = new URLSearchParams({ tanggal });
+			if (satkerId) params.set('satker_id', satkerId);
+			const paramsJadwal = new URLSearchParams({ dari: tanggal, sampai: tanggal });
+			if (satkerId) paramsJadwal.set('satker_id', satkerId);
+			const paramsAbsensi = new URLSearchParams({
+				dari: tanggal,
+				sampai: tanggal,
+				per_page: '500'
+			});
+			if (satkerId) paramsAbsensi.set('satker_id', satkerId);
+			const paramsStatus = new URLSearchParams({ bulan: tanggal.slice(0, 7) });
+			if (satkerId) paramsStatus.set('satker_id', satkerId);
 
-			const [r, c, t, s, k] = await Promise.all([
-				api<RingkasanDashboard>(`/dashboard/ringkasan?${dasar}`),
-				api<Capaian>(`/dashboard/capaian-indikator?${dasar}`),
-				api<{ nama: string; rata_rata: number }[]>(`/dashboard/tren?bulan=6${satkerId ? `&satker_id=${satkerId}` : ''}`),
-				api<SebaranItem[]>(`/dashboard/sebaran-kategori?${dasar}`),
-				api<{ data: Penilaian[]; meta: { page: number; per_page: number; total: number } }>(
-					`/dashboard/rekap?${query(page)}`
-				)
+			const [r, j, a, s] = await Promise.all([
+				api<RingkasanKehadiran>(`/dashboard/kehadiran?${params}`),
+				api<JadwalPh[]>(`/ph/jadwal?${paramsJadwal}`),
+				api<ListResponse<AbsensiHarian>>(`/absensi/harian?${paramsAbsensi}`),
+				api<StatusJadwalPh>(`/ph/jadwal/status?${paramsStatus}`)
 			]);
-
 			ringkasan = r;
-			capaian = c;
-			tren = t;
-			sebaran = s;
-			rekap = k.data;
-			meta = k.meta;
+			jadwal = j;
+			absensi = a.data;
+			statusJadwal = s;
 		} catch (err) {
 			error = err instanceof ApiError ? err.message : 'Gagal memuat dashboard';
 		} finally {
@@ -101,117 +99,57 @@
 		}
 	}
 
-	async function hitungUlang() {
-		if (!periodeId) return;
-		infoHitung = 'Menghitung…';
-		try {
-			const hasil = await api<{ jumlah_personel: number; rata_rata_nilai: number }>(
-				`/penilaian/${periodeId}/hitung`,
-				{ method: 'POST' }
-			);
-			infoHitung = `${hasil.jumlah_personel} personel dihitung · rata-rata ${hasil.rata_rata_nilai.toFixed(2)}`;
-			await muatSemua(meta.page);
-		} catch (err) {
-			infoHitung = err instanceof ApiError ? err.message : 'Gagal menghitung penilaian';
-		}
-	}
-
-	function bukaPanel(row: Penilaian) {
-		dipilih = row;
-		catatanPimpinan = row.catatan_pimpinan ?? '';
-		keputusan = row.keputusan ?? 'disetujui';
-		panelPimpinan = true;
-	}
-
-	async function simpanKeputusan() {
-		if (!dipilih) return;
-		menyimpan = true;
-		try {
-			await api(`/penilaian/${dipilih.id}/keputusan`, {
-				method: 'POST',
-				body: { catatan: catatanPimpinan || null, keputusan }
-			});
-			panelPimpinan = false;
-			await muatSemua(meta.page);
-		} catch (err) {
-			error = err instanceof ApiError ? err.message : 'Gagal menyimpan keputusan';
-		} finally {
-			menyimpan = false;
-		}
-	}
-
-	function nada(kategori: Kategori) {
-		if (kategori === 'sangat_baik') return 'green';
-		if (kategori === 'baik') return 'blue';
-		if (kategori === 'cukup') return 'amber';
-		return 'red';
-	}
-
 	onMount(async () => {
 		try {
-			const [p, s] = await Promise.all([api<Periode[]>('/periode'), api<Satker[]>('/satker')]);
-			periodeList = p;
-			satkerList = s;
-			periodeId = p[0]?.id ?? '';
-			await muatSemua(1);
-		} catch (err) {
-			error = err instanceof ApiError ? err.message : 'Gagal memuat data awal';
-			memuat = false;
+			satkerList = await api<Satker[]>('/satker');
+		} catch {
+			satkerList = [];
 		}
+		await muat();
 	});
 </script>
 
 <svelte:head>
-	<title>Dashboard Penilaian Kinerja — Polda Bali</title>
+	<title>Dashboard Kehadiran — Polda Bali</title>
 </svelte:head>
 
 <div class="space-y-4">
-	<!-- Filter -->
+	{#if statusJadwal}
+		{#if statusJadwal.disalin_dari_bulan}
+			<p class="rounded-lg bg-amber-50 px-4 py-2 text-sm text-amber-800 ring-1 ring-amber-200">
+				Jadwal strong point bulan ini belum disusun; sistem memakai salinan jadwal sebelumnya.
+				Segera susun jadwal bulan ini di menu Strong Point.
+			</p>
+		{:else if statusJadwal.perlu_susun_bulan_depan && statusJadwal.bulan.slice(0, 7) === hariIni().slice(0, 7)}
+			<p class="rounded-lg bg-sky-50 px-4 py-2 text-sm text-sky-800 ring-1 ring-sky-200">
+				Jadwal strong point bulan depan belum disusun. Segera susun sebelum tanggal 1 agar tidak
+				memakai jadwal bulan sebelumnya.
+			</p>
+		{/if}
+	{/if}
 	<div class="card flex flex-wrap items-end gap-3 p-4 no-print">
 		<div class="min-w-40 flex-1">
-			<label class="label" for="periode">Periode Penilaian</label>
-			<select id="periode" class="input" bind:value={periodeId} onchange={() => muatSemua(1)}>
-				{#each periodeList as p}
-					<option value={p.id}>{p.nama}</option>
-				{/each}
-			</select>
+			<label class="label" for="tanggal">Tanggal</label>
+			<input id="tanggal" type="date" class="input" bind:value={tanggal} onchange={muat} />
 		</div>
-
-		<div class="min-w-40 flex-1">
+		<div class="min-w-52 flex-1">
 			<label class="label" for="satker">Satuan Kerja</label>
-			<select id="satker" class="input" bind:value={satkerId} onchange={() => muatSemua(1)}>
+			<select id="satker" class="input" bind:value={satkerId} onchange={muat}>
 				<option value="">Semua Satker</option>
 				{#each satkerList as s}
 					<option value={s.id}>{s.nama}</option>
 				{/each}
 			</select>
 		</div>
-
-		<div class="min-w-32 flex-1">
-			<label class="label" for="unit">Subdit / Bagian</label>
-			<input id="unit" class="input" placeholder="Semua unit" bind:value={unit} onchange={() => muatSemua(1)} />
-		</div>
-
 		<div class="flex gap-2">
-			<button class="btn btn-ghost border border-slate-300" onclick={() => muatSemua(meta.page)}>
+			<button class="btn btn-ghost border border-slate-300" onclick={muat}>
 				<Icon name="refresh" size={16} /> Muat ulang
 			</button>
-			{#if bisaNilai}
-				<button class="btn btn-primary" onclick={hitungUlang}>
-					<Icon name="trend" size={16} /> Hitung Penilaian
-				</button>
-			{/if}
-			<button class="btn btn-gold" onclick={() => window.print()}>
-				<Icon name="laporan" size={16} /> Cetak
-			</button>
+			<a class="btn btn-primary" href="/absensi/rekap?tab=rekap">
+				<Icon name="laporan" size={16} /> Buka Rekap
+			</a>
 		</div>
 	</div>
-
-	{#if infoHitung}
-		<div class="rounded-lg bg-sky-50 px-4 py-2 text-sm text-sky-800 ring-1 ring-sky-200 no-print">
-			{infoHitung}
-		</div>
-	{/if}
 
 	{#if error}
 		<div class="rounded-lg bg-rose-50 px-4 py-2 text-sm text-rose-700 ring-1 ring-rose-200">
@@ -219,8 +157,7 @@
 		</div>
 	{/if}
 
-	<!-- KPI -->
-	<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+	<div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
 		<StatCard
 			label="Total Personel"
 			nilai={ringkasan?.total_personel ?? 0}
@@ -229,200 +166,136 @@
 			warna="bg-navy-800"
 		/>
 		<StatCard
-			label="Hadir Hari Ini"
-			nilai={ringkasan?.hadir_hari_ini ?? 0}
+			label="Hadir"
+			nilai={ringkasan?.hadir ?? 0}
 			sub={`${(ringkasan?.persen_hadir ?? 0).toFixed(1)}% kehadiran`}
 			icon="check"
 			warna="bg-emerald-600"
 		/>
 		<StatCard
-			label="Rencana Kerja"
-			nilai={ringkasan?.total_rencana ?? 0}
-			sub="periode berjalan"
-			icon="rencana"
+			label="Belum Absen"
+			nilai={ringkasan?.belum_absensi ?? 0}
+			sub="belum ada absensi masuk"
+			icon="clock"
+			warna="bg-rose-600"
+		/>
+		<StatCard
+			label="Telat"
+			nilai={ringkasan?.telat ?? 0}
+			sub="melewati jam masuk"
+			icon="alert"
 			warna="bg-amber-500"
 		/>
 		<StatCard
-			label="Hasil Kerja"
-			nilai={ringkasan?.total_hasil ?? 0}
-			sub="terverifikasi"
-			icon="hasil"
+			label="Sesi Strong Point"
+			nilai={ringkasan?.sesi_strong_point ?? 0}
+			sub={`${ringkasan?.hadir_strong_point ?? 0} dari ${ringkasan?.personel_strong_point ?? 0} anggota check-in`}
+			icon="pin"
 			warna="bg-sky-700"
 		/>
 		<StatCard
-			label="Output"
-			nilai={ringkasan?.total_output ?? 0}
-			sub="disetujui"
-			icon="output"
+			label="Cuti / Izin / Sakit"
+			nilai={(ringkasan?.cuti ?? 0) + (ringkasan?.izin ?? 0) + (ringkasan?.sakit ?? 0)}
+			sub={`${ringkasan?.cuti ?? 0} cuti · ${ringkasan?.izin ?? 0} izin · ${ringkasan?.sakit ?? 0} sakit`}
+			icon="clock"
 			warna="bg-violet-600"
 		/>
-		<StatCard
-			label="Rata-rata Kinerja"
-			nilai={`${(ringkasan?.rata_rata_nilai ?? 0).toFixed(1)}%`}
-			sub={ringkasan?.periode_nama ?? ''}
-			icon="trend"
-			warna="bg-rose-600"
-		/>
 	</div>
 
-	<!-- Chart -->
-	<div class="grid gap-4 lg:grid-cols-3">
-		<div class="card p-4">
-			<h2 class="mb-3 text-sm font-semibold text-slate-700">Capaian Kinerja Per Indikator</h2>
-			<div class="grid grid-cols-2 gap-3">
-				<Donut nilai={capaian?.absensi ?? 0} label="Absensi" warna="#059669" />
-				<Donut nilai={capaian?.rencana_kerja ?? 0} label="Rencana Kerja" warna="#0284c7" />
-				<Donut nilai={capaian?.hasil_kerja ?? 0} label="Hasil Kerja" warna="#0b2545" />
-				<Donut nilai={capaian?.output ?? 0} label="Output" warna="#d4a017" />
+	<p class="text-xs text-slate-500">Ringkasan untuk {tanggalPanjang(tanggal)}.</p>
+
+	<div class="grid gap-4 xl:grid-cols-2">
+		<div class="card overflow-hidden">
+			<div class="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+				<h2 class="text-sm font-semibold text-slate-700">Strong Point Hari Ini</h2>
+				<span class="text-xs text-slate-500">{jadwal.length} sesi</span>
 			</div>
-		</div>
-
-		<div class="card p-4">
-			<h2 class="mb-3 text-sm font-semibold text-slate-700">Tren Capaian Kinerja</h2>
-			<TrendChart points={tren} />
-			<p class="mt-2 text-[11px] text-slate-500">
-				Rata-rata nilai akhir per periode penilaian.
-			</p>
-		</div>
-
-		<div class="card p-4">
-			<h2 class="mb-3 text-sm font-semibold text-slate-700">Sebaran Kategori Kinerja</h2>
-			<CategoryPie items={sebaran} />
-			<p class="mt-3 text-[11px] leading-relaxed text-slate-500">
-				Sangat Baik ≥ 95 · Baik 90–94,99 · Cukup 80–89,99 · Perlu Pembinaan &lt; 80
-			</p>
-		</div>
-	</div>
-
-	<!-- Rekap -->
-	<div class="card overflow-hidden">
-		<div class="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-			<h2 class="text-sm font-semibold text-slate-700">Rekap Penilaian Kinerja Personel</h2>
-			<span class="text-xs text-slate-500">
-				Menampilkan {rekap.length} dari {meta.total} personel
-			</span>
-		</div>
-
-		<div class="overflow-x-auto">
-			<table class="w-full">
-				<thead class="bg-slate-50">
-					<tr>
-						<th class="th">No</th>
-						<th class="th">Nama Personel</th>
-						<th class="th">Pangkat</th>
-						<th class="th">Jabatan / Unit</th>
-						<th class="th text-center">Absensi</th>
-						<th class="th text-center">Rencana</th>
-						<th class="th text-center">Hasil</th>
-						<th class="th text-center">Output</th>
-						<th class="th text-center">Nilai Akhir</th>
-						<th class="th">Kategori</th>
-						{#if bisaNilai}<th class="th no-print">Aksi</th>{/if}
-					</tr>
-				</thead>
-				<tbody class="divide-y divide-slate-100">
-					{#each rekap as row, i}
-						<tr class="hover:bg-slate-50/70">
-							<td class="td text-slate-500">{(meta.page - 1) * meta.per_page + i + 1}</td>
-							<td class="td">
-								<p class="font-medium text-slate-800">{row.personel_nama}</p>
-								<p class="text-[11px] text-slate-500">NRP {row.personel_nrp}</p>
-							</td>
-							<td class="td text-slate-600">{row.pangkat}</td>
-							<td class="td text-slate-600">{row.jabatan}</td>
-							<td class="td text-center">{row.skor_absensi.toFixed(1)}</td>
-							<td class="td text-center">{row.skor_rencana_kerja.toFixed(1)}</td>
-							<td class="td text-center">{row.skor_hasil_kerja.toFixed(1)}</td>
-							<td class="td text-center">{row.skor_output.toFixed(1)}</td>
-							<td class="td text-center font-semibold text-slate-800">
-								{row.nilai_akhir.toFixed(2)}
-							</td>
-							<td class="td"><Badge tone={nada(row.kategori)}>{LABEL_KATEGORI[row.kategori]}</Badge></td>
-							{#if bisaNilai}
-								<td class="td no-print">
-									<button class="btn btn-ghost px-2 py-1 text-xs" onclick={() => bukaPanel(row)}>
-										<Icon name="penilaian" size={14} /> Nilai
-									</button>
-								</td>
-							{/if}
-						</tr>
-					{:else}
+			<div class="overflow-x-auto">
+				<table class="w-full">
+					<thead class="bg-slate-50">
 						<tr>
-							<td class="td text-center text-slate-500" colspan={bisaNilai ? 11 : 10}>
-								{memuat ? 'Memuat data…' : 'Belum ada penilaian pada periode ini. Klik "Hitung Penilaian".'}
-							</td>
+							<th class="th">Sesi / Jam</th>
+							<th class="th">Titik</th>
+							<th class="th">Satker</th>
+							<th class="th text-center">Anggota</th>
 						</tr>
-					{/each}
-				</tbody>
-			</table>
+					</thead>
+					<tbody class="divide-y divide-slate-100">
+						{#each jadwal as row (row.id)}
+							<tr class="hover:bg-slate-50/70">
+								<td class="td">
+									<p class="font-medium capitalize text-slate-800">{row.sesi ?? 'pagi'}</p>
+									<p class="text-[11px] text-slate-500">
+										{row.jam_mulai}–{row.jam_selesai}
+									</p>
+								</td>
+								<td class="td text-slate-600">{row.strong_point_nama}</td>
+								<td class="td text-xs text-slate-500">
+									{satkerMap.get(row.satker_id) ?? '-'}
+								</td>
+								<td class="td text-center text-slate-600">{row.jumlah_personel}</td>
+							</tr>
+						{:else}
+							<tr>
+								<td class="td text-center text-slate-500" colspan="4">
+									{memuat ? 'Memuat…' : 'Tidak ada jadwal strong point pada tanggal ini.'}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
+			</div>
 		</div>
 
-		<div class="flex items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 no-print">
-			<p class="text-xs text-slate-500">Halaman {meta.page} dari {totalHalaman}</p>
-			<div class="flex gap-2">
-				<button
-					class="btn btn-ghost border border-slate-300 px-2 py-1"
-					disabled={meta.page <= 1}
-					onclick={() => muatSemua(meta.page - 1)}
-				>
-					<Icon name="left" size={16} />
-				</button>
-				<button
-					class="btn btn-ghost border border-slate-300 px-2 py-1"
-					disabled={meta.page >= totalHalaman}
-					onclick={() => muatSemua(meta.page + 1)}
-				>
-					<Icon name="right" size={16} />
-				</button>
+		<div class="card overflow-hidden">
+			<div class="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+				<h2 class="text-sm font-semibold text-slate-700">Absensi Masuk / Pulang</h2>
+				<a class="text-xs font-medium text-navy-700 underline" href="/absensi/rekap?tab=detail">
+					Detail rekap
+				</a>
+			</div>
+			<div class="max-h-96 overflow-auto">
+				<table class="w-full">
+					<thead class="sticky top-0 bg-slate-50">
+						<tr>
+							<th class="th">Personel</th>
+							<th class="th">Masuk</th>
+							<th class="th">Pulang</th>
+							<th class="th">Status</th>
+						</tr>
+					</thead>
+					<tbody class="divide-y divide-slate-100">
+						{#each absensi as row (row.personel_id + row.tanggal)}
+							<tr class="hover:bg-slate-50/70">
+								<td class="td">
+									<p class="font-medium text-slate-800">{row.personel_nama}</p>
+									<p class="text-[11px] text-slate-500">
+										{row.personel_nrp} · {satkerMap.get(row.satker_id) ?? row.unit ?? '-'}
+									</p>
+								</td>
+								<td class="td text-slate-600">
+									{row.masuk_jam ?? '-'}
+									{#if row.menit_telat > 0}
+										<span class="ml-1 text-[11px] font-medium text-amber-700">
+											+{row.menit_telat} mnt
+										</span>
+									{/if}
+								</td>
+								<td class="td text-slate-600">{row.pulang_jam ?? '-'}</td>
+								<td class="td text-xs text-slate-600">
+									{LABEL_STATUS_KEHADIRAN[statusHarian(row) ?? 'tanpa_keterangan']}
+								</td>
+							</tr>
+						{:else}
+							<tr>
+								<td class="td text-center text-slate-500" colspan="4">
+									{memuat ? 'Memuat…' : 'Belum ada absensi pada tanggal ini.'}
+								</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</div>
 		</div>
 	</div>
-
-	<!-- Keterangan status kehadiran (untuk cetak) -->
-	<p class="hidden text-[10px] text-slate-500 print:block">
-		Status kehadiran: {Object.values(LABEL_STATUS_KEHADIRAN).join(' · ')}. Dokumen dicetak dari
-		Sistem Penilaian Kinerja Personel Polda Bali pada {new Date().toLocaleString('id-ID')}.
-	</p>
 </div>
-
-<Modal open={panelPimpinan} title="Penilaian Pimpinan" onclose={() => (panelPimpinan = false)}>
-	{#if dipilih}
-		<div class="space-y-4">
-			<div class="rounded-lg bg-slate-50 p-3 text-sm">
-				<p class="font-semibold text-slate-800">{dipilih.personel_nama}</p>
-				<p class="text-xs text-slate-500">
-					{dipilih.pangkat} · {dipilih.jabatan} / {dipilih.unit ?? '-'}
-				</p>
-				<p class="mt-2 text-xs text-slate-600">
-					Nilai akhir <strong>{dipilih.nilai_akhir.toFixed(2)}</strong> ·
-					{LABEL_KATEGORI[dipilih.kategori]}
-				</p>
-			</div>
-
-			<div>
-				<label class="label" for="catatan">Catatan Pimpinan</label>
-				<textarea
-					id="catatan"
-					class="input h-28 resize-none"
-					placeholder="Contoh: Kinerja baik, tingkatkan kualitas output dan ketepatan waktu."
-					bind:value={catatanPimpinan}
-				></textarea>
-			</div>
-
-			<div>
-				<label class="label" for="keputusan">Keputusan Penilaian</label>
-				<select id="keputusan" class="input" bind:value={keputusan}>
-					<option value="disetujui">Disetujui</option>
-					<option value="perlu_perbaikan">Perlu Perbaikan</option>
-				</select>
-			</div>
-
-			<div class="flex justify-end gap-2">
-				<button class="btn btn-ghost" onclick={() => (panelPimpinan = false)}>Batal</button>
-				<button class="btn btn-primary" disabled={menyimpan} onclick={simpanKeputusan}>
-					<Icon name="check" size={16} /> {menyimpan ? 'Menyimpan…' : 'Simpan Penilaian'}
-				</button>
-			</div>
-		</div>
-	{/if}
-</Modal>

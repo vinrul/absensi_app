@@ -18,7 +18,6 @@ use crate::error::{AppError, AppResult};
 use crate::repo::absensi::{
     self, AbsensiHarianRow, AbsensiRow, ListFilter, ListHarianFilter, NewAbsensi,
 };
-use crate::repo::periode;
 use crate::repo::personel;
 use crate::repo::satker;
 use crate::repo::titik_dinas;
@@ -617,7 +616,8 @@ pub async fn list_harian(
 
 #[derive(Debug, Deserialize)]
 pub struct FotoQuery {
-    pub periode_id: Option<Uuid>,
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
     pub satker_id: Option<Uuid>,
     pub personel_id: Option<Uuid>,
 }
@@ -639,23 +639,17 @@ pub async fn list_foto(
     Query(query): Query<FotoQuery>,
 ) -> AppResult<Json<Vec<FotoAbsensiDto>>> {
     pastikan_pengelola_absensi(&user)?;
-    let (periode, scope) = periode_dan_scope(
+    let (dari, sampai, scope) = rentang_dan_scope(
         &state,
         &user,
-        query.periode_id,
+        query.dari,
+        query.sampai,
         query.satker_id,
         "Anda tidak berhak melihat foto absensi satker tersebut",
     )
     .await?;
 
-    let rows = absensi::list_foto(
-        &state.pool,
-        &scope,
-        query.personel_id,
-        periode.tanggal_mulai,
-        periode.tanggal_selesai,
-    )
-    .await?;
+    let rows = absensi::list_foto(&state.pool, &scope, query.personel_id, dari, sampai).await?;
 
     Ok(Json(
         rows.into_iter()
@@ -673,7 +667,8 @@ pub async fn list_foto(
 
 #[derive(Debug, Deserialize)]
 pub struct RekapQuery {
-    pub periode_id: Option<Uuid>,
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
     pub satker_id: Option<Uuid>,
 }
 
@@ -687,33 +682,20 @@ pub async fn rekap_absensi(
             "Rekap absensi hanya untuk atasan/pimpinan/admin".into(),
         ));
     }
-    let periode = periode::find_or_current(&state.pool, query.periode_id).await?;
-
-    let mut scope = crate::routes::personel::scope_for(&state, &user).await?;
-    if let Some(satker_id) = query.satker_id {
-        if !scope.contains(&satker_id) {
-            return Err(AppError::Forbidden(
-                "Anda tidak berhak melihat rekap satker tersebut".into(),
-            ));
-        }
-        scope = vec![satker_id];
-    }
-
-    let rows = absensi::rekap(
-        &state.pool,
-        &scope,
-        periode.tanggal_mulai,
-        periode.tanggal_selesai,
+    let (dari, sampai, scope) = rentang_dan_scope(
+        &state,
+        &user,
+        query.dari,
+        query.sampai,
+        query.satker_id,
+        "Anda tidak berhak melihat rekap satker tersebut",
     )
     .await?;
 
+    let rows = absensi::rekap(&state.pool, &scope, dari, sampai).await?;
+
     Ok(Json(serde_json::json!({
-        "periode": {
-            "id": periode.id,
-            "nama": periode.nama,
-            "tanggal_mulai": periode.tanggal_mulai,
-            "tanggal_selesai": periode.tanggal_selesai,
-        },
+        "rentang": { "dari": dari, "sampai": sampai },
         "data": rows,
     })))
 }
@@ -722,13 +704,15 @@ pub async fn rekap_absensi(
 
 #[derive(Debug, Deserialize)]
 pub struct RekapEksporQuery {
-    pub periode_id: Option<Uuid>,
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
     pub satker_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct EksporQuery {
-    pub periode_id: Option<Uuid>,
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
     pub satker_id: Option<Uuid>,
     pub personel_id: Option<Uuid>,
 }
@@ -743,15 +727,37 @@ fn pastikan_pengelola_absensi(user: &AuthUser) -> AppResult<()> {
     }
 }
 
-/// Periode terpilih + cakupan satker yang boleh diakses pengguna.
-async fn periode_dan_scope(
+/// Rentang laporan default: 30 hari terakhir sampai hari ini.
+fn tentukan_rentang(
+    dari: Option<NaiveDate>,
+    sampai: Option<NaiveDate>,
+) -> AppResult<(NaiveDate, NaiveDate)> {
+    let hari_ini = waktu::hari_ini_wita();
+    let sampai = sampai.unwrap_or(hari_ini);
+    let dari = dari.unwrap_or_else(|| sampai - Duration::days(29));
+    if sampai < dari {
+        return Err(AppError::Unprocessable(
+            "Tanggal selesai tidak boleh sebelum tanggal mulai".into(),
+        ));
+    }
+    if (sampai - dari).num_days() > 366 {
+        return Err(AppError::Unprocessable(
+            "Rentang laporan maksimal 366 hari".into(),
+        ));
+    }
+    Ok((dari, sampai))
+}
+
+/// Rentang tanggal + cakupan satker yang boleh diakses pengguna.
+async fn rentang_dan_scope(
     state: &AppState,
     user: &AuthUser,
-    periode_id: Option<Uuid>,
+    dari: Option<NaiveDate>,
+    sampai: Option<NaiveDate>,
     satker_id: Option<Uuid>,
     pesan_satker: &str,
-) -> AppResult<(periode::PeriodeRow, Vec<Uuid>)> {
-    let periode = periode::find_or_current(&state.pool, periode_id).await?;
+) -> AppResult<(NaiveDate, NaiveDate, Vec<Uuid>)> {
+    let (dari, sampai) = tentukan_rentang(dari, sampai)?;
     let mut scope = crate::routes::personel::scope_for(state, user).await?;
 
     if let Some(satker_id) = satker_id {
@@ -761,15 +767,14 @@ async fn periode_dan_scope(
         scope = vec![satker_id];
     }
 
-    Ok((periode, scope))
+    Ok((dari, sampai, scope))
 }
 
-fn label_periode(periode: &periode::PeriodeRow) -> String {
+fn label_rentang(dari: NaiveDate, sampai: NaiveDate) -> String {
     format!(
-        "{} ({} s/d {})",
-        periode.nama,
-        laporan::format_tanggal(periode.tanggal_mulai),
-        laporan::format_tanggal(periode.tanggal_selesai)
+        "{} s.d. {}",
+        laporan::format_tanggal(dari),
+        laporan::format_tanggal(sampai)
     )
 }
 
@@ -898,22 +903,17 @@ pub async fn ekspor_rekap_pdf(
     Query(query): Query<RekapEksporQuery>,
 ) -> AppResult<Response> {
     pastikan_pengelola_absensi(&user)?;
-    let (periode, scope) = periode_dan_scope(
+    let (dari, sampai, scope) = rentang_dan_scope(
         &state,
         &user,
-        query.periode_id,
+        query.dari,
+        query.sampai,
         query.satker_id,
         "Anda tidak berhak mengekspor rekap satker tersebut",
     )
     .await?;
 
-    let rows = absensi::rekap(
-        &state.pool,
-        &scope,
-        periode.tanggal_mulai,
-        periode.tanggal_selesai,
-    )
-    .await?;
+    let rows = absensi::rekap(&state.pool, &scope, dari, sampai).await?;
 
     let nama_satker = nama_satker_terpilih(&state, query.satker_id).await?;
     let dicetak_oleh = nama_pencetak(&state, &user).await?;
@@ -998,7 +998,7 @@ pub async fn ekspor_rekap_pdf(
 
     let html = laporan::html(&laporan::Laporan {
         judul: "Rekap Kehadiran Personel",
-        periode: &label_periode(&periode),
+        periode: &label_rentang(dari, sampai),
         satker: &nama_satker,
         personel: "Semua Personel",
         status: "Semua status kehadiran",
@@ -1088,10 +1088,11 @@ pub async fn ekspor_verifikasi_pdf(
     Query(query): Query<EksporQuery>,
 ) -> AppResult<Response> {
     pastikan_pengelola_absensi(&user)?;
-    let (periode, scope) = periode_dan_scope(
+    let (dari, sampai, scope) = rentang_dan_scope(
         &state,
         &user,
-        query.periode_id,
+        query.dari,
+        query.sampai,
         query.satker_id,
         "Anda tidak berhak mengekspor absensi satker tersebut",
     )
@@ -1102,8 +1103,8 @@ pub async fn ekspor_verifikasi_pdf(
         &ListHarianFilter {
             satker_ids: scope,
             personel_id: query.personel_id,
-            dari: Some(periode.tanggal_mulai),
-            sampai: Some(periode.tanggal_selesai),
+            dari: Some(dari),
+            sampai: Some(sampai),
             perlu_verifikasi: Some(true),
             limit: 5000,
             offset: 0,
@@ -1158,7 +1159,7 @@ pub async fn ekspor_verifikasi_pdf(
 
     let html = laporan::html(&laporan::Laporan {
         judul: "Daftar Absensi Menunggu Verifikasi",
-        periode: &label_periode(&periode),
+        periode: &label_rentang(dari, sampai),
         satker: &nama_satker,
         personel: &nama_personel,
         status: "Menunggu verifikasi",
@@ -1225,10 +1226,11 @@ pub async fn ekspor_detail_pdf(
     Query(query): Query<EksporQuery>,
 ) -> AppResult<Response> {
     pastikan_pengelola_absensi(&user)?;
-    let (periode, scope) = periode_dan_scope(
+    let (dari, sampai, scope) = rentang_dan_scope(
         &state,
         &user,
-        query.periode_id,
+        query.dari,
+        query.sampai,
         query.satker_id,
         "Anda tidak berhak mengekspor absensi satker tersebut",
     )
@@ -1252,8 +1254,8 @@ pub async fn ekspor_detail_pdf(
         &ListHarianFilter {
             satker_ids: scope,
             personel_id: Some(personel_id),
-            dari: Some(periode.tanggal_mulai),
-            sampai: Some(periode.tanggal_selesai),
+            dari: Some(dari),
+            sampai: Some(sampai),
             perlu_verifikasi: None,
             limit: 5000,
             offset: 0,
@@ -1331,7 +1333,7 @@ pub async fn ekspor_detail_pdf(
 
     let html = laporan::html(&laporan::Laporan {
         judul: "Detail Absensi Personel",
-        periode: &label_periode(&periode),
+        periode: &label_rentang(dari, sampai),
         satker: &nama_satker,
         personel: &nama_personel,
         status: "Semua jenis absensi",

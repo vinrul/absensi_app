@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { api, ApiError } from '#lib/api/client';
 	import Icon from '#lib/components/Icon.svelte';
 	import Peta from '#lib/components/Peta.svelte';
 	import Pesan from '#lib/components/Pesan.svelte';
 	import WizardHeader from '#lib/components/WizardHeader.svelte';
-	import { awalBulan, tanggalHariIni } from '#lib/format';
+	import { geserTanggal, tanggalHariIni } from '#lib/format';
 	import { adaInternet, alamatLokasi, ambilLokasi, fotoKeBase64, type Posisi } from '#lib/lokasi';
 	import { bacaAntreanPh, tambahAntreanPh } from '#lib/offline';
 	import { session } from '#lib/stores/session.svelte';
@@ -46,8 +47,19 @@
 	let lewatiFoto = $state(false);
 
 	const hariIni = $derived(tanggalHariIni());
-	const jadwalHariIni = $derived(jadwal.find((item) => item.tanggal === hariIni) ?? null);
+	const daftarHariIni = $derived(jadwal.filter((item) => item.tanggal === hariIni));
+	const jadwalHariIni = $derived(
+		daftarHariIni.find((item) => item.id === page.url.searchParams.get('jadwal')) ??
+			daftarHariIni[0] ??
+			null
+	);
 	const status = $derived(statusStrongPoint(jadwalHariIni?.id, absensi, antrean));
+	const sudahCheckIn = $derived(status.sesi.some((item) => item.jenis === 'masuk'));
+	const labelSesi = $derived(
+		jadwalHariIni
+			? `${jadwalHariIni.sesi === 'sore' ? 'Sore' : 'Pagi'} ${jadwalHariIni.jam_mulai}–${jadwalHariIni.jam_selesai}`
+			: '-'
+	);
 	const totalLangkah = $derived(jenis === 'pulang' ? 2 : 3);
 	const nomorLangkah = $derived(jenis === 'pulang' && langkah === 3 ? 2 : langkah);
 	const judul = $derived(
@@ -74,11 +86,12 @@
 		if (!user) return;
 		memuat = true;
 		antrean = bacaAntreanPh(user.id);
-		const bulan = awalBulan().slice(0, 7);
+		const dari = geserTanggal(hariIni, -1);
+		const sampai = geserTanggal(hariIni, 1);
 		try {
 			[jadwal, absensi] = await Promise.all([
-				api<JadwalPhSaya[]>(`/ph/jadwal/saya?bulan=${bulan}`),
-				api<AbsensiPh[]>(`/ph/absensi/saya?bulan=${bulan}`)
+				api<JadwalPhSaya[]>(`/ph/jadwal/saya?dari=${dari}&sampai=${sampai}`),
+				api<AbsensiPh[]>(`/ph/absensi/saya?dari=${dari}&sampai=${sampai}`)
 			]);
 		} catch (err) {
 			galat = err instanceof ApiError ? err.message : 'Jadwal strong point tidak dapat dimuat.';
@@ -280,7 +293,9 @@
 
 		<div class="kartu p-4">
 			<p class="judul-bagian">Jadwal Hari Ini</p>
-			<p class="teks-kecil">{keteranganJadwal(jadwalHariIni.regu, jadwalHariIni.strong_point_nama)}</p>
+			<p class="teks-kecil">
+				{labelSesi} · {keteranganJadwal(jadwalHariIni.regu, jadwalHariIni.strong_point_nama)}
+			</p>
 			<dl class="mt-2">
 				<div class="baris-info">
 					<dt>Status</dt>
@@ -288,21 +303,13 @@
 						{#if status.sesi.length === 0}
 							Belum check-in
 						{:else if status.terbuka}
-							Check-in {status.masukTerakhir?.jam}
-							{status.perluCheckInBaru ? ' (perlu sesi baru)' : ''}
+							Check-in {status.masukTerakhir?.jam} · belum check-out
 						{:else}
 							Sudah check-out {status.pulangTerakhir?.jam}
 						{/if}
 					</dd>
 				</div>
 			</dl>
-			{#if status.perluCheckInBaru}
-				<Pesan
-					jenis="info"
-					pesan={`Check-in pukul ${status.masukTerakhir?.jam} belum check-out (lebih dari 2 jam). Check-in baru akan dicatat sebagai sesi berikutnya.`}
-					class="mt-2"
-				/>
-			{/if}
 		</div>
 
 		{#if !daring}
@@ -311,21 +318,27 @@
 				pesan="Tidak ada koneksi internet. Pilih check-in atau check-out; data disimpan di perangkat."
 			/>
 			<div class="grid grid-cols-2 gap-2">
-				<button class="btn btn-utama bg-emerald-600 py-4 hover:bg-emerald-700" onclick={() => mulai('masuk', true)}>
-					CHECK-IN <span class="text-[10px] font-medium">(Offline)</span>
-				</button>
-				<button class="btn btn-bahaya py-4" onclick={() => mulai('pulang', true)}>
-					CHECK-OUT <span class="text-[10px] font-medium">(Offline)</span>
-				</button>
+				{#if !sudahCheckIn}
+					<button class="btn btn-utama bg-emerald-600 py-4 hover:bg-emerald-700" onclick={() => mulai('masuk', true)}>
+						CHECK-IN <span class="text-[10px] font-medium">(Offline)</span>
+					</button>
+				{/if}
+				{#if status.terbuka}
+					<button class="btn btn-bahaya py-4" onclick={() => mulai('pulang', true)}>
+						CHECK-OUT <span class="text-[10px] font-medium">(Offline)</span>
+					</button>
+				{/if}
 			</div>
-		{:else if status.terbuka && !status.perluCheckInBaru}
+		{:else if status.terbuka}
 			<button class="btn btn-bahaya w-full py-4" onclick={() => mulai('pulang', false)}>
 				CHECK-OUT <span class="text-[10px] font-medium">(Check Out)</span>
 			</button>
-		{:else}
+		{:else if !sudahCheckIn}
 			<button class="btn btn-utama w-full bg-emerald-600 py-4 hover:bg-emerald-700" onclick={() => mulai('masuk', false)}>
 				CHECK-IN <span class="text-[10px] font-medium">(Check In)</span>
 			</button>
+		{:else}
+			<Pesan jenis="sukses" pesan="Sesi strong point ini sudah selesai." />
 		{/if}
 	{:else if langkah === 2}
 		<div class="kartu p-4">
