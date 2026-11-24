@@ -23,6 +23,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 1.7 | Logo & header halaman login Android terpusat | ✅ | `LoginScreen.kt` |
 | 1.8 | Tampil/sembunyikan password dengan ikon mata | ✅ | `IkonMata.kt`, `trailingIcon` pada field password |
 | 1.9 | Favicon & apple-touch-icon web | ✅ | `dashboard/static` dan `personel/static` memakai logo SIAP Bali |
+| 1.10 | Nama aplikasi Android **SIAP Bali** | ✅ | `android/app/src/main/res/values/strings.xml` → `app_name`; tampil di launcher dan task switcher |
 
 ## 2. Struktur organisasi & peran
 
