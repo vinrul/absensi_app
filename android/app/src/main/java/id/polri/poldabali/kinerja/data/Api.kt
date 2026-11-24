@@ -13,6 +13,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import id.polri.poldabali.kinerja.BuildConfig
 
 class ApiException(val status: Int, message: String) : Exception(message)
 
@@ -40,10 +41,8 @@ class Api(private val sesi: PenyimpananSesi) {
 
     private val mediaJson = "application/json; charset=utf-8".toMediaType()
 
-    private suspend fun alamat(): String {
-        val dasar = sesi.alamatServer()?.trim().orEmpty().ifEmpty { ALAMAT_BAWAAN }
-        return if (dasar.endsWith("/")) dasar else "$dasar/"
-    }
+    private fun alamat(): String =
+        if (ALAMAT_BAWAAN.endsWith("/")) ALAMAT_BAWAAN else "$ALAMAT_BAWAAN/"
 
     suspend fun panggil(
         metode: String,
@@ -220,8 +219,11 @@ class Api(private val sesi: PenyimpananSesi) {
     }
 
     companion object {
-        /** Emulator: 10.0.2.2 menuju localhost mesin pengembang. */
-        //const val ALAMAT_BAWAAN = "http://10.0.2.2:8080/api/v1/"
-        const val ALAMAT_BAWAAN = "https://absensi.jagradewata.id/api/v1/"
+        /** Debug memakai emulator (10.0.2.2); release memakai server produksi. */
+        val ALAMAT_BAWAAN: String = if (BuildConfig.DEBUG) {
+            "http://10.0.2.2:8080/api/v1/"
+        } else {
+            "https://absensi.jagradewata.id/api/v1/"
+        }
     }
 }

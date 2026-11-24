@@ -240,17 +240,9 @@
 				: ''}"
 		>
 			<div class="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-5">
-				<div
-					class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white p-1"
-				>
-					<img
-						src="/logo-polda-bali.png"
-						alt="Logo SIAP Bali"
-						class="h-full w-auto"
-					/>
-				</div>
+				<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-10 w-auto shrink-0" />
 				<div class="min-w-0">
-					<p class="truncate text-sm font-semibold text-white">Absensi & Strong Point</p>
+					<p class="truncate text-sm font-semibold text-white">SIAP Bali</p>
 					<p class="truncate text-[11px] text-navy-300">Polda Bali</p>
 				</div>
 			</div>

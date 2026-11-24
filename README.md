@@ -152,8 +152,10 @@ cd F:\absensi_polda_bali\android
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-Alamat server default `http://10.0.2.2:8080/api/v1/` (emulator). Untuk perangkat
-nyata, ubah lewat layar login → **Ubah alamat server** menjadi `http://<ip-server>:8080/api/v1/`.
+Alamat server ditentukan otomatis dari tipe build: **debug** memakai `http://10.0.2.2:8080/api/v1/`
+(emulator) dan **release** memakai `https://absensi.jagradewata.id/api/v1/`. Input alamat server
+di layar login sudah dihapus; untuk menguji build debug di perangkat fisik, ubah sementara
+`ALAMAT_BAWAAN` di `Api.kt` ke IP server pengembang.
 
 #### Build release (APK + AAB)
 
@@ -373,10 +375,10 @@ Catatan penting:
   satu baris.
 - **Profil & pengaturan Android**: foto profil (JPG/PNG), edit nama/pangkat (combobox 22 tingkat
   Polri termasuk Brigpol + 17 pangkat ASN/PNS)/jabatan/telepon/email, ganti password, dan
-  antrean offline. Alamat server diatur di **layar login** (tombol **Ubah alamat server**), bukan
-  di Profil. Form personel dashboard memakai **Combobox ber-pencarian** untuk pangkat, satker, dan
-  atasan langsung; filter satker/personel pada Rekap Absensi dan Strong Point juga memakai
-  combobox ber-pencarian.
+  antrean offline. Alamat server ditentukan otomatis dari tipe build (debug `10.0.2.2`, rilis
+  `absensi.jagradewata.id`); input alamat server di layar login sudah dihapus. Form personel
+  dashboard memakai **Combobox ber-pencarian** untuk pangkat, satker, dan atasan langsung;
+  filter satker/personel pada Rekap Absensi dan Strong Point juga memakai combobox ber-pencarian.
 - **Profil Saya di dashboard**: halaman `/profil` untuk admin & pimpinan dengan unggah foto profil
   (JPG/PNG maks. 5 MB) dan ganti password; setiap kolom password punya ikon mata
   tampil/sembunyikan. Avatar tampil di sidebar dan header, dan ganti password mencabut seluruh

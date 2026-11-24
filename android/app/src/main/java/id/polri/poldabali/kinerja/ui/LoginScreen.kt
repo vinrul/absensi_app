@@ -15,12 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-	import androidx.compose.material3.IconButton
-	import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -28,16 +27,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-	import androidx.compose.ui.res.painterResource
-	import androidx.compose.ui.semantics.contentDescription
-	import androidx.compose.ui.semantics.semantics
-	import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-	import androidx.compose.ui.text.input.PasswordVisualTransformation
-	import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import id.polri.poldabali.kinerja.R
@@ -50,9 +48,7 @@ fun LoginScreen(
 ) {
     var nrp by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    	var server by remember { mutableStateOf(vm.alamatServer) }
-    	var tampilServer by remember { mutableStateOf(false) }
-    	var tampilPassword by remember { mutableStateOf(false) }
+    var tampilPassword by remember { mutableStateOf(false) }
 
     Box(
         Modifier
@@ -67,37 +63,30 @@ fun LoginScreen(
                 .padding(24.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            			Surface(
-                				modifier = Modifier.align(Alignment.CenterHorizontally),
-                				color = Color.White,
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                shadowElevation = 4.dp
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.logo_polda_bali),
-                    contentDescription = "Logo SIAP Bali",
-                    modifier = Modifier
-                        .height(88.dp)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
+            Image(
+                painter = painterResource(R.drawable.logo_polda_bali),
+                contentDescription = "Logo SIAP Bali",
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .height(120.dp),
+                contentScale = ContentScale.Fit
+            )
 
             Spacer(Modifier.height(18.dp))
-            			Text(
-            				"Absensi & Penilaian Kinerja",
-            				style = MaterialTheme.typography.headlineSmall,
-            				color = androidx.compose.ui.graphics.Color.White,
-            				textAlign = TextAlign.Center,
-            				modifier = Modifier.fillMaxWidth()
-            			)
-            			Text(
-            				"Personel Polda Bali dan Polres jajaran",
-            				style = MaterialTheme.typography.bodyMedium,
-            				color = Warna.NavySoft,
-            				textAlign = TextAlign.Center,
-            				modifier = Modifier.fillMaxWidth()
-            			)
+            Text(
+                "SIAP Bali",
+                style = MaterialTheme.typography.headlineMedium,
+                color = androidx.compose.ui.graphics.Color.White,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Text(
+                "Personel Polda Bali dan Polres jajaran",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Warna.NavySoft,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
 
             Spacer(Modifier.height(28.dp))
 
@@ -129,53 +118,36 @@ fun LoginScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    					OutlinedTextField(
-                    						value = password,
-                    						onValueChange = { password = it },
-                    						label = { Text("Password") },
-                    						singleLine = true,
-                    						modifier = Modifier.fillMaxWidth(),
-                    						visualTransformation = if (tampilPassword) {
-                    							VisualTransformation.None
-                    						} else {
-                    							PasswordVisualTransformation()
-                    						},
-                    						trailingIcon = {
-                    							IconButton(
-                    								onClick = { tampilPassword = !tampilPassword },
-                    								modifier = Modifier.semantics {
-                    									contentDescription = if (tampilPassword) {
-                    										"Sembunyikan password"
-                    									} else {
-                    										"Tampilkan password"
-                    									}
-                    								}
-                    							) {
-                    								IkonMata(terbuka = tampilPassword)
-                    							}
-                    						},
-                    						keyboardOptions = KeyboardOptions(
-                    							keyboardType = KeyboardType.Password,
-                    							imeAction = ImeAction.Done
-                    						)
-                    					)
-
-                    if (tampilServer) {
-                        Spacer(Modifier.height(12.dp))
-                        OutlinedTextField(
-                            value = server,
-                            onValueChange = { server = it },
-                            label = { Text("Alamat server") },
-                            supportingText = { Text("Contoh: http://192.168.1.10:8080/api/v1/") },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        visualTransformation = if (tampilPassword) {
+                            VisualTransformation.None
+                        } else {
+                            PasswordVisualTransformation()
+                        },
+                        trailingIcon = {
+                            IconButton(
+                                onClick = { tampilPassword = !tampilPassword },
+                                modifier = Modifier.semantics {
+                                    contentDescription = if (tampilPassword) {
+                                        "Sembunyikan password"
+                                    } else {
+                                        "Tampilkan password"
+                                    }
+                                }
+                            ) {
+                                IkonMata(terbuka = tampilPassword)
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
                         )
-                    }
-
-                    Spacer(Modifier.height(6.dp))
-                    TextButton(onClick = { tampilServer = !tampilServer }) {
-                        Text(if (tampilServer) "Sembunyikan alamat server" else "Ubah alamat server")
-                    }
+                    )
 
                     vm.galat?.let {
                         KotakPesan(it, JenisPesan.Galat)
@@ -186,10 +158,7 @@ fun LoginScreen(
                         teks = "Masuk",
                         memuat = vm.sedangMemproses,
                         aktif = nrp.isNotBlank() && password.isNotBlank(),
-                        onClick = {
-                            if (tampilServer && server.isNotBlank()) vm.ubahAlamatServer(server)
-                            vm.login(nrp, password, onBerhasil)
-                        }
+                        onClick = { vm.login(nrp, password, onBerhasil) }
                     )
                 }
             }

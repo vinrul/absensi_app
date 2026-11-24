@@ -24,6 +24,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 1.8 | Tampil/sembunyikan password dengan ikon mata | ✅ | `IkonMata.kt`, `trailingIcon` pada field password |
 | 1.9 | Favicon & apple-touch-icon web | ✅ | `dashboard/static` dan `personel/static` memakai logo SIAP Bali |
 | 1.10 | Nama aplikasi Android **SIAP Bali** | ✅ | `android/app/src/main/res/values/strings.xml` → `app_name`; tampil di launcher dan task switcher |
+| 1.11 | Logo transparan & judul **SIAP Bali** | ✅ | Dashboard login/sidebar dan Android login/top bar tanpa kotak putih; judul halaman login & sidebar menjadi **SIAP Bali**; input alamat server Android dihapus, default build debug `10.0.2.2`, rilis `absensi.jagradewata.id` |
 
 ## 2. Struktur organisasi & peran
 

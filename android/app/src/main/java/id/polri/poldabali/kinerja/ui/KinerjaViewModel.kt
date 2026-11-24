@@ -164,9 +164,6 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     var titikTerdekat by mutableStateOf<id.polri.poldabali.kinerja.data.TitikTerdekatResponse?>(null)
         private set
 
-    var alamatServer by mutableStateOf("")
-        private set
-
     /** Jam server WITA yang berdetak lokal; disinkronkan ulang berkala. */
     var jamServerTeks by mutableStateOf("--:--:--")
         private set
@@ -180,7 +177,6 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
     init {
         mulaiJamServer()
         viewModelScope.launch {
-            alamatServer = repo.alamatServer()
             pengguna = repo.penggunaTersimpan()
             wizardIzinSelesai = runCatching { repo.wizardIzinSelesai() }.getOrDefault(false)
             memuatSesi = false
@@ -295,16 +291,7 @@ class KinerjaViewModel(aplikasi: Application) : AndroidViewModel(aplikasi) {
         }
     }
 
-    fun ubahAlamatServer(url: String) {
-        jalankan {
-            repo.ubahAlamatServer(url)
-            alamatServer = repo.alamatServer()
-            sinkronJamSekarang()
-            pesan = "Alamat server disimpan"
-        }
-    }
-
-    /** Sinkronisasi jam segera setelah login atau alamat server berubah. */
+    /** Sinkronisasi jam segera setelah login. */
     private fun sinkronJamSekarang() {
         viewModelScope.launch { runCatching { sinkronJamServer() } }
     }

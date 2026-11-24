@@ -538,9 +538,9 @@ seed `--reset` pada database produksi.
 
 ## 12. Aplikasi Android
 
-- Alamat server: `https://absensi.jagradewata.id/api/v1/` (isi lewat **layar login → Ubah alamat
-  server** pada build debug, atau ubah `ALAMAT_BAWAAN` di `android/app/src/main/java/id/polri/poldabali/kinerja/data/Api.kt`
-  untuk build rilis).
+- Alamat server ditentukan otomatis: build **debug** memakai `http://10.0.2.2:8080/api/v1/`
+  (emulator) dan build **rilis** memakai `https://absensi.jagradewata.id/api/v1/`
+  (lihat `ALAMAT_BAWAAN` di `Api.kt`). Input alamat server di layar login sudah dihapus.
 - Konfigurasi jaringan sudah dipisah: `src/main/res/xml/network_security_config.xml` menetapkan
   `cleartextTrafficPermitted="false"` untuk rilis, sedangkan `src/debug/res/xml/` mengizinkan
   HTTP untuk emulator. Buat APK/AAB dengan `android\build-release.bat` (signing dari

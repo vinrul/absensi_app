@@ -75,7 +75,7 @@ fun WizardIzinScreen(onSelesai: () -> Unit) {
         HalamanIzin(
             judul = "Selamat datang di Absensi Kinerja",
             deskripsi = "Sebelum masuk, aplikasi perlu menjelaskan izin yang digunakan. " +
-                "Izin hanya diminta sesuai kebutuhan dan tidak digunakan untuk melacak Anda di luar absensi.",
+                    "Izin hanya diminta sesuai kebutuhan dan tidak digunakan untuk melacak Anda di luar absensi.",
             alasan = "Wizard ini muncul sekali setelah aplikasi dipasang. Anda dapat mengubah izin kapan saja lewat Pengaturan Android.",
             izin = emptyList(),
             ikon = Icons.Filled.CheckCircle,
@@ -160,20 +160,12 @@ fun WizardIzinScreen(onSelesai: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Spacer(Modifier.height(20.dp))
-            Surface(
-                color = Color.White,
-                shape = RoundedCornerShape(16.dp),
-                shadowElevation = 4.dp
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.logo_polda_bali),
-                    contentDescription = "Logo SIAP Bali",
-                    modifier = Modifier
-                        .height(88.dp)
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    contentScale = ContentScale.Fit
-                )
-            }
+            Image(
+                painter = painterResource(R.drawable.logo_polda_bali),
+                contentDescription = "Logo SIAP Bali",
+                modifier = Modifier.height(120.dp),
+                contentScale = ContentScale.Fit
+            )
             Spacer(Modifier.height(16.dp))
             Text(
                 "Izin Aplikasi",

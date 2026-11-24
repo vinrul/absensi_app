@@ -83,10 +83,6 @@ class Repositori(
         antrean.kosongkan()
     }
 
-    suspend fun alamatServer(): String = sesi.alamatServer() ?: Api.ALAMAT_BAWAAN
-
-    suspend fun ubahAlamatServer(url: String) = sesi.setAlamatServer(url.trim())
-
     suspend fun wizardIzinSelesai(): Boolean = sesi.wizardIzinSelesai()
 
     suspend fun tandaiWizardIzinSelesai() = sesi.setWizardIzinSelesai()

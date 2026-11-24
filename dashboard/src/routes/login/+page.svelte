@@ -46,7 +46,7 @@
 </script>
 
 <svelte:head>
-	<title>Masuk — Penilaian Kinerja Personel Polda Bali</title>
+	<title>Masuk — SIAP Bali</title>
 </svelte:head>
 
 <div class="flex min-h-screen flex-col lg:flex-row">
@@ -61,20 +61,14 @@
 
 		<div class="relative">
 			<div class="flex items-center gap-3">
-				<div
-					class="flex h-20 items-center justify-center rounded-2xl bg-white px-3 py-2 shadow-lg shadow-navy-900/30"
-				>
-					<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-full w-auto" />
-				</div>
+				<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-20 w-auto" />
 				<div>
 					<p class="text-sm font-semibold tracking-widest text-gold-400 uppercase">Polda Bali</p>
 					<p class="text-xs text-navy-200">Kepolisian Daerah Bali</p>
 				</div>
 			</div>
 
-			<h1 class="mt-12 max-w-md text-3xl leading-tight font-bold lg:text-4xl">
-				Sistem Absensi &amp; Penilaian Kinerja Personel
-			</h1>
+			<h1 class="mt-12 max-w-md text-3xl leading-tight font-bold lg:text-4xl">SIAP Bali</h1>
 			<p class="mt-4 max-w-md text-sm leading-relaxed text-navy-100">
 				Pencatatan kehadiran berbasis geolokasi, rencana kerja, hasil kerja, dan output yang
 				terintegrasi menjadi nilai kinerja personel Polda Bali dan Polres jajaran.

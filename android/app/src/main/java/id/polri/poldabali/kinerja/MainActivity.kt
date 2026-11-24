@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
@@ -28,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -150,19 +148,12 @@ private fun Aplikasi(vm: KinerjaViewModel = viewModel()) {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(
-                            color = Color.White,
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.logo_polda_bali),
-                                contentDescription = "Logo SIAP Bali",
-                                modifier = Modifier
-                                    .height(30.dp)
-                                    .padding(horizontal = 3.dp, vertical = 2.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
+                        Image(
+                            painter = painterResource(R.drawable.logo_polda_bali),
+                            contentDescription = "Logo SIAP Bali",
+                            modifier = Modifier.height(38.dp),
+                            contentScale = ContentScale.Fit
+                        )
                         Column(Modifier.weight(1f).padding(start = 10.dp)) {
                             Text(
                                 DAFTAR_TAB[tabAktif].judul,
