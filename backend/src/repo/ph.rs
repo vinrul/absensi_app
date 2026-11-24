@@ -138,6 +138,33 @@ pub struct RekapPhRow {
     pub total_menit_pulang_cepat: i64,
 }
 
+/// Satu baris jadwal × personel untuk rekap strong point per tanggal.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct RekapPhHarianRow {
+    pub tanggal: NaiveDate,
+    pub jadwal_ph_id: Uuid,
+    pub sesi: Option<String>,
+    pub jam_mulai: NaiveTime,
+    pub jam_selesai: NaiveTime,
+    pub strong_point_nama: String,
+    pub strong_point_id: Uuid,
+    pub strong_point_latitude: f64,
+    pub strong_point_longitude: f64,
+    pub strong_point_radius_m: i32,
+    pub regu: Option<String>,
+    pub personel_id: Uuid,
+    pub nama: String,
+    pub nrp: String,
+    pub pangkat: String,
+    pub unit: Option<String>,
+    pub masuk_jam: Option<NaiveTime>,
+    pub pulang_jam: Option<NaiveTime>,
+    pub masuk_latitude: Option<f64>,
+    pub masuk_longitude: Option<f64>,
+    pub menit_telat: i64,
+    pub menit_pulang_cepat: i64,
+}
+
 pub struct NewAbsensiPh {
     pub id: Uuid,
     pub client_uuid: Uuid,
@@ -1308,6 +1335,51 @@ pub async fn rekap_ph(
         .bind(satker_ids)
         .bind(dari)
         .bind(sampai)
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn rekap_ph_harian(
+    pool: &PgPool,
+    satker_ids: &[Uuid],
+    dari: NaiveDate,
+    sampai: NaiveDate,
+    personel_id: Option<Uuid>,
+) -> AppResult<Vec<RekapPhHarianRow>> {
+    const SQL: &str = r#"
+        SELECT j.tanggal, j.id AS jadwal_ph_id, j.sesi, j.jam_mulai, j.jam_selesai,
+               sp.nama AS strong_point_nama, sp.id AS strong_point_id,
+               sp.latitude::float8 AS strong_point_latitude,
+               sp.longitude::float8 AS strong_point_longitude,
+               sp.radius_m AS strong_point_radius_m, j.regu,
+               p.id AS personel_id, p.nama, p.nrp, p.pangkat, p.unit,
+               max(ap.jam) FILTER (WHERE ap.jenis = 'masuk') AS masuk_jam,
+               max(ap.jam) FILTER (WHERE ap.jenis = 'pulang') AS pulang_jam,
+               (max(ap.latitude) FILTER (WHERE ap.jenis = 'masuk'))::float8 AS masuk_latitude,
+               (max(ap.longitude) FILTER (WHERE ap.jenis = 'masuk'))::float8 AS masuk_longitude,
+               coalesce(max(ap.menit_telat) FILTER (WHERE ap.jenis = 'masuk'), 0)::bigint
+                   AS menit_telat,
+               coalesce(max(ap.menit_pulang_cepat) FILTER (WHERE ap.jenis = 'pulang'), 0)::bigint
+                   AS menit_pulang_cepat
+          FROM jadwal_ph j
+          JOIN jadwal_ph_personel jp ON jp.jadwal_ph_id = j.id
+          JOIN personel p ON p.id = jp.personel_id
+          JOIN strong_point sp ON sp.id = j.strong_point_id
+          LEFT JOIN absensi_ph ap
+                 ON ap.jadwal_ph_id = j.id AND ap.personel_id = jp.personel_id
+         WHERE j.satker_id = ANY($1::uuid[]) AND j.tanggal BETWEEN $2 AND $3
+           AND NOT j.is_arsip
+           AND ($4::uuid IS NULL OR jp.personel_id = $4)
+         GROUP BY j.tanggal, j.id, j.sesi, j.jam_mulai, j.jam_selesai, sp.nama, sp.id,
+                  sp.latitude, sp.longitude, sp.radius_m, j.regu,
+                  p.id, p.nama, p.nrp, p.pangkat, p.unit
+         ORDER BY j.tanggal, j.jam_mulai, p.nama
+    "#;
+    Ok(sqlx::query_as::<_, RekapPhHarianRow>(SQL)
+        .bind(satker_ids)
+        .bind(dari)
+        .bind(sampai)
+        .bind(personel_id)
         .fetch_all(pool)
         .await?)
 }

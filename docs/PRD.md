@@ -47,7 +47,7 @@ Akun dibagi menjadi dua jenis:
 | **Personel** | Data sendiri | Absen, strong point (check-in/out per sesi), riwayat; modul kinerja dorman |
 | **Atasan Langsung** | Satker + bawahan | Semua di atas untuk dirinya + verifikasi absensi/PH, mengelola titik dinas; modul kinerja dorman |
 | **Admin Sistem** | Semua | Seluruh master, akun admin, audit log; periode/penilaian dorman |
-| **Admin Polda** | Polda + seluruh turunannya | Kelola satker/personel, titik strong point level Polda/Polres, jadwal & penempatan |
+| **Admin Polda** | Polda + seluruh turunannya | Kelola satker/personel, titik strong point level Polda/Polres, jadwal & penempatan, audit log |
 | **Admin Satker Polda** | Satu satker di level Polda | Kelola personel, jadwal & penempatan satkernya |
 | **Admin Polres** | Polres + satker di bawahnya | Kelola satker/personel, titik strong point level Polres, jadwal & penempatan |
 | **Admin Satker Polres** | Satu satker di level Polres | Kelola personel, jadwal & penempatan satkernya |
@@ -229,9 +229,16 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 - Dashboard baru: filter **tanggal** + satker, kartu total personel, hadir, belum absensi,
   telat, sesi strong point, serta cuti/izin/sakit; tabel strong point hari itu dan absensi
   masuk/pulang.
+- Dashboard menampilkan **peta** (Leaflet/OpenStreetMap) berisi marker absensi berwarna status
+  kehadiran, marker check-in strong point (lengkap/TC), titik dinas + radius, dan titik strong
+  point + radius. Lapisan dapat dinyalakan/dimatikan per kategori, basemap dapat diganti
+  **Jalan/Satelit**, dan klik marker membuka detail. Marker absensi dilewati bila personel
+  sudah check-in strong point agar tidak dobel.
 - Halaman **Rekap Absensi** (`/absensi/rekap`) memiliki tiga tab dengan filter **rentang tanggal**:
   - **Rekap Kehadiran**: `dari`–`sampai` + satker; kolom hadir, telat (hari), menit telat,
-    dinas luar, piket, cuti, izin, sakit, PH, tanpa keterangan, dan menunggu verifikasi.
+    dinas luar, piket, cuti, izin, sakit, PH, tanpa keterangan, dan menunggu verifikasi. Kartu
+    ringkasan total periode tampil di atas mode **Matriks** maupun **Ringkasan**; klik kartu
+    membuka rincian per personel.
   - **Verifikasi**: `dari`–`sampai` + satker + personel; absen masuk dan pulang pada tanggal yang
     sama digabung menjadi satu baris, menampilkan kedua jam dan menit telat.
   - **Detail per Orang**: `dari`–`sampai` + satker + personel; riwayat harian dengan pasangan
@@ -243,7 +250,8 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 
 ### FR-08 Audit & operasional
 - Setiap POST/PUT/PATCH/DELETE dicatat (aktor, aksi, entitas, entitas_id, IP, user agent, status).
-- Admin global dapat menelusuri audit berdasarkan entitas, aktor, dan rentang tanggal.
+- Admin global dan admin Polda dapat menelusuri audit log di halaman **Pengaturan → Audit Log**,
+  dengan filter entitas, pelaku, dan rentang tanggal, serta detail before/after, IP, dan user agent.
 - Backup harian database + berkas unggahan dengan retensi 30 hari (`deploy/backup.sh`).
 
 ### FR-09 PH / Strong Point
@@ -285,9 +293,22 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 - Server mencatat `menit_telat` (check-in setelah jam mulai) dan `menit_pulang_cepat`
   (check-out sebelum jam selesai); rekap menjumlahkan keduanya per personel.
 - Absensi PH memiliki `client_uuid` untuk idempotensi dan dapat diverifikasi atasan/admin.
-- Rekap PH memakai **rentang tanggal** dan menampilkan jumlah jadwal, check-in, hanya check-in,
-  tidak hadir beserta tanggal, menunggu verifikasi, total telat, dan total pulang cepat.
-  Perhitungan dibatasi sampai hari ini.
+- Rekap PH memakai **rentang tanggal** (default awal bulan berjalan s.d. hari ini, maks. 31 hari)
+  dengan sub-tab **Ringkasan** dan **Matriks Harian**. Ringkasan menampilkan jumlah jadwal,
+  check-in, hanya check-in, tidak hadir beserta tanggal, menunggu verifikasi, total telat, dan
+  total pulang cepat. Matriks Harian menampilkan satu baris per personel dan satu kolom per tanggal
+  (awal s.d. akhir filter); setiap sel berisi sesi/jam/titik, status melakukan, telat, pulang cepat,
+  hanya check-in (**TC**), dan tidak strong point (**TA**). Klik nama personel pada Ringkasan maupun
+  Matriks Harian untuk membuka **detail per personel** (ringkasan angka + rincian jadwal per sesi,
+  check-in/out, telat, pulang cepat, TC/TA) yang juga dapat diekspor ke **PDF**. Hanya personel
+  yang memiliki jadwal pada rentang filter yang ditampilkan (pada PDF, tiap bagian minggu hanya
+  memuat personel yang berjadwal di minggu tersebut). Matriks dapat diekspor ke **PDF**
+  (A4 landscape, dibagi per minggu). Perhitungan dibatasi sampai hari ini.
+- **Rekap Harian Strong Point** memakai filter **satu tanggal** + satker, dengan sub-tab
+  **Ringkasan** dan **Peta**. Ringkasan berisi kartu Personel, Sesi Jadwal, Strong Point, Sesi
+  Hadir, Sesi Belum (TA), Sesi TC, total telat, dan total pulang cepat; klik kartu membuka
+  daftar personel. Peta menampilkan titik strong point + radius dan marker check-in (hijau
+  lengkap, kuning TC), dengan basemap Jalan/Satelit dan legenda.
 - Jadwal dan rekap dapat diekspor **PDF** (A4 landscape); PDF jadwal berupa tabel
   Tanggal/Sesi/Jam/Titik/Regu/Anggota.
 - **Hari libur nasional tidak mengubah jadwal strong point**; jadwal mengikuti tanggal yang

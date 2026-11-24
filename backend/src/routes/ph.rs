@@ -7,7 +7,7 @@ use axum::response::Response;
 use axum::routing::{get, patch, post};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use chrono::{Duration, NaiveDate, NaiveTime, Timelike, Utc};
+use chrono::{Datelike, Duration, NaiveDate, NaiveTime, Timelike, Utc, Weekday};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
@@ -54,6 +54,12 @@ pub fn routes() -> Router<AppState> {
         .route("/absensi/jadwal/{id}", get(absensi_jadwal))
         .route("/absensi/{id}/verifikasi", post(verifikasi_absensi_ph))
         .route("/rekap", get(rekap_ph))
+        .route("/rekap/harian", get(rekap_ph_harian))
+        .route("/rekap/harian/ekspor", get(ekspor_rekap_harian_pdf))
+        .route(
+            "/rekap/personel/{id}/ekspor",
+            get(ekspor_rekap_personel_pdf),
+        )
         .route("/rekap/ekspor", get(ekspor_rekap_pdf))
         .route("/foto", get(list_foto_ph))
 }
@@ -255,6 +261,16 @@ fn rentang(
         ));
     }
     Ok((dari, sampai))
+}
+
+/// Rekap matriks strong point dibatasi 31 hari agar tetap terbaca.
+fn validasi_rentang_rekap_harian(dari: NaiveDate, sampai: NaiveDate) -> AppResult<()> {
+    if (sampai - dari).num_days() + 1 > 31 {
+        return Err(AppError::Unprocessable(
+            "Rentang rekap harian maksimal 31 hari".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn parse_time(value: &str) -> AppResult<NaiveTime> {
@@ -1473,6 +1489,111 @@ pub async fn rekap_ph(
     })))
 }
 
+#[derive(Debug, Serialize)]
+pub struct RekapPhHarianDto {
+    pub tanggal: NaiveDate,
+    pub jadwal_ph_id: Uuid,
+    pub sesi: Option<String>,
+    pub jam_mulai: String,
+    pub jam_selesai: String,
+    pub strong_point_nama: String,
+    pub strong_point_id: Uuid,
+    pub strong_point_latitude: f64,
+    pub strong_point_longitude: f64,
+    pub strong_point_radius_m: i32,
+    pub regu: Option<String>,
+    pub personel_id: Uuid,
+    pub nama: String,
+    pub nrp: String,
+    pub pangkat: String,
+    pub unit: Option<String>,
+    pub masuk_jam: Option<String>,
+    pub pulang_jam: Option<String>,
+    pub masuk_latitude: Option<f64>,
+    pub masuk_longitude: Option<f64>,
+    pub menit_telat: i64,
+    pub menit_pulang_cepat: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RekapHarianQuery {
+    pub dari: Option<NaiveDate>,
+    pub sampai: Option<NaiveDate>,
+    pub satker_id: Option<Uuid>,
+    pub personel_id: Option<Uuid>,
+}
+
+pub async fn rekap_ph_harian(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<RekapHarianQuery>,
+) -> AppResult<Json<serde_json::Value>> {
+    pastikan_pengelola(&user)?;
+    let (dari, sampai_diminta) = rentang(query.dari, query.sampai)?;
+    validasi_rentang_rekap_harian(dari, sampai_diminta)?;
+    // Tanggal yang belum berjalan tidak boleh dianggap belum melaksanakan strong point.
+    let sampai = sampai_diminta.min(hari_ini_wita());
+    let mut scope = user.satker_akses().to_vec();
+    if let Some(satker_id) = query.satker_id {
+        if !scope.contains(&satker_id) {
+            return Err(AppError::Forbidden(
+                "Anda tidak berhak melihat satker tersebut".into(),
+            ));
+        }
+        scope = vec![satker_id];
+    }
+    if let Some(personel_id) = query.personel_id {
+        let orang = personel::find_by_id(&state.pool, personel_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Personel tidak ditemukan".into()))?;
+        if orang.jenis_akun != JenisAkun::Personel {
+            return Err(AppError::NotFound("Personel tidak ditemukan".into()));
+        }
+        if !scope.contains(&orang.satker_id) {
+            return Err(AppError::Forbidden(
+                "Anda tidak berhak melihat personel tersebut".into(),
+            ));
+        }
+    }
+    let rows = if dari > sampai {
+        Vec::new()
+    } else {
+        pastikan_jadwal_rentang(&state, &scope, dari, sampai).await?;
+        ph::rekap_ph_harian(&state.pool, &scope, dari, sampai, query.personel_id).await?
+    };
+    let data: Vec<RekapPhHarianDto> = rows
+        .into_iter()
+        .map(|row| RekapPhHarianDto {
+            tanggal: row.tanggal,
+            jadwal_ph_id: row.jadwal_ph_id,
+            sesi: row.sesi,
+            jam_mulai: row.jam_mulai.format("%H:%M").to_string(),
+            jam_selesai: row.jam_selesai.format("%H:%M").to_string(),
+            strong_point_nama: row.strong_point_nama,
+            strong_point_id: row.strong_point_id,
+            strong_point_latitude: row.strong_point_latitude,
+            strong_point_longitude: row.strong_point_longitude,
+            strong_point_radius_m: row.strong_point_radius_m,
+            regu: row.regu,
+            personel_id: row.personel_id,
+            nama: row.nama,
+            nrp: row.nrp,
+            pangkat: row.pangkat,
+            unit: row.unit,
+            masuk_jam: row.masuk_jam.map(|jam| jam.format("%H:%M").to_string()),
+            pulang_jam: row.pulang_jam.map(|jam| jam.format("%H:%M").to_string()),
+            masuk_latitude: row.masuk_latitude,
+            masuk_longitude: row.masuk_longitude,
+            menit_telat: row.menit_telat,
+            menit_pulang_cepat: row.menit_pulang_cepat,
+        })
+        .collect();
+    Ok(Json(serde_json::json!({
+        "rentang": { "dari": dari, "sampai": sampai_diminta },
+        "data": data,
+    })))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct FotoPhQuery {
     pub dari: Option<NaiveDate>,
@@ -1607,6 +1728,51 @@ fn label_sesi(sesi: Option<&str>) -> &'static str {
         _ => "Pagi",
     }
 }
+
+fn hari_singkat(tanggal: NaiveDate) -> &'static str {
+    match tanggal.weekday() {
+        Weekday::Mon => "Sen",
+        Weekday::Tue => "Sel",
+        Weekday::Wed => "Rab",
+        Weekday::Thu => "Kam",
+        Weekday::Fri => "Jum",
+        Weekday::Sat => "Sab",
+        Weekday::Sun => "Min",
+    }
+}
+
+const LEGENDA_REKAP_HARIAN_PDF: &str = r#"<div class="legenda"><b>Pagi/Sore</b> jadwal · <b>Ya</b> check-in · <b>TA</b> tidak strong point · <b>TC</b> check-in tanpa check-out · <b>T</b> telat · <b>PC</b> pulang cepat</div>"#;
+
+const CSS_REKAP_HARIAN_PDF: &str = r#"
+@page { size: A4 landscape; margin: 8mm 8mm 10mm; }
+body { font-size: 7.5pt; }
+.judul-halaman { font-size: 10pt; margin: 0 0 4px; color: #0b2545; display: flex; justify-content: space-between; }
+.judul-halaman .halaman-ke { font-size: 8pt; color: #64748b; font-weight: normal; }
+.legenda { font-size: 6.8pt; color: #475569; margin-bottom: 4px; }
+table.matriks { width: 100%; border-collapse: collapse; table-layout: fixed; }
+table.matriks th, table.matriks td { border: 1px solid #94a3b8; padding: 2px 3px; vertical-align: top; }
+table.matriks thead th { background: #0b2545; color: #fff; font-size: 7pt; text-align: center; }
+table.matriks thead th span { font-weight: normal; font-size: 6pt; color: #cbd5e1; }
+table.matriks th.akhir-pekan { background: #334155; }
+table.matriks col.kolom-nama { width: 42mm; }
+table.matriks col.kolom-tanggal { width: 33mm; }
+table.matriks td.nama strong { display: block; font-size: 7.2pt; }
+table.matriks td.nama .sub { display: block; font-size: 6.2pt; color: #64748b; }
+table.matriks td.tanggal { font-size: 6.4pt; }
+table.matriks td.tanggal .blok { margin-bottom: 2px; }
+table.matriks td.tanggal .sesi { display: block; font-weight: 600; color: #0b2545; }
+table.matriks td.tanggal .status { display: inline-block; margin-right: 2px; font-weight: 600; }
+table.matriks td.tanggal .menit { display: inline-block; margin-right: 2px; color: #b45309; }
+table.matriks td.tanggal .titik { display: block; color: #64748b; font-size: 6pt; }
+table.matriks td.tanggal .ya { color: #047857; }
+table.matriks td.tanggal .ta { color: #be123c; }
+table.matriks td.tanggal .tc { color: #b45309; }
+table.matriks td.kosong { color: #cbd5e1; text-align: center; }
+.halaman { page-break-after: always; }
+.halaman:last-of-type { page-break-after: auto; }
+table.matriks thead { display: table-header-group; }
+table.matriks tr { page-break-inside: avoid; }
+"#;
 
 /// Ekspor daftar jadwal strong point pada rentang tanggal menjadi PDF.
 pub async fn ekspor_jadwal_pdf(
@@ -1819,6 +1985,391 @@ pub async fn ekspor_rekap_pdf(
         pdf,
         format!(
             "rekap-strong-point-{}-{}.pdf",
+            dari.format("%Y%m%d"),
+            sampai.format("%Y%m%d")
+        ),
+    ))
+}
+
+struct BarisMatriksPh<'a> {
+    nama: &'a str,
+    pangkat: &'a str,
+    nrp: &'a str,
+    unit: Option<&'a str>,
+    sel: HashMap<NaiveDate, Vec<&'a ph::RekapPhHarianRow>>,
+}
+
+fn html_rekap_harian_ph<'a>(
+    data: &'a [ph::RekapPhHarianRow],
+    tanggal: &[NaiveDate],
+    periode: &str,
+    nama_satker: &str,
+    dicetak_oleh: &str,
+    dicetak_pada: &str,
+) -> String {
+    let mut peta: HashMap<Uuid, BarisMatriksPh<'a>> = HashMap::new();
+    for row in data {
+        let baris = peta
+            .entry(row.personel_id)
+            .or_insert_with(|| BarisMatriksPh {
+                nama: &row.nama,
+                pangkat: &row.pangkat,
+                nrp: &row.nrp,
+                unit: row.unit.as_deref(),
+                sel: HashMap::new(),
+            });
+        baris.sel.entry(row.tanggal).or_default().push(row);
+    }
+    let mut daftar: Vec<BarisMatriksPh<'a>> = peta.into_values().collect();
+    daftar.sort_by(|a, b| a.nama.cmp(b.nama));
+
+    let total_bagian = tanggal.chunks(7).count().max(1);
+    let mut isi = String::new();
+    if daftar.is_empty() {
+        isi.push_str("<p class=\"empty\">Tidak ada jadwal strong point pada rentang ini.</p>");
+    } else {
+        for (indeks, potongan) in tanggal.chunks(7).enumerate() {
+            let label = if potongan.len() == 1 {
+                laporan::format_tanggal(potongan[0])
+            } else {
+                format!(
+                    "{} s.d. {}",
+                    laporan::format_tanggal(potongan[0]),
+                    laporan::format_tanggal(potongan[potongan.len() - 1])
+                )
+            };
+            isi.push_str("<section class=\"halaman\">");
+            isi.push_str(&format!(
+                "<h2 class=\"judul-halaman\">Matriks Rekap Strong Point {label}<span class=\"halaman-ke\">Bagian {}/{total_bagian}</span></h2>",
+                indeks + 1
+            ));
+            isi.push_str(LEGENDA_REKAP_HARIAN_PDF);
+            isi.push_str("<table class=\"matriks\"><colgroup><col class=\"kolom-nama\">");
+            for _ in potongan {
+                isi.push_str("<col class=\"kolom-tanggal\">");
+            }
+            isi.push_str("</colgroup><thead><tr><th class=\"nama\">Personel</th>");
+            for tgl in potongan {
+                let kelas = if matches!(tgl.weekday(), Weekday::Sat | Weekday::Sun) {
+                    " akhir-pekan"
+                } else {
+                    ""
+                };
+                isi.push_str(&format!(
+                    "<th class=\"tanggal{kelas}\">{}<br><span>{}</span></th>",
+                    tgl.format("%d-%m"),
+                    hari_singkat(*tgl)
+                ));
+            }
+            isi.push_str("</tr></thead><tbody>");
+            let personel_minggu: Vec<&BarisMatriksPh<'a>> = daftar
+                .iter()
+                .filter(|baris| potongan.iter().any(|tgl| baris.sel.contains_key(tgl)))
+                .collect();
+            if personel_minggu.is_empty() {
+                isi.push_str(&format!(
+                    "<tr><td colspan=\"{}\" class=\"empty\">Tidak ada jadwal strong point pada minggu ini.</td></tr>",
+                    potongan.len() + 1
+                ));
+            } else {
+                for baris in personel_minggu.iter().copied() {
+                    isi.push_str(&format!(
+                    "<td class=\"nama\"><strong>{}</strong><span class=\"sub\">{} · {}</span><span class=\"sub\">{}</span></td>",
+                    laporan::esc(baris.nama),
+                    laporan::esc(baris.pangkat),
+                    laporan::esc(baris.nrp),
+                    laporan::esc(baris.unit.unwrap_or("-"))
+                ));
+                    for tgl in potongan {
+                        match baris.sel.get(tgl) {
+                            Some(jadwal) if !jadwal.is_empty() => {
+                                isi.push_str("<td class=\"tanggal\">");
+                                for sesi in jadwal {
+                                    isi.push_str("<div class=\"blok\">");
+                                    isi.push_str(&format!(
+                                        "<span class=\"sesi\">{} {}–{}</span>",
+                                        label_sesi(sesi.sesi.as_deref()),
+                                        sesi.jam_mulai.format("%H:%M"),
+                                        sesi.jam_selesai.format("%H:%M")
+                                    ));
+                                    match sesi.masuk_jam {
+                                        Some(masuk) => isi.push_str(&format!(
+                                            "<span class=\"status ya\">Ya {}</span>",
+                                            masuk.format("%H:%M")
+                                        )),
+                                        None => isi.push_str("<span class=\"status ta\">TA</span>"),
+                                    }
+                                    if sesi.masuk_jam.is_some() && sesi.pulang_jam.is_none() {
+                                        isi.push_str("<span class=\"status tc\">TC</span>");
+                                    }
+                                    if sesi.menit_telat > 0 {
+                                        isi.push_str(&format!(
+                                            "<span class=\"menit\">T {}m</span>",
+                                            sesi.menit_telat
+                                        ));
+                                    }
+                                    if sesi.menit_pulang_cepat > 0 {
+                                        isi.push_str(&format!(
+                                            "<span class=\"menit\">PC {}m</span>",
+                                            sesi.menit_pulang_cepat
+                                        ));
+                                    }
+                                    isi.push_str(&format!(
+                                        "<span class=\"titik\">{}</span></div>",
+                                        laporan::esc(&sesi.strong_point_nama)
+                                    ));
+                                }
+                                isi.push_str("</td>");
+                            }
+                            _ => isi.push_str("<td class=\"tanggal kosong\">·</td>"),
+                        }
+                    }
+                    isi.push_str("</tr>");
+                }
+            }
+
+            isi.push_str("</tbody></table></section>");
+        }
+    }
+
+    laporan::html_kustom(&laporan::LaporanKustom {
+        judul: "Matriks Rekap Strong Point",
+        periode,
+        satker: nama_satker,
+        personel: "Semua Personel",
+        status: "Semua jadwal strong point",
+        dicetak_oleh,
+        dicetak_pada,
+        isi,
+        catatan: Some(format!(
+            "Matriks disusun per minggu agar mudah dibaca. Total {} personel; Ya = check-in, TA = tidak strong point, TC = check-in tanpa check-out, T = menit telat, PC = menit pulang cepat.",
+            daftar.len()
+        )),
+        css_tambahan: CSS_REKAP_HARIAN_PDF,
+    })
+}
+
+/// Ekspor matriks rekap strong point per tanggal (maks. 31 hari) menjadi PDF.
+pub async fn ekspor_rekap_harian_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Query(query): Query<RentangQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola(&user)?;
+    let (dari, sampai_diminta) = rentang(query.dari, query.sampai)?;
+    validasi_rentang_rekap_harian(dari, sampai_diminta)?;
+    let sampai = sampai_diminta.min(hari_ini_wita());
+    let scope = scope_ekspor(&user, query.satker_id)?;
+    let rows = if dari > sampai {
+        Vec::new()
+    } else {
+        pastikan_jadwal_rentang(&state, &scope, dari, sampai).await?;
+        ph::rekap_ph_harian(&state.pool, &scope, dari, sampai, None).await?
+    };
+    let tanggal: Vec<NaiveDate> = if dari > sampai {
+        Vec::new()
+    } else {
+        dari.iter_days()
+            .take(((sampai - dari).num_days() + 1) as usize)
+            .collect()
+    };
+    let html = html_rekap_harian_ph(
+        &rows,
+        &tanggal,
+        &label_rentang(dari, sampai_diminta),
+        &nama_satker_ekspor(&state, query.satker_id).await?,
+        &nama_pencetak(&state, &user).await?,
+        &waktu_cetak(),
+    );
+    let pdf = pdf::render_pdf(&html).await?;
+    Ok(respons_pdf(
+        pdf,
+        format!(
+            "rekap-strong-point-harian-{}-{}.pdf",
+            dari.format("%Y%m%d"),
+            sampai.format("%Y%m%d")
+        ),
+    ))
+}
+
+/// Ekspor detail rekap strong point satu personel menjadi PDF.
+pub async fn ekspor_rekap_personel_pdf(
+    State(state): State<AppState>,
+    user: AuthUser,
+    Path(personel_id): Path<Uuid>,
+    Query(query): Query<RentangQuery>,
+) -> AppResult<Response> {
+    pastikan_pengelola(&user)?;
+    let (dari, sampai_diminta) = rentang(query.dari, query.sampai)?;
+    validasi_rentang_rekap_harian(dari, sampai_diminta)?;
+    let sampai = sampai_diminta.min(hari_ini_wita());
+    let scope = scope_ekspor(&user, query.satker_id)?;
+    let orang = personel::find_by_id(&state.pool, personel_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Personel tidak ditemukan".into()))?;
+    if orang.jenis_akun != JenisAkun::Personel {
+        return Err(AppError::NotFound("Personel tidak ditemukan".into()));
+    }
+    if !scope.contains(&orang.satker_id) {
+        return Err(AppError::Forbidden(
+            "Anda tidak berhak mengekspor rekap personel tersebut".into(),
+        ));
+    }
+    let rows = if dari > sampai {
+        Vec::new()
+    } else {
+        pastikan_jadwal_rentang(&state, &scope, dari, sampai).await?;
+        ph::rekap_ph_harian(&state.pool, &scope, dari, sampai, Some(personel_id)).await?
+    };
+
+    let hadir = rows.iter().filter(|row| row.masuk_jam.is_some()).count();
+    let hanya_check_in = rows
+        .iter()
+        .filter(|row| row.masuk_jam.is_some() && row.pulang_jam.is_none())
+        .count();
+    let tidak_sp = rows.iter().filter(|row| row.masuk_jam.is_none()).count();
+    let total_telat: i64 = rows.iter().map(|row| row.menit_telat).sum();
+    let total_pulang_cepat: i64 = rows.iter().map(|row| row.menit_pulang_cepat).sum();
+
+    let mut baris = String::new();
+    for (indeks, row) in rows.iter().enumerate() {
+        let status = if row.masuk_jam.is_none() {
+            "TA"
+        } else if row.pulang_jam.is_none() {
+            "TC"
+        } else {
+            "Lengkap"
+        };
+        let titik = match row.regu.as_deref() {
+            Some(regu) if !regu.trim().is_empty() => {
+                format!("{} · {}", row.strong_point_nama, regu)
+            }
+            _ => row.strong_point_nama.clone(),
+        };
+        let masuk = row
+            .masuk_jam
+            .map(|jam| jam.format("%H:%M").to_string())
+            .unwrap_or_else(|| "-".into());
+        let pulang = row
+            .pulang_jam
+            .map(|jam| jam.format("%H:%M").to_string())
+            .unwrap_or_else(|| "-".into());
+        let telat = if row.menit_telat > 0 {
+            row.menit_telat.to_string()
+        } else {
+            "-".into()
+        };
+        let pulang_cepat = if row.menit_pulang_cepat > 0 {
+            row.menit_pulang_cepat.to_string()
+        } else {
+            "-".into()
+        };
+        baris.push_str(&format!(
+            "<tr>\
+                <td style=\"text-align:center\">{}</td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{} {}–{}</td>\
+                <td>{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+                <td style=\"text-align:center\">{}</td>\
+             </tr>",
+            indeks + 1,
+            laporan::format_tanggal(row.tanggal),
+            label_sesi(row.sesi.as_deref()),
+            row.jam_mulai.format("%H:%M"),
+            row.jam_selesai.format("%H:%M"),
+            laporan::esc(&titik),
+            masuk,
+            pulang,
+            telat,
+            pulang_cepat,
+            status,
+        ));
+    }
+
+    let nama_personel = match orang.nrp.clone() {
+        Some(nrp) => format!("{} ({})", orang.nama, nrp),
+        None => orang.nama.clone(),
+    };
+    let nama_satker = if query.satker_id.is_some() {
+        nama_satker_ekspor(&state, query.satker_id).await?
+    } else {
+        match orang.unit.as_deref().filter(|unit| !unit.trim().is_empty()) {
+            Some(unit) => format!("{} · {}", orang.satker_nama, unit),
+            None => orang.satker_nama.clone(),
+        }
+    };
+    let nama_berkas = orang.nrp.clone().unwrap_or_else(|| personel_id.to_string());
+
+    let html = laporan::html(&laporan::Laporan {
+        judul: "Detail Rekap Strong Point",
+        periode: &label_rentang(dari, sampai_diminta),
+        satker: &nama_satker,
+        personel: &nama_personel,
+        status: "Semua jadwal strong point",
+        dicetak_oleh: &nama_pencetak(&state, &user).await?,
+        dicetak_pada: &waktu_cetak(),
+        kolom: vec![
+            laporan::Kolom {
+                judul: "No",
+                lebar: 4,
+            },
+            laporan::Kolom {
+                judul: "Tanggal",
+                lebar: 10,
+            },
+            laporan::Kolom {
+                judul: "Sesi & Jam",
+                lebar: 13,
+            },
+            laporan::Kolom {
+                judul: "Titik / Regu",
+                lebar: 29,
+            },
+            laporan::Kolom {
+                judul: "Check-in",
+                lebar: 7,
+            },
+            laporan::Kolom {
+                judul: "Check-out",
+                lebar: 8,
+            },
+            laporan::Kolom {
+                judul: "Telat (menit)",
+                lebar: 8,
+            },
+            laporan::Kolom {
+                judul: "Pulang Cepat (menit)",
+                lebar: 10,
+            },
+            laporan::Kolom {
+                judul: "Status",
+                lebar: 8,
+            },
+        ],
+        baris,
+        jumlah: rows.len(),
+        total: rows.len() as i64,
+        catatan: Some(format!(
+            "Jadwal {} sesi · Hadir {} · Hanya check-in {} · Tidak strong point {} · Total telat {} menit · Total pulang cepat {} menit. Perhitungan sampai {}.",
+            rows.len(),
+            hadir,
+            hanya_check_in,
+            tidak_sp,
+            total_telat,
+            total_pulang_cepat,
+            laporan::format_tanggal(sampai)
+        )),
+    });
+    let pdf = pdf::render_pdf(&html).await?;
+    Ok(respons_pdf(
+        pdf,
+        format!(
+            "rekap-strong-point-{}-{}-{}.pdf",
+            nama_berkas,
             dari.format("%Y%m%d"),
             sampai.format("%Y%m%d")
         ),

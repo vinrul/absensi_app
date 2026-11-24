@@ -103,6 +103,11 @@ impl AppRole {
         )
     }
 
+    /// Hanya admin global dan admin Polda yang boleh membuka audit log.
+    pub fn admin_audit(self) -> bool {
+        matches!(self, Self::AdminSistem | Self::AdminPolda)
+    }
+
     /// Semua peran pimpinan, termasuk pimpinan ber-scope.
     pub fn pimpinan_any(self) -> bool {
         matches!(
@@ -334,3 +339,18 @@ pg_enum!(
     "keputusan_penilaian",
     [Disetujui => "disetujui", PerluPerbaikan => "perlu_perbaikan"]
 );
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn audit_hanya_untuk_admin_sistem_dan_admin_polda() {
+        let diizinkan: Vec<AppRole> = AppRole::ALL
+            .iter()
+            .copied()
+            .filter(|role| role.admin_audit())
+            .collect();
+        assert_eq!(diizinkan, vec![AppRole::AdminSistem, AppRole::AdminPolda]);
+    }
+}

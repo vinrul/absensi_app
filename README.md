@@ -452,7 +452,8 @@ Kategori: **Sangat Baik ≥ 95**, **Baik 90–94,99**, **Cukup 80–89,99**,
 - RBAC ber-scope: personel hanya melihat datanya, atasan melihat satuan kerjanya,
   admin/pimpinan melihat sesuai cakupan satker (Polda/Polres/Satker), admin global penuh.
 - Setiap mutasi (`POST/PUT/PATCH/DELETE`) otomatis dicatat ke `audit_log`
-  (aktor, aksi, entitas, IP, user agent, status) dan dapat ditelusuri admin via `GET /audit`.
+  (aktor, aksi, entitas, IP, user agent, status) dan dapat ditelusuri admin global maupun
+  admin Polda lewat halaman **Pengaturan → Audit Log**.
 - Rate limit: login 5/menit/IP, endpoint lain 120/menit/IP (HTTP 429 + `Retry-After`).
 - Untuk produksi: aktifkan HTTPS (`APP__COOKIE_SECURE=true`), ganti `JWT_SECRET`,
   ganti seluruh password demo, dan set `cleartextTrafficPermitted=false` pada

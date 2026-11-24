@@ -71,6 +71,7 @@
 			items: [
 				{ href: '/ph?tab=jadwal', label: 'Jadwal Strong Point', roles: dashboardRole },
 				{ href: '/ph?tab=rekap', label: 'Rekap Strong Point', roles: dashboardRole },
+				{ href: '/ph?tab=harian', label: 'Rekap Harian Strong Point', roles: dashboardRole },
 				{ href: '/ph?tab=penempatan', label: 'Penempatan Anggota', roles: adminRole },
 				{ href: '/ph?tab=titik', label: 'Titik Strong Point', roles: adminRole }
 			]
@@ -83,7 +84,8 @@
 					href: '/admin',
 					label: 'Akun Admin',
 					roles: ['admin_sistem', 'admin_polda', 'admin_polres']
-				}
+				},
+				{ href: '/audit', label: 'Audit Log', roles: ['admin_sistem', 'admin_polda'] }
 			]
 		}
 	];

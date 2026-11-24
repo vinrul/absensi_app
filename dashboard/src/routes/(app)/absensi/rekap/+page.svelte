@@ -182,6 +182,10 @@
 		});
 	}
 
+	function formatJumlah(nilai: number) {
+		return nilai.toLocaleString('id-ID');
+	}
+
 	function namaSatker(row: AbsensiHarian) {
 		return satkerMap.get(row.satker_id) ?? row.unit ?? '-';
 	}
@@ -399,6 +403,129 @@
 	        return kartu;
 	    });
 
+	    type KategoriRekap = {
+	        id: string;
+	        label: string;
+	        keterangan: string;
+	        tone: KategoriHarian['tone'];
+	        ambil: (row: RekapAbsensi) => number;
+	    };
+
+	    const KATEGORI_REKAP: KategoriRekap[] = [
+	        {
+	            id: 'hadir',
+	            label: 'Hadir',
+	            keterangan: 'Total hari hadir personel',
+	            tone: 'green',
+	            ambil: (row) => row.hadir
+	        },
+	        {
+	            id: 'telat',
+	            label: 'Telat',
+	            keterangan: 'Kejadian terlambat',
+	            tone: 'amber',
+	            ambil: (row) => row.telat
+	        },
+	        {
+	            id: 'dinas_luar',
+	            label: 'Dinas Luar',
+	            keterangan: 'Hari dinas luar',
+	            tone: 'blue',
+	            ambil: (row) => row.dinas_luar
+	        },
+	        {
+	            id: 'piket',
+	            label: 'Piket/Shift',
+	            keterangan: 'Hari piket atau shift',
+	            tone: 'green',
+	            ambil: (row) => row.piket
+	        },
+	        {
+	            id: 'cuti',
+	            label: 'Cuti',
+	            keterangan: 'Hari cuti disetujui',
+	            tone: 'amber',
+	            ambil: (row) => row.cuti
+	        },
+	        {
+	            id: 'izin',
+	            label: 'Izin',
+	            keterangan: 'Hari izin tidak masuk',
+	            tone: 'amber',
+	            ambil: (row) => row.izin
+	        },
+	        {
+	            id: 'sakit',
+	            label: 'Sakit',
+	            keterangan: 'Hari sakit',
+	            tone: 'amber',
+	            ambil: (row) => row.sakit
+	        },
+	        {
+	            id: 'libur_nasional',
+	            label: 'Libur Nasional',
+	            keterangan: 'Hari libur nasional',
+	            tone: 'slate',
+	            ambil: (row) => row.libur_nasional
+	        },
+	        {
+	            id: 'tanpa_keterangan',
+	            label: 'Tanpa Keterangan',
+	            keterangan: 'Hari tanpa keterangan',
+	            tone: 'red',
+	            ambil: (row) => row.tanpa_keterangan
+	        },
+	        {
+	            id: 'menunggu_verifikasi',
+	            label: 'Menunggu Verifikasi',
+	            keterangan: 'Absensi menunggu verifikasi',
+	            tone: 'blue',
+	            ambil: (row) => row.menunggu_verifikasi
+	        }
+	    ];
+
+	    let kategoriRekapId = $state<string | null>(null);
+
+	    // Matriks memfilter satu personel di server; rekap ringkas tetap memuat semua
+	    // sehingga kartu disaring di klien agar angkanya ikut filter.
+	    const rekapRingkas = $derived(
+	        modeRekap === 'matriks' && filter.rekap.personel_id
+	            ? rekap.filter((row) => row.personel_id === filter.rekap.personel_id)
+	            : rekap
+	    );
+	    const ringkasanRekap = $derived.by(() =>
+	        KATEGORI_REKAP.map((item) => ({
+	            ...item,
+	            nilai: rekapRingkas.reduce((jumlah, row) => jumlah + item.ambil(row), 0)
+	        }))
+	    );
+	    const totalMenitTelat = $derived(
+	        rekapRingkas.reduce((jumlah, row) => jumlah + row.menit_telat, 0)
+	    );
+	    const kategoriRekap = $derived(
+	        kategoriRekapId
+	            ? (KATEGORI_REKAP.find((item) => item.id === kategoriRekapId) ?? null)
+	            : null
+	    );
+	    const orangKategoriRekap = $derived.by(() => {
+	        if (!kategoriRekap) return [];
+	        return rekapRingkas
+	            .filter((row) => kategoriRekap.ambil(row) > 0)
+	            .sort(
+	                (a, b) =>
+	                    kategoriRekap.ambil(b) - kategoriRekap.ambil(a) ||
+	                    a.nama.localeCompare(b.nama, 'id')
+	            );
+	    });
+
+	    function bukaKategoriRekap(id: string) {
+	        kategoriRekapId = id;
+	    }
+
+	    function tutupKategoriRekap() {
+	        kategoriRekapId = null;
+	    }
+
 	    function kelasBarKategori(tone: KategoriHarian['tone']) {
 	        if (tone === 'red') return 'bg-rose-500';
 	        if (tone === 'amber') return 'bg-amber-500';
@@ -523,24 +650,31 @@
 	        memuat = true;
 	        error = null;
 	        try {
-	            const params = new URLSearchParams({
+	            const paramsRekap = new URLSearchParams({
 	                dari: filter.rekap.dari,
 	                sampai: filter.rekap.sampai
 	            });
-	if (filter.rekap.satker_id) params.set('satker_id', filter.rekap.satker_id);
-	if (modeRekap === 'matriks' && filter.rekap.personel_id) {
-		params.set('personel_id', filter.rekap.personel_id);
-	}
+	            if (filter.rekap.satker_id) paramsRekap.set('satker_id', filter.rekap.satker_id);
 
 	            if (modeRekap === 'matriks') {
-	                const hasil = await api<AbsensiMatriksResponse>(`/absensi/matriks?${params}`);
-	                matriks = hasil;
-	                rekapRentang = rentangTeks(hasil.rentang.dari, hasil.rentang.sampai);
+	                const paramsMatriks = new URLSearchParams(paramsRekap);
+	                if (filter.rekap.personel_id) {
+	                    paramsMatriks.set('personel_id', filter.rekap.personel_id);
+	                }
+	                const [hasilMatriks, hasilRekap] = await Promise.all([
+	                    api<AbsensiMatriksResponse>(`/absensi/matriks?${paramsMatriks}`),
+	                    api<{ rentang: { dari: string; sampai: string }; data: RekapAbsensi[] }>(
+	                        `/absensi/rekap?${paramsRekap}`
+	                    )
+	                ]);
+	                matriks = hasilMatriks;
+	                rekap = hasilRekap.data;
+	                rekapRentang = rentangTeks(hasilMatriks.rentang.dari, hasilMatriks.rentang.sampai);
 	            } else {
 	                const hasil = await api<{
 	                    rentang: { dari: string; sampai: string };
 	                    data: RekapAbsensi[];
-	                }>(`/absensi/rekap?${params}`);
+	                }>(`/absensi/rekap?${paramsRekap}`);
 	                rekap = hasil.data;
 	                rekapRentang = rentangTeks(hasil.rentang.dari, hasil.rentang.sampai);
 	                halamanRekap = 1;
@@ -849,6 +983,32 @@
 </script>
 
 <svelte:head><title>Rekap Absensi — Absensi & Strong Point</title></svelte:head>
+
+{#snippet kartuRingkasanRekap()}
+	{#if rekap.length > 0}
+		<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+			{#each ringkasanRekap as kategori (kategori.id)}
+				<button
+					type="button"
+					class="card flex flex-col items-start gap-1 p-4 text-left transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-navy-400"
+					onclick={() => bukaKategoriRekap(kategori.id)}
+				>
+					<span class="h-1 w-10 rounded-full {kelasBarKategori(kategori.tone)}"></span>
+					<span class="mt-2 text-2xl font-semibold text-slate-800"
+						>{formatJumlah(kategori.nilai)}</span
+					>
+					<span class="text-sm font-medium text-slate-700">{kategori.label}</span>
+					<span class="text-[11px] text-slate-500">{kategori.keterangan}</span>
+					{#if kategori.id === 'telat' && totalMenitTelat > 0}
+						<span class="mt-1 text-[10px] font-medium text-amber-700">
+							{formatJumlah(totalMenitTelat)} menit total
+						</span>
+					{/if}
+				</button>
+			{/each}
+		</div>
+	{/if}
+{/snippet}
 
 <div class="space-y-4">
 	<div class="card space-y-3 p-4">
@@ -1207,7 +1367,9 @@
 			{/if}
 		</div>
 	{:else if tab === 'rekap' && modeRekap === 'matriks'}
-		<div class="card overflow-hidden">
+		<div class="space-y-4">
+			{@render kartuRingkasanRekap()}
+			<div class="card overflow-hidden">
 			<div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
 				<div>
 					<h2 class="text-sm font-semibold text-slate-700">
@@ -1392,15 +1554,23 @@
 					</tbody>
 				</table>
 			</div>
+			</div>
 		</div>
 	{:else if tab === 'rekap'}
-		<div class="card overflow-hidden">
-			<div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-				<h2 class="text-sm font-semibold text-slate-700">
-					Rekap Kehadiran {rekapRentang}
-				</h2>
-				<span class="text-xs text-slate-500">{rekap.length} personel</span>
-			</div>
+		<div class="space-y-4">
+			{@render kartuRingkasanRekap()}
+			<div class="card overflow-hidden">
+				<div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+					<h2 class="text-sm font-semibold text-slate-700">
+						Rekap Kehadiran {rekapRentang}
+					</h2>
+					<span class="text-xs text-slate-500">
+						{rekap.length} personel
+						{#if rekap.length > 0}
+							· klik kartu untuk rincian
+						{/if}
+					</span>
+				</div>
 
 			<div class="max-h-[70vh] overflow-auto">
 				<table class="w-full">
@@ -1489,6 +1659,7 @@
 				label="personel"
 				onchange={(p) => (halamanRekap = p)}
 			/>
+			</div>
 		</div>
 	{:else if tab === 'verifikasi'}
 		<div class="card overflow-hidden">
@@ -2134,6 +2305,62 @@
 								>
 									Detail
 								</button>
+							</div>
+						</div>
+					{/each}
+				</div>
+			{/if}
+		</div>
+	{/if}
+</Modal>
+
+<Modal
+	open={!!kategoriRekap}
+	title={kategoriRekap?.label ?? 'Ringkasan Rekap'}
+	lebar="max-w-3xl"
+	onclose={tutupKategoriRekap}
+>
+	{#if kategoriRekap}
+		<div class="space-y-3 text-sm">
+			<div class="rounded-lg bg-slate-50 p-3">
+				<p class="text-sm font-semibold text-slate-800">
+					{kategoriRekap.label} · {rekapRentang}
+				</p>
+				<p class="text-xs text-slate-500">
+					{kategoriRekap.keterangan} · {orangKategoriRekap.length} personel
+				</p>
+				{#if kategoriRekap.id === 'telat' && totalMenitTelat > 0}
+					<p class="text-[11px] font-medium text-amber-700">
+						{formatJumlah(totalMenitTelat)} menit keterlambatan total
+					</p>
+				{/if}
+			</div>
+			{#if orangKategoriRekap.length === 0}
+				<p
+					class="rounded-lg border border-dashed border-slate-300 p-4 text-center text-sm text-slate-500"
+				>
+					Tidak ada personel pada kategori ini.
+				</p>
+			{:else}
+				<div
+					class="max-h-[65vh] divide-y divide-slate-100 overflow-auto rounded-lg border border-slate-200"
+				>
+					{#each orangKategoriRekap as row (row.personel_id)}
+						<div class="flex flex-wrap items-start justify-between gap-3 p-3">
+							<div class="min-w-0">
+								<p class="font-medium text-slate-800">{row.nama}</p>
+								<p class="text-[11px] text-slate-500">{row.pangkat} · {row.nrp}</p>
+								<p class="text-[11px] text-slate-400">{row.unit ?? '-'}</p>
+							</div>
+							<div class="text-right">
+								<p class="text-lg font-semibold text-slate-800">
+									{formatJumlah(kategoriRekap.ambil(row))}
+								</p>
+								{#if kategoriRekap.id === 'telat' && row.menit_telat > 0}
+									<p class="text-[11px] text-amber-700">
+										{formatJumlah(row.menit_telat)} menit
+									</p>
+								{/if}
 							</div>
 						</div>
 					{/each}

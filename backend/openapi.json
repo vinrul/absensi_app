@@ -1004,6 +1004,44 @@
         "responses": { "200": { "description": "Rekap PH" }, "403": { "description": "Di luar cakupan" } }
       }
     },
+    "/ph/rekap/harian": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Rekap strong point per tanggal dan personel (maks. 31 hari, dihitung sampai hari ini)",
+        "parameters": [
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
+          { "name": "personel_id", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Filter satu personel (untuk halaman detail)" }
+        ],
+        "responses": { "200": { "description": "Baris jadwal × personel beserta realisasi" }, "403": { "description": "Di luar cakupan" }, "422": { "description": "Rentang lebih dari 31 hari" } }
+      }
+    },
+    "/ph/rekap/harian/ekspor": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Ekspor PDF matriks rekap strong point per tanggal (maks. 31 hari)",
+        "parameters": [
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" }, "422": { "description": "Rentang lebih dari 31 hari" } }
+      }
+    },
+    "/ph/rekap/personel/{id}/ekspor": {
+      "get": {
+        "tags": ["ph"],
+        "summary": "Ekspor PDF detail rekap strong point satu personel",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" } },
+          { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal mulai (default 30 hari terakhir)" },
+          { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" }, "description": "Tanggal selesai (default hari ini)" },
+          { "name": "satker_id", "in": "query", "schema": { "type": "string", "format": "uuid" } }
+        ],
+        "responses": { "200": { "description": "Berkas PDF" }, "403": { "description": "Di luar cakupan" }, "404": { "description": "Personel tidak ditemukan" }, "422": { "description": "Rentang lebih dari 31 hari" } }
+      }
+    },
     "/ph/foto": {
       "get": {
         "tags": ["ph"],
@@ -1731,15 +1769,16 @@
     "/audit": {
       "get": {
         "tags": ["sistem"],
-        "summary": "Audit log mutasi (admin)",
+        "summary": "Audit log mutasi (admin global & admin Polda)",
         "parameters": [
           { "name": "entitas", "in": "query", "schema": { "type": "string" } },
           { "name": "actor_id", "in": "query", "schema": { "type": "string", "format": "uuid" } },
           { "name": "dari", "in": "query", "schema": { "type": "string", "format": "date" } },
           { "name": "sampai", "in": "query", "schema": { "type": "string", "format": "date" } },
-          { "name": "page", "in": "query", "schema": { "type": "integer" } }
+          { "name": "page", "in": "query", "schema": { "type": "integer" } },
+          { "name": "per_page", "in": "query", "schema": { "type": "integer" } }
         ],
-        "responses": { "200": { "description": "Daftar audit" }, "403": { "description": "Hanya admin" } }
+        "responses": { "200": { "description": "Daftar audit" }, "403": { "description": "Hanya admin global dan admin Polda" } }
       }
     }
   }

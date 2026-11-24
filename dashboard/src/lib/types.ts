@@ -255,6 +255,20 @@ export interface RekapAbsensi {
 	menunggu_verifikasi: number;
 }
 
+export interface AuditLog {
+	id: string;
+	actor_id: string | null;
+	actor_nama: string | null;
+	aksi: string;
+	entitas: string;
+	entitas_id: string | null;
+	ip: string | null;
+	user_agent: string | null;
+	before_data: unknown;
+	after_data: unknown;
+	created_at: string;
+}
+
 export interface TitikDinas {
 	id: string;
 	satker_id: string;
@@ -606,6 +620,31 @@ export interface RekapPh {
 	menunggu_verifikasi: number;
 	total_menit_telat: number;
 	total_menit_pulang_cepat: number;
+}
+
+export interface RekapPhHarian {
+	tanggal: string;
+	jadwal_ph_id: string;
+	sesi: string | null;
+	jam_mulai: string;
+	jam_selesai: string;
+	strong_point_nama: string;
+	strong_point_id: string;
+	strong_point_latitude: number;
+	strong_point_longitude: number;
+	strong_point_radius_m: number;
+	regu: string | null;
+	personel_id: string;
+	nama: string;
+	nrp: string;
+	pangkat: string;
+	unit: string | null;
+	masuk_jam: string | null;
+	pulang_jam: string | null;
+	masuk_latitude: number | null;
+	masuk_longitude: number | null;
+	menit_telat: number;
+	menit_pulang_cepat: number;
 }
 
 export interface PenempatanPh {

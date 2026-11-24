@@ -3,10 +3,10 @@
 Dokumen ini merangkum kondisi proyek, keputusan teknis, konvensi, dan pekerjaan yang tersisa.
 Baca ini dulu sebelum mengubah kode.
 
-Terakhir diverifikasi: 23 November 2026 (40 unit test backend; 89 cek API pada DB uji;
+Terakhir diverifikasi: 24 November 2026 (40 unit test backend; 89 cek API pada DB uji;
 seed `--reset` development menghasilkan 145 personel, 102 jadwal PH, penempatan tetap, dan
 fallback jadwal bulan sebelumnya; dashboard & web personel `bun run check`/`build`; APK debug;
-`openapi.json` 96 path).
+`openapi.json` 96 path; peta dashboard diuji Chrome headless).
 
 Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 
@@ -53,14 +53,15 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Output + verifikasi | e2e API + wizard Android 3 langkah (pilih hasil terverifikasi → data → berkas), draf, kirim, revisi; status `draft` lewat migrasi `0014` |
 | Mesin penilaian 20/20/30/30 + kategori | unit test `scoring.rs`; hari strong point tetap dinilai, telat kantor diabaikan bila check-in |
 | Dashboard pimpinan + cetak + CSV | Dashboard baru fokus kehadiran & strong point hari ini (filter tanggal + satker); laporan kinerja tetap ada di kode tetapi tidak dijangkau UI |
-| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Rekap Harian**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; badge status dan **TA/TC/TM** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet dan rincian sesi. Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
+| **Peta absensi di dashboard** | `PetaDashboard.svelte` menggambar marker absensi berwarna status, marker check-in strong point (lengkap/TC), titik dinas + radius, dan titik strong point + radius; lapisan dapat dimatikan per kategori, basemap Jalan/Satelit, popup detail. Memakai endpoint yang ada (`/absensi/harian`, `/ph/rekap/harian`, `/titik-dinas`, `/ph/strong-point`) tanpa endpoint baru |
+| Rekap Absensi bertab + Export PDF | `/absensi/rekap` memiliki tab **Rekap Kehadiran**, **Rekap Harian**, **Verifikasi**, dan **Detail per Orang** dengan filter terpisah; rekap kehadiran memakai **matriks harian** (satu baris per personel, satu kolom per tanggal, maks. 31 hari) berisi status, jam masuk/pulang, telat, pulang cepat; badge status dan **TA/TC/TM** terpisah (mis. DK TC); sesi strong point pagi/sore beserta realisasinya; jadwal PH tanpa absensi tampil PH + TA; sel dapat diklik untuk modal alamat (Nominatim) + peta Leaflet dan rincian sesi. Kartu ringkasan total periode tampil di atas mode Matriks maupun Ringkasan (klik kartu membuka rincian per personel). Tersedia **Export PDF Ringkasan** dan **Export PDF Matriks Harian** (PDF matriks dibagi per minggu); PDF verifikasi/detail tetap ada |
 | **Rekap Harian ringkas** | Tab **Rekap Harian** dengan filter tanggal (default hari ini) + satker; sub-tab **Ringkasan** berisi kartu **Tidak Absen**, **Jadwal PH** (rincian **Sudah PH**/**Belum PH**), DK, DL, Piket, Operasi, Cuti, Izin, dan Sakit; sub-tab **Peta** menampilkan marker check-in berwarna status, titik dinas + radius, strong point + radius, basemap Jalan/Satelit, dan legenda. Klik kartu membuka daftar personel + tombol Detail; memakai matriks satu hari dan endpoint titik yang ada, tanpa endpoint baru |
 | Profil Saya di dashboard | `/profil` (admin & pimpinan): unggah foto JPG/PNG maks. 5 MB (`POST /auth/foto`), avatar bersama `Avatar.svelte` di sidebar + header, ganti password (`POST /auth/change-password`) dengan tombol mata; sukses memicu logout dan redirect `/login` |
 | Aplikasi web personel & atasan | Folder `personel/` (SvelteKit SPA, Tailwind, Bun, port 5174): Beranda, Absensi GPS + peta OSM + antrean offline, Strong Point (daftar sesi hari ini + wizard), riwayat; halaman kinerja masih ada di disk tetapi tidak dijangkau navigasi; login memakai kanal `personel_web` |
 | Deteksi lokasi tiruan (fake GPS) | Android memeriksa `Location.isMock`/`isFromMockProvider` + peringatan Developer Options/mock app; server `APP__MOCK_LOCATION_POLICY=flag|reject` (default `flag`, produksi `reject`); antrean mencatat penolakan; panduan `docs/fake-gps.md` |
-| Strong Point: rekap + Export PDF | Rekap per rentang tanggal dengan kolom telat & pulang cepat; PDF `/ph/jadwal/ekspor` berupa tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota dan `/ph/rekap/ekspor` (uji API + Chrome headless) |
+| Strong Point: rekap + Export PDF | Rekap per rentang tanggal (default awal bulan s.d. hari ini, maks. 31 hari) dengan sub-tab **Ringkasan** (per personel) dan **Matriks Harian** (baris personel berjadwal, kolom tanggal; sel memuat sesi/jam/titik, melakukan, telat, pulang cepat, TC, TA); tab **Rekap Harian** (satu tanggal + satker) berisi kartu ringkasan (personel, sesi, titik, hadir, belum, TC, telat, pulang cepat; klik kartu → daftar personel) dan **Peta** (titik strong point + radius, marker check-in lengkap/TC, Jalan/Satelit); klik nama personel membuka **detail per personel** (`?tab=rekap&personel_id=`, kartu ringkasan + rincian per jadwal + tombol **Export PDF Detail** via `/ph/rekap/personel/{id}/ekspor`); tombol **Export PDF Matriks** memakai `/ph/rekap/harian/ekspor` (A4 landscape, dibagi per minggu, hanya personel yang berjadwal di minggu tsb); PDF `/ph/jadwal/ekspor` berupa tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota dan `/ph/rekap/ekspor` (uji API + Chrome headless) |
 | Aplikasi Android (login, absensi GPS, offline, wizard rencana/hasil/output, persetujuan & verifikasi atasan, profil + foto + ganti password, penampil lampiran) | APK debug terbentuk |
-| Audit log mutasi | `GET /audit` mencatat `PATCH /api/v1/satker/<uuid>` |
+| Audit log mutasi | `GET /audit` (admin global & admin Polda) + halaman **Pengaturan → Audit Log** di dashboard; mencatat mis. `PATCH /api/v1/satker/<uuid>` dengan status respons |
 | Rate limit | login ke-4 dalam 1 menit → 429 |
 | Dokumentasi API | `/docs` (96 path), `/api-docs/openapi.json` |
 | Backup script | `deploy/backup.sh` (belum dijadwalkan di server) |
@@ -328,6 +329,12 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     status, dan basemap dapat diganti Jalan/Satelit. Kartu dapat diklik untuk modal daftar
     personel dan tombol **Detail** menuju modal absensi penuh. Jangan menduplikasi query agregat
     di server kecuali kartu perlu dihitung untuk periode yang lebih besar.
+34. **Peta dashboard memakai ulang endpoint yang ada.** `PetaDashboard.svelte` di `/dashboard`
+    memanggil `/absensi/harian`, `/ph/rekap/harian`, `/titik-dinas`, dan `/ph/strong-point`
+    dengan filter tanggal + satker aktif. Marker absensi menyembunyikan baris `ph_hadir` agar
+    tidak bertumpuk dengan marker check-in strong point; hanya titik aktif yang digambar.
+    Kegagalan endpoint titik/rekap PH diabaikan (peta tetap tampil) supaya dashboard tidak
+    ikut gagal saat salah satu layanan bermasalah.
 
 ---
 
@@ -510,7 +517,8 @@ GET    /ph/jadwal/saya?dari&sampai=        GET|PUT|DELETE /ph/jadwal/{id}
 GET    /ph/jadwal/ekspor?dari&sampai&satker_id=      # PDF tabel jadwal
 POST   /ph/absensi        GET /ph/absensi/saya?dari&sampai=   GET /ph/absensi/jadwal/{id}
 POST   /ph/absensi/{id}/verifikasi                 GET /ph/rekap?dari&sampai&satker_id=
-GET    /ph/rekap/ekspor?dari&sampai&satker_id=      GET /ph/foto?dari&sampai&personel_id=
+GET    /ph/rekap/harian?dari&sampai&satker_id=     GET /ph/rekap/harian/ekspor?dari&sampai&satker_id=
+GET    /ph/rekap/personel/{id}/ekspor?dari&sampai&satker_id=   GET /ph/rekap/ekspor?dari&sampai&satker_id=      GET /ph/foto?dari&sampai&personel_id=
 POST   /absensi           GET  /absensi?dari&sampai&personel_id&perlu_verifikasi   GET /absensi/saya
 GET    /absensi/harian?dari&sampai&personel_id&perlu_verifikasi   # masuk+pulang digabung
 GET    /absensi/rekap     GET  /absensi/rekap/ekspor      GET /absensi/verifikasi/ekspor
@@ -534,7 +542,7 @@ GET    /dashboard/{ringkasan,capaian-indikator,tren,sebaran-kategori,rekap}   # 
 GET    /dashboard/kehadiran?tanggal=&satker_id=    # dipakai UI baru
 GET    /laporan/penilaian[?format=csv]
 GET    /notifikasi        POST /notifikasi/{id}/baca
-GET    /audit             # admin
+GET    /audit             # admin global & admin Polda
 GET    /health            # di luar /api/v1
 GET    /docs              # di luar /api/v1
 ```
@@ -706,13 +714,12 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
 11. **Pengingat Android per sesi**: saat ini WorkManager memakai jadwal (satu baris per sesi),
     tetapi label notifikasi belum membedakan pagi/sore secara eksplisit.
 12. Ekspor PDF server-side dengan kop & QR verifikasi.
-13. `GET /audit` UI di halaman Pengaturan (saat ini hanya API).
-14. Rate limit berbasis Redis bila API di-scale.
-15. **Play Integrity** (`APP__PLAY_INTEGRITY_MODE=off|log|enforce`) untuk memastikan APK asli;
+13. Rate limit berbasis Redis bila API di-scale.
+14. **Play Integrity** (`APP__PLAY_INTEGRITY_MODE=off|log|enforce`) untuk memastikan APK asli;
     bukan pengganti deteksi koordinat.
-16. **Validasi plausibilitas server**: lompatan koordinat, kecepatan tidak wajar, dan jarak/waktu
+15. **Validasi plausibilitas server**: lompatan koordinat, kecepatan tidak wajar, dan jarak/waktu
     antarabsensi.
-17. Deteksi lokasi tiruan di web personel tidak tersedia di browser; pertimbangkan kebijakan
+16. Deteksi lokasi tiruan di web personel tidak tersedia di browser; pertimbangkan kebijakan
     foto wajib + verifikasi atasan.
 
 **P3 — teknis**

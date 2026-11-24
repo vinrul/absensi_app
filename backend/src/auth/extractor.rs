@@ -67,6 +67,19 @@ impl AuthUser {
             ))
         }
     }
+
+    /// Audit log hanya dapat dibuka admin global dan admin Polda.
+    pub fn require_audit(&self) -> AppResult<()> {
+        let diizinkan =
+            self.is_admin_global() || self.role_scopes.iter().any(|r| r.role.admin_audit());
+        if diizinkan {
+            Ok(())
+        } else {
+            Err(AppError::Forbidden(
+                "Audit log hanya untuk admin global dan admin Polda".into(),
+            ))
+        }
+    }
 }
 
 impl FromRequestParts<AppState> for AuthUser {

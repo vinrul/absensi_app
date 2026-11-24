@@ -62,6 +62,8 @@ pub struct ListFilter {
 }
 
 pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<AuditRow>, i64)> {
+    // `created_at` bertipe timestamptz; batas tanggal dihitung pada zona WITA
+    // agar filter "dari/sampai" sama dengan tanggal yang ditampilkan UI.
     const SQL: &str = r#"
         SELECT a.id, a.actor_id, p.nama AS actor_nama, a.aksi, a.entitas, a.entitas_id,
                a.ip, a.user_agent, a.before_data, a.after_data, a.created_at
@@ -69,8 +71,10 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<AuditRow
           LEFT JOIN personel p ON p.id = a.actor_id
          WHERE ($1::text IS NULL OR a.entitas = $1)
            AND ($2::uuid IS NULL OR a.actor_id = $2)
-           AND ($3::date IS NULL OR a.created_at >= $3)
-           AND ($4::date IS NULL OR a.created_at < ($4::date + 1))
+           AND ($3::date IS NULL
+                OR a.created_at >= ($3::date::timestamp AT TIME ZONE 'Asia/Makassar'))
+           AND ($4::date IS NULL
+                OR a.created_at < (($4::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar'))
          ORDER BY a.created_at DESC
          LIMIT $5 OFFSET $6
     "#;
@@ -80,8 +84,10 @@ pub async fn list(pool: &PgPool, filter: &ListFilter) -> AppResult<(Vec<AuditRow
           FROM audit_log a
          WHERE ($1::text IS NULL OR a.entitas = $1)
            AND ($2::uuid IS NULL OR a.actor_id = $2)
-           AND ($3::date IS NULL OR a.created_at >= $3)
-           AND ($4::date IS NULL OR a.created_at < ($4::date + 1))
+           AND ($3::date IS NULL
+                OR a.created_at >= ($3::date::timestamp AT TIME ZONE 'Asia/Makassar'))
+           AND ($4::date IS NULL
+                OR a.created_at < (($4::date + 1)::timestamp AT TIME ZONE 'Asia/Makassar'))
     "#;
 
     let rows = sqlx::query_as::<_, AuditRow>(SQL)

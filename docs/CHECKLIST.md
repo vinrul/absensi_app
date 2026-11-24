@@ -118,6 +118,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.66 | Export PDF Ringkasan & Matriks Harian | ✅ | Dua tombol di tab Rekap Kehadiran: `/absensi/rekap/ekspor` (ringkasan) dan `/absensi/matriks/ekspor` (matriks per minggu, maks. 31 hari; 422 bila lebih); legenda PDF memuat TA/TC/TM dan sel menampilkan sesi strong point |
 | 3.67 | Tab Rekap Harian ringkas | ✅ | Menu sidebar **Rekap Harian**; filter tanggal (default hari ini) + satker; sub-tab **Ringkasan** berisi kartu Tidak Absen, Jadwal PH (rincian Sudah/Belum PH), DK, DL, Piket, Operasi, Cuti, Izin, Sakit; sub-tab **Peta** menampilkan marker check-in berwarna status, titik dinas + radius, strong point + radius, basemap Jalan/Satelit, legenda, dan popup; klik kartu membuka modal daftar personel + tombol Detail |
 | 3.68 | Combobox ber-pencarian pada filter & anggota Strong Point | ✅ | Rekap Kehadiran/Harian/Verifikasi/Detail: combobox satker + personel; Jadwal/Rekap Strong Point: combobox satker; modal Jadwal & Penempatan: combobox satker + pencarian nama/NRP; Titik Strong Point: combobox pemilik titik |
+| 3.69 | Kartu ringkasan Rekap Kehadiran | ✅ | Sepuluh kartu total periode (hadir, telat + menit, dinas luar, piket, cuti, izin, sakit, libur nasional, tanpa keterangan, menunggu verifikasi) tampil di atas mode **Matriks** dan **Ringkasan**; angka mengikuti filter satker/personel; klik kartu membuka modal rincian per personel |
 
 ## 4. Modul Strong Point v2 (terpisah dari absensi harian)
 
@@ -132,10 +133,10 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.7 | Check-in/out wajib lokasi & radius | ✅ | Haversine sisi server; di luar radius 422 |
 | 4.8 | Satu check-in & satu check-out per jadwal | ✅ | Ganda 409; check-in dibuka −30 menit dan ditutup di `jam_selesai`; check-out maks. `jam_selesai + 60 menit` |
 | 4.9 | Telat & pulang cepat per sesi | ✅ | `absensi_ph.menit_telat` dan `menit_pulang_cepat`; tampil di rekap |
-| 4.10 | Rekap PH per rentang tanggal | ✅ | `GET /ph/rekap?dari&sampai&satker_id`; total telat/pulang cepat; dibatasi sampai hari ini |
+| 4.10 | Rekap PH per rentang tanggal | ✅ | `GET /ph/rekap?dari&sampai&satker_id`; default awal bulan s.d. hari ini; total telat/pulang cepat; dibatasi sampai hari ini |
 | 4.11 | Rekap menandai tidak hadir / hanya check-in | ✅ | `tanggal_tidak_hadir`, `tanggal_hanya_check_in`, `menunggu_verifikasi` |
 | 4.12 | Deteksi bentrok & validasi sesi | ✅ | Bentrok jam 409; sesi selain pagi/sore 422; jam selesai ≤ mulai 422 |
-| 4.13 | Export PDF jadwal & rekap | ✅ | `/ph/jadwal/ekspor` (tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota) dan `/ph/rekap/ekspor` |
+| 4.13 | Export PDF jadwal & rekap | ✅ | `/ph/jadwal/ekspor` (tabel Tanggal/Sesi/Jam/Titik/Regu/Anggota), `/ph/rekap/ekspor`, dan `/ph/rekap/harian/ekspor` (matriks A4 landscape per minggu) |
 | 4.14 | Tab Strong Point di dashboard | ✅ | `?tab=` jadwal, rekap, penempatan, titik; filter **bulan** untuk jadwal dan rentang tanggal untuk rekap; tombol **Salin Bulan Lalu** |
 | 4.15 | Titik strong point dengan peta | ✅ | `PetaPicker` satelit + pencarian alamat; modal lebar |
 | 4.16 | Tab **Strong** Android dihapus | ✅ | Fokus absensi; sesi strong point tampil di Beranda dan digabung ke **Riwayat Absensi** per tanggal |
@@ -155,6 +156,10 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.30 | Android satu tab Absensi | ✅ | Tab Strong dihapus; wizard status → GPS → foto → kirim; check-out berikutnya tidak memilih status |
 | 4.31 | Riwayat absensi Android per tanggal | ✅ | `riwayatHarian()` menggabungkan absensi + jadwal/absensi PH: satu baris per tanggal, status berpasangan dengan check-in/check-out, sesi strong point pagi/sore beserta realisasi; rentang mengikuti tanggal server (mendukung fake time) |
 | 4.32 | Filter tanggal riwayat Android | ✅ | `FieldTanggal` Dari/Sampai + tombol **Tampilkan** dan **Bulan Ini**; default tanggal 1 s.d. akhir bulan berjalan; validasi mulai ≤ selesai; data riwayat & sesi PH dimuat ulang sesuai rentang |
+| 4.33 | Rekap Strong Point per tanggal | ✅ | Sub-tab **Ringkasan** / **Matriks Harian**; filter default tanggal 1 s.d. hari ini (maks. 31 hari) + tombol **Bulan Ini**; matriks: baris personel berjadwal, kolom tanggal, sel berisi sesi/jam/titik, melakukan, telat, pulang cepat, TC, TA; data dari `GET /ph/rekap/harian`; tombol **Export PDF Matriks** memakai `/ph/rekap/harian/ekspor`; personel tanpa jadwal pada filter tidak ditampilkan |
+| 4.34 | Detail rekap strong point per personel | ✅ | Klik nama personel di **Ringkasan** atau **Matriks Harian** → `?tab=rekap&personel_id=...`; kartu ringkasan (jadwal, hadir, hanya check-in, tidak SP, total telat, total pulang cepat) + tabel rincian per jadwal (tanggal, sesi/jam, titik/regu, check-in/out, telat, pulang cepat, status Lengkap/TC/TA); tombol **Export PDF Detail** (`/ph/rekap/personel/{id}/ekspor`) dan **Kembali** kembali ke rekap |
+| 4.35 | Rekap Harian Strong Point | ✅ | Tab **Rekap Harian** (`?tab=harian`) dengan filter tanggal (default hari ini, maks. hari ini) + satker; sub-tab **Ringkasan** berisi 8 kartu (personel, sesi jadwal, strong point, sesi hadir, sesi belum/TA, sesi TC, total telat, total pulang cepat) dan klik kartu membuka daftar personel; sub-tab **Peta** menampilkan titik strong point + radius, marker check-in lengkap (hijau) / TC (kuning), basemap Jalan/Satelit, dan legenda |
+| 4.36 | Peta absensi di Dashboard | ✅ | `PetaDashboard.svelte` di halaman `/dashboard`: marker absensi berwarna status (kecuali personel yang sudah check-in strong point), marker check-in strong point lengkap/TC, titik dinas + radius, dan titik strong point + radius; checkbox per lapisan (Absensi, Check-in strong point, Titik dinas, Titik strong point), basemap Jalan/Satelit, popup detail, dan `fitBounds` otomatis |
 
 ## 5. Pengingat jadwal tanpa FCM
 
@@ -209,12 +214,12 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | # | Item | Status | Catatan |
 |---|---|---|---|
 | 7.1 | Setiap mutasi `/api/v1` masuk `audit_log` | ✅ | middleware |
-| 7.2 | Audit hanya admin global | ✅ | |
+| 7.2 | Audit hanya admin global & admin Polda | ✅ | |
 | 7.3 | Lampiran mentah dicek kepemilikan/cakupan | ✅ | `GET /lampiran/raw/{key}` |
 | 7.4 | Hapus lampiran dicek pemilik/admin | ✅ | |
 | 7.5 | Password di-hash Argon2id | ✅ | |
 | 7.6 | Rate limit login | ✅ | 5/menit/IP |
-| 7.7 | UI audit log di dashboard | ⬜ | masih via API |
+| 7.7 | UI audit log di dashboard | ✅ | **Pengaturan → Audit Log**: filter tanggal, entitas, pelaku; tabel waktu/pelaku/aksi/entitas/status/IP; modal detail before/after & user agent |
 | 7.8 | HTTPS + cookie `Secure` di produksi | ⬜ | lihat backlog P1 |
 
 ## 8. Dokumentasi
@@ -266,6 +271,14 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.30 | Tab Rekap Harian | ✅ | Chrome headless: 9 kartu tampil (Tidak Absen 146, Jadwal PH 3 dengan rincian Sudah PH 0/Belum PH 3, status lain 0 pada data demo); klik kartu membuka modal 146 personel dengan badge TA dan tombol Detail; URL menjadi `?tab=harian` |
 | 9.31 | Peta Rekap Harian | ✅ | Chrome headless tanggal 3 Nov: 120 marker check-in, 22 titik dinas, 22 strong point, 208 layer interaktif, 27 tile OSM; lingkaran radius dan legenda status tampil; sub-tab Peta aktif |
 | 9.32 | Pencarian combobox filter | ✅ | Chrome headless: `badung` → 3 opsi satker; personel `85` pada Satlantas → 5 opsi; PH `ditreskrimsus` → 1 opsi; modal Jadwal memuat 9 anggota dan pencarian `85000001` → 1; modal Penempatan memiliki combobox satker + pencarian anggota |
+| 9.33 | Kartu ringkasan Rekap Kehadiran | ✅ | Chrome headless 1–24 Nov 2026: 10 kartu tampil di mode Matriks (Hadir 1.929, Telat 444/7.860 menit, Tanpa Keterangan 65, Menunggu Verifikasi 40); klik kartu Hadir membuka modal 121 personel terurut; mode Ringkasan tetap menampilkan kartu |
+| 9.34 | Audit Log dashboard | ✅ | API: admin global & admin Polda `GET /audit` → 200, admin satker & pimpinan → 403, tanpa token → 401; Chrome headless sebagai `admin_polda`: menu **Pengaturan → Audit Log** tampil, 20 baris + total 114, filter dan modal detail berfungsi |
+| 9.35 | Rekap Strong Point per tanggal | ✅ | API 1–24 Nov: `GET /ph/rekap/harian` → 343 baris/17 tanggal (253 hadir, 76 TC, 90 TA), rentang 55 hari → 422; Chrome headless: default filter 01–24 Nov, sub-tab **Matriks Harian** menampilkan 24 kolom tanggal × 87 personel dengan sel berisi Pagi/Sore, Ya/TA, TC, T, PC dan titik strong point; kolom tanggal tanpa jadwal kosong |
+| 9.36 | PDF matriks rekap strong point | ✅ | `GET /ph/rekap/harian/ekspor` 1–24 Nov → PDF 1,6 MB/4 bagian mingguan; teks memuat 01-11 s.d. 07-11, Pagi/Sore, Ya/TA, TC, T, PC, dan titik; rentang 55 hari → 422; personel yang mulai berjadwal 18 Nov hanya muncul di bagian pekan ke-3 (tidak ada di bagian 1–2) |
+| 9.37 | Detail rekap strong point per personel | ✅ | API: `GET /ph/rekap/harian?personel_id=...` 1–24 Nov untuk I Gede Artawan → 20 baris, 1 personel; ID tak dikenal → 404; Chrome headless: klik nama di Ringkasan membuka detail (3 jadwal, 2 hadir, 1 TC, 1 TA, 10 menit telat), klik nama di Matriks Harian juga membuka detail, tombol Kembali kembali ke rekap |
+| 9.38 | PDF detail rekap strong point | ✅ | `GET /ph/rekap/personel/{id}/ekspor` 1–24 Nov → PDF 528 KB/1 halaman: 20 sesi, ringkasan “Hadir 16 · Hanya check-in 4 · Tidak strong point 4 · Total telat 80 menit · Total pulang cepat 0”, status Lengkap/TC/TA; ID tak dikenal → 404, rentang 55 hari → 422 |
+| 9.39 | Rekap Harian Strong Point (card + peta) | ✅ | API 3 Nov: 86 baris/22 sesi/83 personel/21 titik, 64 check-in berkoordinat, 22 TC, 22 TA; Chrome headless 24 Nov: 8 kartu tampil (3 personel, 2 sesi, 1 titik, 0 hadir, 6 belum, 0 TC), klik kartu Sesi Belum membuka modal 6 baris; sub-tab Peta menampilkan Leaflet dengan tile OSM, marker strong point + radius, dan legenda |
+| 9.40 | Peta absensi di Dashboard | ✅ | Chrome headless: 24 Nov tidak ada aktivitas → 88 elemen interaktif (22 titik dinas + 22 titik strong point beserta radius), teks "0 absensi berkoordinat · 0 check-in strong point · 22 titik dinas · 22 titik strong point"; 3 Nov → 210 elemen (58 absensi + 64 check-in strong point + 44 titik + 44 radius), tile OSM termuat 20/20; mematikan keempat lapisan menyisakan 0 marker |
 
 ## 10. Yang belum dikerjakan (backlog)
 
@@ -273,16 +286,15 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 |---|---|---|---|
 | 10.1 | Ekspor CSV rekap PH | P2 | JSON + PDF sudah ada |
 | 10.2 | Pusat notifikasi & pengingat di dashboard | P2 | API `/notifikasi` sudah tersedia |
-| 10.3 | UI audit log di Pengaturan | P2 | API `GET /audit` sudah tersedia |
-| 10.4 | Uji lapangan penempatan tetap, salin bulanan, fallback & toleransi jam | P1 | pastikan −30/+60 menit dan pemetaan minggu sesuai kondisi lapangan |
-| 10.5 | Ekspor PDF server-side (kop + QR) | P2 | PDF sudah memakai Chrome/Edge headless |
-| 10.6 | Bersihkan halaman kinerja dorman | P3 | API/tabel sengaja dipertahankan |
-| 10.7 | Jadwalkan backup + uji restore | P1 | skrip ada, cron belum |
-| 10.8 | HTTPS produksi + `cleartextTrafficPermitted=false` | P1 | |
-| 10.9 | Uji perangkat nyata (Android 8 & 13) | P1 | emulator sudah |
-| 10.10 | Push FCM untuk notifikasi daring | P3 | pengingat lokal sudah memenuhi kebutuhan |
-| 10.11 | Utoipa/OpenAPI otomatis | P3 | `openapi.json` manual + validator |
-| 10.12 | Cache titik dinas untuk absensi offline sejak awal | P2 | saat offline total, radius belum diketahui sampai ada sinyal |
+| 10.3 | Uji lapangan penempatan tetap, salin bulanan, fallback & toleransi jam | P1 | pastikan −30/+60 menit dan pemetaan minggu sesuai kondisi lapangan |
+| 10.4 | Ekspor PDF server-side (kop + QR) | P2 | PDF sudah memakai Chrome/Edge headless |
+| 10.5 | Bersihkan halaman kinerja dorman | P3 | API/tabel sengaja dipertahankan |
+| 10.6 | Jadwalkan backup + uji restore | P1 | skrip ada, cron belum |
+| 10.7 | HTTPS produksi + `cleartextTrafficPermitted=false` | P1 | |
+| 10.8 | Uji perangkat nyata (Android 8 & 13) | P1 | emulator sudah |
+| 10.9 | Push FCM untuk notifikasi daring | P3 | pengingat lokal sudah memenuhi kebutuhan |
+| 10.10 | Utoipa/OpenAPI otomatis | P3 | `openapi.json` manual + validator |
+| 10.11 | Cache titik dinas untuk absensi offline sejak awal | P2 | saat offline total, radius belum diketahui sampai ada sinyal |
 
 ## 11. Deploy VPS
 

@@ -31,7 +31,7 @@ pub async fn list_audit(
     user: AuthUser,
     Query(query): Query<ListQuery>,
 ) -> AppResult<Json<ListResponse<AuditRow>>> {
-    user.require_admin_global()?;
+    user.require_audit()?;
 
     let (page, per_page, offset) = pagination(query.page, query.per_page);
 

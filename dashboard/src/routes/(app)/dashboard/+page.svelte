@@ -5,13 +5,17 @@
 		AbsensiHarian,
 		JadwalPh,
 		ListResponse,
+		RekapPhHarian,
 		Satker,
 		StatusJadwalPh,
-		StatusKehadiran
+		StatusKehadiran,
+		StrongPoint,
+		TitikDinas
 	} from '#lib/types';
 	import { LABEL_STATUS_KEHADIRAN } from '#lib/types';
 	import StatCard from '#lib/components/StatCard.svelte';
 	import Icon from '#lib/components/Icon.svelte';
+	import PetaDashboard from '#lib/components/PetaDashboard.svelte';
 
 	interface RingkasanKehadiran {
 		tanggal: string;
@@ -46,6 +50,9 @@
 	let ringkasan = $state<RingkasanKehadiran | null>(null);
 	let jadwal = $state<JadwalPh[]>([]);
 	let absensi = $state<AbsensiHarian[]>([]);
+	let titikDinas = $state<TitikDinas[]>([]);
+	let titikStrongPoint = $state<StrongPoint[]>([]);
+	let phHarian = $state<RekapPhHarian[]>([]);
 	let statusJadwal = $state<StatusJadwalPh | null>(null);
 	let memuat = $state(true);
 	let error = $state<string | null>(null);
@@ -81,17 +88,29 @@
 			if (satkerId) paramsAbsensi.set('satker_id', satkerId);
 			const paramsStatus = new URLSearchParams({ bulan: tanggal.slice(0, 7) });
 			if (satkerId) paramsStatus.set('satker_id', satkerId);
+			const paramsTitik = new URLSearchParams();
+			if (satkerId) paramsTitik.set('satker_id', satkerId);
+			const paramsPh = new URLSearchParams({ dari: tanggal, sampai: tanggal });
+			if (satkerId) paramsPh.set('satker_id', satkerId);
 
-			const [r, j, a, s] = await Promise.all([
+			const [r, j, a, s, td, sp, ph] = await Promise.all([
 				api<RingkasanKehadiran>(`/dashboard/kehadiran?${params}`),
 				api<JadwalPh[]>(`/ph/jadwal?${paramsJadwal}`),
 				api<ListResponse<AbsensiHarian>>(`/absensi/harian?${paramsAbsensi}`),
-				api<StatusJadwalPh>(`/ph/jadwal/status?${paramsStatus}`)
+				api<StatusJadwalPh>(`/ph/jadwal/status?${paramsStatus}`),
+				api<TitikDinas[]>(`/titik-dinas?${paramsTitik}`).catch(() => []),
+				api<StrongPoint[]>(`/ph/strong-point?${paramsTitik}`).catch(() => []),
+				api<{ rentang: { dari: string; sampai: string }; data: RekapPhHarian[] }>(
+					`/ph/rekap/harian?${paramsPh}`
+				).catch(() => ({ rentang: { dari: tanggal, sampai: tanggal }, data: [] }))
 			]);
 			ringkasan = r;
 			jadwal = j;
 			absensi = a.data;
 			statusJadwal = s;
+			titikDinas = td;
+			titikStrongPoint = sp;
+			phHarian = ph.data;
 		} catch (err) {
 			error = err instanceof ApiError ? err.message : 'Gagal memuat dashboard';
 		} finally {
@@ -203,6 +222,13 @@
 	</div>
 
 	<p class="text-xs text-slate-500">Ringkasan untuk {tanggalPanjang(tanggal)}.</p>
+
+	<PetaDashboard
+		{absensi}
+		titikDinas={titikDinas}
+		strongPoint={titikStrongPoint}
+		{phHarian}
+	/>
 
 	<div class="grid gap-4 xl:grid-cols-2">
 		<div class="card overflow-hidden">
