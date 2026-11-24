@@ -190,6 +190,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 6.9 | Contoh rencana draft, diajukan, dan perlu revisi untuk akun Android | ✅ | seed `--reset`: 3 dokumen + tahapan rincian + catatan revisi untuk NRP `85000001` |
 | 6.10 | Contoh rantai dual-role atasan → pimpinan | ✅ | seed: rencana `000100` berstatus `diajukan` ke atasan `000002` |
 | 6.11 | Lampiran contoh PDF & gambar pada pengajuan | ✅ | seed menulis file ke `APP__UPLOAD_DIR`: PDF+PNG untuk `85000001` dan personel lain `85210022`, PDF untuk `000100` dan rencana revisi |
+| 6.12 | Seed admin global tanpa data demo | ✅ | `backend/sql/seed_admin_global.sql`: idempoten, membuat satker Polda bila belum ada, akun `superuser / Superuser#2026` + role `admin_sistem`; diuji pada `kinerja_db` dan login API → 200 `jenis_akun=admin` |
 
 ### Akun demo (seed)
 

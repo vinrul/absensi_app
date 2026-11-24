@@ -134,6 +134,10 @@ Akun seed:
 | Atasan | `000100` | `Atasan#2026` |
 | Personel | `85000001` | `Polri#2026` |
 
+Untuk database produksi tanpa data demo, buat hanya akun admin global lewat
+`backend/sql/seed_admin_global.sql` (idempoten, menyetel sandi `Superuser#2026` dan role
+`admin_sistem`).
+
 Admin hanya dapat login lewat dashboard (`client=web`). Android dan web personel hanya menerima
 akun personel (termasuk pimpinan/atasan); akun admin ditolak dengan HTTP 403. Web personel
 mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.

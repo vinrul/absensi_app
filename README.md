@@ -69,6 +69,13 @@ Admin memakai **username** dan hanya dapat login lewat dashboard web. Pimpinan m
 dapat login dashboard web maupun Android. **Atasan langsung dan personel** memakai Android atau
 **aplikasi web personel** (`personel/`); dashboard menolak login mereka dengan 403.
 
+Bila database tidak perlu diisi data demo dan hanya memerlukan akun admin global, jalankan
+`backend/sql/seed_admin_global.sql` (idempoten):
+
+```bash
+psql "$APP__DATABASE_URL" -f backend/sql/seed_admin_global.sql
+```
+
 Aplikasi web personel memakai kanal login `personel_web`: hanya akun personel (termasuk
 atasan/pimpinan) yang diterima. Access token disimpan di memori dan refresh memakai cookie
 httpOnly (`device_id = "web-personel"`).

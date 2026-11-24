@@ -257,6 +257,20 @@ cargo run --bin seed -- --reset
 
 Akun Polres (`admin_polres`, `000022`, `000023`) **tidak dibuat** pada profil VPS.
 
+### Akun admin global tanpa seed demo
+
+Bila database tidak perlu diisi data demo dan hanya memerlukan akun admin global, salin
+`backend/sql/seed_admin_global.sql` lalu jalankan:
+
+```bash
+scp backend/sql/seed_admin_global.sql user@vps:/tmp/
+sudo -u postgres psql -d absensi -f /tmp/seed_admin_global.sql
+```
+
+Skrip bersifat idempoten: membuat satker Polda bila belum ada, lalu membuat/menyetel ulang
+akun `superuser / Superuser#2026` dengan role `admin_sistem` (cakupan global). Data lain tidak
+diubah. **Ganti sandi setelah login pertama.**
+
 **Ganti seluruh password demo sebelum dipakai sungguhan.**
 
 ---
