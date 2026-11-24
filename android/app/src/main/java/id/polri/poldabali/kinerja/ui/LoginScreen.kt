@@ -149,6 +149,8 @@ fun LoginScreen(
                         )
                     )
 
+                    Spacer(Modifier.height(16.dp))
+
                     vm.galat?.let {
                         KotakPesan(it, JenisPesan.Galat)
                         Spacer(Modifier.height(10.dp))
