@@ -81,7 +81,7 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Text(
-                "Personel Polda Bali dan Polres jajaran",
+                "Sistem Informasi Absensi Personel Bali",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Warna.NavySoft,
                 textAlign = TextAlign.Center,

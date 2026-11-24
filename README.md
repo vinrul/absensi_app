@@ -394,8 +394,9 @@ Catatan penting:
 - **Kalender hari libur**: libur nasional/cuti bersama dan libur khusus satker; tanggal libur
   otomatis dikeluarkan dari perhitungan absensi harian.
 - **Branding**: logo **SIAP Bali** di login (terpusat), sidebar, kop laporan/PDF, aplikasi Android,
-  favicon web, dan ikon launcher, dengan nama aplikasi Android **SIAP Bali**. Password pada login
-  Android dapat ditampilkan/disembunyikan lewat ikon mata.
+  favicon web, dan ikon launcher, dengan nama aplikasi Android **SIAP Bali**. Judul **SIAP Bali**
+  memakai subjudul **Sistem Informasi Absensi Personel Bali** di login Android dan dashboard.
+  Password pada login Android dapat ditampilkan/disembunyikan lewat ikon mata.
 - **Jam server palsu (development)**: `cargo run --bin fake -- DD-MM-YYYY HH:MM` mengubah jam yang
   dipakai backend untuk absensi; endpoint hanya aktif bila `APP__ALLOW_FAKE_TIME=true`.
 - **Operasional**: audit log setiap mutasi, rate limit login 5/menit/IP, RBAC ber-scope,

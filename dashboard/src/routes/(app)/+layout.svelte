@@ -243,7 +243,9 @@
 				<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-10 w-auto shrink-0" />
 				<div class="min-w-0">
 					<p class="truncate text-sm font-semibold text-white">SIAP Bali</p>
-					<p class="truncate text-[11px] text-navy-300">Polda Bali</p>
+					<p class="text-[10px] leading-tight text-navy-300">
+						Sistem Informasi Absensi<br />Personel Bali
+					</p>
 				</div>
 			</div>
 

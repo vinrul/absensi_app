@@ -69,6 +69,9 @@
 			</div>
 
 			<h1 class="mt-12 max-w-md text-3xl leading-tight font-bold lg:text-4xl">SIAP Bali</h1>
+			<p class="mt-2 max-w-md text-sm font-medium tracking-wide text-gold-400">
+				Sistem Informasi Absensi Personel Bali
+			</p>
 			<p class="mt-4 max-w-md text-sm leading-relaxed text-navy-100">
 				Pencatatan kehadiran berbasis geolokasi, rencana kerja, hasil kerja, dan output yang
 				terintegrasi menjadi nilai kinerja personel Polda Bali dan Polres jajaran.
