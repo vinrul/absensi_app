@@ -282,6 +282,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.38 | PDF detail rekap strong point | ✅ | `GET /ph/rekap/personel/{id}/ekspor` 1–24 Nov → PDF 528 KB/1 halaman: 20 sesi, ringkasan “Hadir 16 · Hanya check-in 4 · Tidak strong point 4 · Total telat 80 menit · Total pulang cepat 0”, status Lengkap/TC/TA; ID tak dikenal → 404, rentang 55 hari → 422 |
 | 9.39 | Rekap Harian Strong Point (card + peta) | ✅ | API 3 Nov: 86 baris/22 sesi/83 personel/21 titik, 64 check-in berkoordinat, 22 TC, 22 TA; Chrome headless 24 Nov: 8 kartu tampil (3 personel, 2 sesi, 1 titik, 0 hadir, 6 belum, 0 TC), klik kartu Sesi Belum membuka modal 6 baris; sub-tab Peta menampilkan Leaflet dengan tile OSM, marker strong point + radius, dan legenda |
 | 9.40 | Peta absensi di Dashboard | ✅ | Chrome headless: 24 Nov tidak ada aktivitas → 88 elemen interaktif (22 titik dinas + 22 titik strong point beserta radius), teks "0 absensi berkoordinat · 0 check-in strong point · 22 titik dinas · 22 titik strong point"; 3 Nov → 210 elemen (58 absensi + 64 check-in strong point + 44 titik + 44 radius), tile OSM termuat 20/20; mematikan keempat lapisan menyisakan 0 marker |
+| 9.41 | Emulator Pixel Fold API 36 | ✅ | Boot ~40 detik dengan `-gpu host -cores 4 -memory 4096`; APK debug terpasang, wizard izin menampilkan "Selamat datang di SIAP Bali", login tampil; launch tanpa dialog izin 1,8 detik |
 
 ## 10. Yang belum dikerjakan (backlog)
 

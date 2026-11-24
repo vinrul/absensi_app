@@ -616,7 +616,8 @@ API sendiri di port 8091; pastikan tidak ada `kinerja-api.exe` lain yang mengunc
   ketik bertahap (`Polri`, `'#'`, `2026`) alih-alih satu string.
 - Emulator GPS: `adb emu geo fix <longitude> <latitude>` (urutan longitude dulu), lalu
   `pm grant ... ACCESS_FINE_LOCATION`.
-- `emulator` butuh `-gpu swiftshader_indirect` di mesin ini agar tidak crash.
+- Emulator: gunakan `-gpu host -cores 4 -memory 4096` agar responsif; fallback ke
+  `-gpu swiftshader_indirect` bila emulator crash.
 - Signing Android dibaca dari `android/keystore.properties` (gitignored). Jangan menaruh
   password keystore di `build.gradle.kts` atau berkas yang di-commit; `storeFile` harus ada
   saat `assembleRelease`/`bundleRelease`, sedangkan build debug tetap berjalan tanpa berkas itu.

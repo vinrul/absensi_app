@@ -73,7 +73,7 @@ fun WizardIzinScreen(onSelesai: () -> Unit) {
 
     val halaman = listOf(
         HalamanIzin(
-            judul = "Selamat datang di Absensi Kinerja",
+            judul = "Selamat datang di SIAP Bali",
             deskripsi = "Sebelum masuk, aplikasi perlu menjelaskan izin yang digunakan. " +
                     "Izin hanya diminta sesuai kebutuhan dan tidak digunakan untuk melacak Anda di luar absensi.",
             alasan = "Wizard ini muncul sekali setelah aplikasi dipasang. Anda dapat mengubah izin kapan saja lewat Pengaturan Android.",

@@ -198,8 +198,8 @@ Pastikan backend sudah berjalan di `http://127.0.0.1:8080` (emulator mengaksesny
 # 1. Lihat AVD yang tersedia
 emulator -list-avds
 
-# 2. Jalankan emulator (nama AVD contoh dari mesin pengembangan ini)
-emulator -avd Pixel_3a_API_34 -gpu swiftshader_indirect
+# 2. Jalankan emulator (contoh: AVD API 36; sesuaikan nama AVD)
+emulator -avd Pixel_Fold -gpu host -cores 4 -memory 4096
 
 # 3. Terminal lain: tunggu emulator siap
 adb wait-for-device
@@ -211,7 +211,7 @@ Jika `emulator`/`adb` tidak ada di `PATH`, panggil langsung dari Android SDK:
 
 ```powershell
 $sdk = "$env:LOCALAPPDATA\Android\Sdk"
-& "$sdk\emulator\emulator.exe" -avd Pixel_3a_API_34 -gpu swiftshader_indirect
+& "$sdk\emulator\emulator.exe" -avd Pixel_Fold -gpu host -cores 4 -memory 4096
 & "$sdk\platform-tools\adb.exe" devices
 ```
 
@@ -231,7 +231,7 @@ adb shell am start -n id.polri.poldabali.kinerja.debug/id.polri.poldabali.kinerj
 Perintah pemeliharaan yang sering dipakai:
 
 ```powershell
-# Hapus data aplikasi (sesi login, wizard izin, pengaturan server kembali awal)
+# Hapus data aplikasi (sesi login & wizard izin kembali awal)
 adb shell pm clear id.polri.poldabali.kinerja.debug
 
 # Copot aplikasi dari emulator
@@ -248,7 +248,8 @@ Catatan:
   dengan akun demo (mis. `85000001` / `Polri#2026`).
 - Jika `adb install` menolak karena versi lama berbeda tanda tangan, jalankan
   `adb uninstall id.polri.poldabali.kinerja.debug` lalu pasang ulang.
-- Emulator mesin ini memerlukan `-gpu swiftshader_indirect` agar tidak crash.
+- Emulator berjalan lebih cepat dengan `-gpu host -cores 4 -memory 4096`; bila emulator crash,
+  ganti ke `-gpu swiftshader_indirect`.
 
 ### 4. Fake server / jam server palsu (development)
 
