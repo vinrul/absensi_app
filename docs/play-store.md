@@ -67,9 +67,11 @@ produksi:
 
 ```
 NRP     : 99999999
-Password: Tinjau2026
 Nama    : Peninjau Google Play
 Satker  : DITRESKRIMSUS
+
+Password disimpan terpisah dan hanya diisi di Play Console. Jangan menaruh password akun
+produksi di repository.
 ```
 
 Akun ini **hanya untuk peninjauan**. Nonaktifkan atau ganti password secara berkala setelah
@@ -85,6 +87,17 @@ Halaman sudah dibuat:
 Keduanya ikut masuk ke `dashboard/build/` saat `bun run build`. **Belum ter-deploy**; saat ini
 URL tersebut masih mengembalikan fallback SPA. Deploy dashboard ke VPS lalu pastikan halaman
 benar-benar tampil (lihat §8).
+
+### 2.5 Keamanan kredensial produksi
+
+- Akun `superuser` produksi masih memakai password default yang tertulis di README. **Ganti
+  segera** melalui **Profil Saya → Ganti Password** sebelum aplikasi dipublikasikan.
+- Ganti atau nonaktifkan seluruh akun demo (`admin_polda`, `000002`, `85000001`, dan seterusnya)
+  yang tidak diperlukan pada server produksi.
+- Password akun peninjau **tidak disimpan di repo**; isi langsung di Play Console. Rotasi
+  password setelah aplikasi disetujui.
+- Jangan pernah commit `backend/.env`, `deploy/.env`, `android/keystore.properties`, atau berkas
+  keystore.
 
 ---
 
@@ -209,7 +222,7 @@ Aplikasi memerlukan akun personel yang dibuat oleh admin satker. Tidak ada penda
 
 Akun uji:
 NRP: 99999999
-Password: Tinjau2026
+Password: (isi password akun peninjau dari catatan internal; jangan simpan di repo)
 
 Langkah:
 1. Buka aplikasi dan selesaikan/lewati wizard izin (lokasi, kamera, notifikasi).
@@ -266,7 +279,7 @@ terstruktur.
 - [ ] Surat kewenangan Polda Bali siap (bila memakai `id.polri`).
 - [ ] Kebijakan privasi & halaman hapus data sudah ter-deploy dan **isinya benar** (bukan
       fallback SPA).
-- [ ] Akun peninjau `99999999 / Tinjau2026` aktif dan bisa login di APK release.
+- [ ] Akun peninjau `99999999` aktif dan bisa login di APK release (password di catatan internal).
 - [ ] AAB `app-release.aab` diunggah (bukan APK) dan ditandatangani.
 - [ ] `versionCode` dinaikkan untuk setiap unggahan berikutnya.
 - [ ] Keystore `E:/new_disposisi/siopa.jks` dan `keystore.properties` di-backup aman.

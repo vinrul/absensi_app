@@ -65,6 +65,9 @@ Akun demo (seed):
 | Atasan | `000100` | `Atasan#2026` |
 | Personel | `85000001` | `Polri#2026` |
 
+> Kredensial di atas **hanya untuk development/seed**. Pada server produksi, ganti seluruh
+> password demo (termasuk `superuser`) dan nonaktifkan akun yang tidak dipakai.
+
 Admin memakai **username** dan hanya dapat login lewat dashboard web. Pimpinan memakai **NRP** dan
 dapat login dashboard web maupun Android. **Atasan langsung dan personel** memakai Android atau
 **aplikasi web personel** (`personel/`); dashboard menolak login mereka dengan 403.

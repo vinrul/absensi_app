@@ -291,7 +291,7 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 10.1 | AAB release bertanda tangan | ✅ | `android/app/build/outputs/bundle/release/app-release.aab`; package `id.polri.poldabali.kinerja`, versionCode 1, targetSdk 36 |
 | 10.2 | Aset store listing | ✅ | `store/play/`: ikon 512×512, feature graphic 1024×500, 4 screenshot 1840×2208 |
 | 10.3 | Kebijakan privasi & hapus data | ✅ | `dashboard/static/privacy-policy.html` & `hapus-data.html`; perlu deploy ke VPS |
-| 10.4 | Akun peninjau produksi | ✅ | NRP `99999999` / `Tinjau2026` (DITRESKRIMSUS); APK release berhasil login ke produksi |
+| 10.4 | Akun peninjau produksi | ✅ | NRP `99999999` (DITRESKRIMSUS); password disimpan di luar repo; APK release berhasil login ke produksi |
 | 10.5 | Panduan Play Console | ✅ | `docs/play-store.md` (listing, data safety, content rating, checklist) |
 | 10.6 | Deploy halaman privasi ke VPS | ⬜ | Jalankan `bun run build` + rsync; verifikasi URL |
 | 10.7 | Unggah AAB & kirim review | ⬜ | Manual di Play Console; putuskan nama paket & surat kewenangan lebih dulu |
