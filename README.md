@@ -189,6 +189,14 @@ dapat terpasang berdampingan dengan build debug. Untuk produksi, server memakai 
 Build debug memakai override `src/debug/res/xml/network_security_config.xml` yang masih
 mengizinkan HTTP untuk emulator (`http://10.0.2.2:8080`).
 
+#### Publikasi Google Play
+
+AAB release siap unggah ada di `app/build/outputs/bundle/release/app-release.aab`. Panduan
+lengkap (store listing, data safety, content rating, akun peninjau, checklist) ada di
+`docs/play-store.md`. Ikon, feature graphic, dan screenshot ada di `store/play/`. Kebijakan
+privasi dan halaman hapus data ada di `dashboard/static/` dan harus di-deploy ke VPS sebelum
+mengisi URL privasi di Play Console.
+
 #### Menjalankan emulator & memasang APK lewat command line
 
 Pastikan backend sudah berjalan di `http://127.0.0.1:8080` (emulator mengaksesnya lewat

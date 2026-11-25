@@ -284,7 +284,19 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.40 | Peta absensi di Dashboard | ✅ | Chrome headless: 24 Nov tidak ada aktivitas → 88 elemen interaktif (22 titik dinas + 22 titik strong point beserta radius), teks "0 absensi berkoordinat · 0 check-in strong point · 22 titik dinas · 22 titik strong point"; 3 Nov → 210 elemen (58 absensi + 64 check-in strong point + 44 titik + 44 radius), tile OSM termuat 20/20; mematikan keempat lapisan menyisakan 0 marker |
 | 9.41 | Emulator Pixel Fold API 36 | ✅ | Boot ~40 detik dengan `-gpu host -cores 4 -memory 4096`; APK debug terpasang, wizard izin menampilkan "Selamat datang di SIAP Bali", login tampil; launch tanpa dialog izin 1,8 detik |
 
-## 10. Yang belum dikerjakan (backlog)
+## 10. Publikasi Google Play
+
+| # | Item | Status | Catatan |
+|---|---|---|---|
+| 10.1 | AAB release bertanda tangan | ✅ | `android/app/build/outputs/bundle/release/app-release.aab`; package `id.polri.poldabali.kinerja`, versionCode 1, targetSdk 36 |
+| 10.2 | Aset store listing | ✅ | `store/play/`: ikon 512×512, feature graphic 1024×500, 4 screenshot 1840×2208 |
+| 10.3 | Kebijakan privasi & hapus data | ✅ | `dashboard/static/privacy-policy.html` & `hapus-data.html`; perlu deploy ke VPS |
+| 10.4 | Akun peninjau produksi | ✅ | NRP `99999999` / `Tinjau2026` (DITRESKRIMSUS); APK release berhasil login ke produksi |
+| 10.5 | Panduan Play Console | ✅ | `docs/play-store.md` (listing, data safety, content rating, checklist) |
+| 10.6 | Deploy halaman privasi ke VPS | ⬜ | Jalankan `bun run build` + rsync; verifikasi URL |
+| 10.7 | Unggah AAB & kirim review | ⬜ | Manual di Play Console; putuskan nama paket & surat kewenangan lebih dulu |
+
+## 11. Yang belum dikerjakan (backlog)
 
 | # | Item | Prioritas | Alasan |
 |---|---|---|---|

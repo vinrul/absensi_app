@@ -46,6 +46,7 @@ Checklist pekerjaan & sisa backlog: [`CHECKLIST.md`](CHECKLIST.md).
 | Dokumentasi foto absensi & strong point | Unggahan base64 Android disimpan sebagai `foto_path`; galeri dashboard lewat `/absensi/foto` dan `/ph/foto`; berkas `/api/v1/files/{key}` dengan cek pemilik/cakupan satker |
 | Pengingat jadwal PH tanpa FCM (WorkManager) | `sync/Pengingat.kt`, H-1 19:00; jadwal tanpa jam diingatkan pagi hari, jadwal berjam tetap 60 menit sebelum |
 | Logo **SIAP Bali** di dashboard, cetak/PDF, web personel, Android (login terpusat), favicon, dan ikon launcher | logo transparan tanpa kotak putih di login/sidebar/top bar; judul **SIAP Bali** dengan subjudul **Sistem Informasi Absensi Personel Bali**; password dapat ditampilkan/disembunyikan; nama aplikasi Android `SIAP Bali` (`app_name`); alamat server Android otomatis per build (debug `10.0.2.2`, rilis `absensi.jagradewata.id`) |
+| Publikasi Google Play | AAB release bertanda tangan + aset store (`store/play/`) + kebijakan privasi/hapus data + akun peninjau produksi; panduan lengkap `docs/play-store.md` |
 | Auth (JWT + refresh rotasi), RBAC per satker | cek e2e: personel hanya melihat data sendiri, dashboard 403; login dashboard hanya role admin/pimpinan (atasan/personel ditolak 403) |
 | Absensi + geofence + antrean offline | e2e: dalam radius 200, luar radius 422, duplikat 409 |
 | Rencana kerja + persetujuan + lampiran | e2e alur penuh + wizard Android 4 langkah (jenis → dasar → rincian kegiatan → lampiran); seed menyediakan contoh draft/diajukan/perlu revisi |
