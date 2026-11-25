@@ -279,14 +279,14 @@
 		},
 		{
 			label: 'Telat',
-			nilai: `${ringkasanDetailPh.telat} mnt`,
-			keterangan: 'Total menit telat',
+			nilai: formatMenit(ringkasanDetailPh.telat),
+			keterangan: 'Total keterlambatan',
 			warna: 'bg-amber-500'
 		},
 		{
 			label: 'Pulang Cepat',
-			nilai: `${ringkasanDetailPh.pulangCepat} mnt`,
-			keterangan: 'Total menit pulang cepat',
+			nilai: formatMenit(ringkasanDetailPh.pulangCepat),
+			keterangan: 'Total pulang cepat',
 			warna: 'bg-rose-500'
 		}
 	]);
@@ -364,17 +364,17 @@
 		{
 			id: 'telat',
 			label: 'Telat',
-			keterangan: 'Total menit telat',
+			keterangan: 'Total keterlambatan',
 			warna: 'bg-amber-500',
-			nilai: `${ringkasanHarianPh.telat} mnt`,
+			nilai: formatMenit(ringkasanHarianPh.telat),
 			baris: harianPh.filter((row) => row.menit_telat > 0)
 		},
 		{
 			id: 'pulang_cepat',
 			label: 'Pulang Cepat',
-			keterangan: 'Total menit pulang cepat',
+			keterangan: 'Total pulang cepat',
 			warna: 'bg-rose-500',
-			nilai: `${ringkasanHarianPh.pulangCepat} mnt`,
+			nilai: formatMenit(ringkasanHarianPh.pulangCepat),
 			baris: harianPh.filter((row) => row.menit_pulang_cepat > 0)
 		}
 	]);
@@ -510,6 +510,22 @@
 		if (sesi === 'pagi') return 'Pagi';
 		if (sesi === 'sore') return 'Sore';
 		return 'Sesi';
+	}
+
+	/** 90 → "1:30"; ≤ 60 tetap "45 mnt". */
+	function formatMenit(nilai: number) {
+		if (nilai <= 60) return `${nilai} mnt`;
+		const jam = Math.floor(nilai / 60);
+		const sisa = nilai % 60;
+		return `${jam}:${String(sisa).padStart(2, '0')}`;
+	}
+
+	/** Versi ringkas untuk sel matriks: 5 → "5m", 90 → "1:30". */
+	function formatMenitRingkas(nilai: number) {
+		if (nilai <= 60) return `${nilai}m`;
+		const jam = Math.floor(nilai / 60);
+		const sisa = nilai % 60;
+		return `${jam}:${String(sisa).padStart(2, '0')}`;
 	}
 
 	function validasiRentangRekap() {
@@ -1666,7 +1682,7 @@
 													? 'font-semibold text-amber-700'
 													: 'text-slate-400'}"
 											>
-												{row.menit_telat > 0 ? `${row.menit_telat} mnt` : '-'}
+												{row.menit_telat > 0 ? formatMenit(row.menit_telat) : '-'}
 											</td>
 											<td
 												class="td text-center {row.menit_pulang_cepat > 0
@@ -1674,7 +1690,7 @@
 													: 'text-slate-400'}"
 											>
 												{row.menit_pulang_cepat > 0
-													? `${row.menit_pulang_cepat} mnt`
+													? formatMenit(row.menit_pulang_cepat)
 													: '-'}
 											</td>
 											<td class="td text-center">
@@ -1783,8 +1799,8 @@
 									<th class="th">Titik / Regu</th>
 									<th class="th text-center">Check-in</th>
 									<th class="th text-center">Check-out</th>
-									<th class="th text-center">Telat (mnt)</th>
-									<th class="th text-center">Pulang Cepat (mnt)</th>
+									<th class="th text-center">Telat</th>
+									<th class="th text-center">Pulang Cepat</th>
 									<th class="th text-center">Status</th>
 								</tr>
 							</thead>
@@ -1817,14 +1833,14 @@
 												? 'font-semibold text-amber-700'
 												: 'text-slate-400'}"
 										>
-											{row.menit_telat > 0 ? row.menit_telat : '-'}
+											{row.menit_telat > 0 ? formatMenit(row.menit_telat) : '-'}
 										</td>
 										<td
 											class="td text-center {row.menit_pulang_cepat > 0
 												? 'font-semibold text-rose-700'
 												: 'text-slate-400'}"
 										>
-											{row.menit_pulang_cepat > 0 ? row.menit_pulang_cepat : '-'}
+											{row.menit_pulang_cepat > 0 ? formatMenit(row.menit_pulang_cepat) : '-'}
 										</td>
 										<td class="td text-center">
 											{#if !row.masuk_jam}
@@ -1900,8 +1916,8 @@
 							<th class="th text-center">Check-in</th>
 							<th class="th text-center">Hanya CI</th>
 							<th class="th text-center">Tidak SP</th>
-							<th class="th text-center">Telat (mnt)</th>
-							<th class="th text-center">Pulang Cepat (mnt)</th>
+							<th class="th text-center">Telat</th>
+							<th class="th text-center">Pulang Cepat</th>
 							<th class="th text-center">Menunggu</th>
 							<th class="th no-print">Dokumentasi</th>
 						</tr>
@@ -1943,10 +1959,12 @@
 									{/if}
 								</td>
 								<td class="td text-center {row.total_menit_telat > 0 ? 'font-semibold text-amber-700' : 'text-slate-400'}">
-									{row.total_menit_telat}
+									{row.total_menit_telat > 0 ? formatMenit(row.total_menit_telat) : 0}
 								</td>
 								<td class="td text-center {row.total_menit_pulang_cepat > 0 ? 'font-semibold text-rose-700' : 'text-slate-400'}">
-									{row.total_menit_pulang_cepat}
+									{row.total_menit_pulang_cepat > 0
+										? formatMenit(row.total_menit_pulang_cepat)
+										: 0}
 								</td>
 								<td class="td text-center">
 									{#if row.menunggu_verifikasi > 0}
@@ -2091,17 +2109,17 @@
 																{#if jadwal.menit_telat > 0}
 																	<span
 																		class="inline-flex rounded-full bg-amber-50 px-1 py-0.5 font-semibold text-amber-700 ring-1 ring-amber-200 ring-inset"
-																		title="Telat {jadwal.menit_telat} menit"
+																		title="Telat {formatMenit(jadwal.menit_telat)}"
 																	>
-																		T {jadwal.menit_telat}m
+																		T {formatMenitRingkas(jadwal.menit_telat)}
 																	</span>
 																{/if}
 																{#if jadwal.menit_pulang_cepat > 0}
 																	<span
 																		class="inline-flex rounded-full bg-rose-50 px-1 py-0.5 font-semibold text-rose-700 ring-1 ring-rose-200 ring-inset"
-																		title="Pulang cepat {jadwal.menit_pulang_cepat} menit"
+																		title="Pulang cepat {formatMenit(jadwal.menit_pulang_cepat)}"
 																	>
-																		PC {jadwal.menit_pulang_cepat}m
+																		PC {formatMenitRingkas(jadwal.menit_pulang_cepat)}
 																	</span>
 																{/if}
 															</div>
@@ -2532,8 +2550,8 @@
 								</td>
 								<td class="td">{bukaJam(masuk?.jam)}</td>
 								<td class="td">{bukaJam(pulang?.jam)}</td>
-								<td class="td text-amber-700">{masuk?.menit_telat ?? 0} mnt</td>
-								<td class="td text-rose-700">{pulang?.menit_pulang_cepat ?? 0} mnt</td>
+								<td class="td text-amber-700">{formatMenit(masuk?.menit_telat ?? 0)}</td>
+								<td class="td text-rose-700">{formatMenit(pulang?.menit_pulang_cepat ?? 0)}</td>
 							</tr>
 						{/each}
 					</tbody>
@@ -2617,10 +2635,10 @@
 									</span>
 								</p>
 								{#if row.menit_telat > 0}
-									<p class="text-amber-700">Telat {row.menit_telat} mnt</p>
+									<p class="text-amber-700">Telat {formatMenit(row.menit_telat)}</p>
 								{/if}
 								{#if row.menit_pulang_cepat > 0}
-									<p class="text-rose-700">PC {row.menit_pulang_cepat} mnt</p>
+									<p class="text-rose-700">PC {formatMenit(row.menit_pulang_cepat)}</p>
 								{/if}
 								<div class="mt-1 flex justify-end">
 									{#if !row.masuk_jam}

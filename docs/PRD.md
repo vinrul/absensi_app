@@ -310,6 +310,8 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
   daftar personel. Di bawah kartu ditampilkan daftar **Personel Strong Point Hari Ini** (satu
   baris per personel per sesi) berisi sesi/jam, titik/regu, check-in/out, telat, pulang cepat,
   dan badge status **Lengkap/TC/TA**; klik nama personel membuka detail rekap per personel.
+  Nilai telat dan pulang cepat di atas 60 menit ditampilkan sebagai jam:menit (mis. 90 →
+  **1:30**) pada kartu, daftar personel, tabel detail, dan modal.
   Peta menampilkan titik strong point + radius dan marker check-in (hijau lengkap, kuning TC),
   dengan basemap Jalan/Satelit dan legenda.
 - Jadwal dan rekap dapat diekspor **PDF** (A4 landscape); PDF jadwal berupa tabel
