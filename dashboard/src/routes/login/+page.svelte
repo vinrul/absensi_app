@@ -150,6 +150,11 @@
 			<p class="mt-6 text-center text-xs text-slate-400">
 				Lupa password? Hubungi admin sistem satker Anda.
 			</p>
+			<p class="mt-2 text-center text-xs text-slate-400">
+				<a class="underline hover:text-slate-600" href="/privacy-policy.html">
+					Kebijakan Privasi
+				</a>
+			</p>
 		</form>
 	</div>
 </div>
