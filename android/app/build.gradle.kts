@@ -30,7 +30,8 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "id.polri.poldabali.kinerja"
+        // Identitas Play Store memakai domain pengembang, bukan nama instansi.
+        applicationId = "id.jagradewata.siapbali"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

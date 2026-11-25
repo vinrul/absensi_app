@@ -186,7 +186,7 @@ Build keduanya sekaligus:
 # AAB  : app\build\outputs\bundle\release\app-release.aab
 ```
 
-APK release memakai `applicationId` `id.polri.poldabali.kinerja` (tanpa `.debug`), sehingga
+APK release memakai `applicationId` `id.jagradewata.siapbali` (tanpa `.debug`), sehingga
 dapat terpasang berdampingan dengan build debug. Untuk produksi, server memakai HTTPS dan
 `src/main/res/xml/network_security_config.xml` menetapkan `cleartextTrafficPermitted="false"`.
 Build debug memakai override `src/debug/res/xml/network_security_config.xml` yang masih
@@ -232,21 +232,21 @@ Setelah emulator siap, build dan pasang APK dari root proyek:
 cd F:\absensi_polda_bali\android
 .\gradlew.bat :app:assembleDebug
 
-# APK debug memakai applicationId id.polri.poldabali.kinerja.debug
+# APK debug memakai applicationId id.jagradewata.siapbali.debug
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 
 # Buka aplikasi tanpa menyentuh layar
-adb shell am start -n id.polri.poldabali.kinerja.debug/id.polri.poldabali.kinerja.MainActivity
+adb shell am start -n id.jagradewata.siapbali.debug/id.polri.poldabali.kinerja.MainActivity
 ```
 
 Perintah pemeliharaan yang sering dipakai:
 
 ```powershell
 # Hapus data aplikasi (sesi login & wizard izin kembali awal)
-adb shell pm clear id.polri.poldabali.kinerja.debug
+adb shell pm clear id.jagradewata.siapbali.debug
 
 # Copot aplikasi dari emulator
-adb uninstall id.polri.poldabali.kinerja.debug
+adb uninstall id.jagradewata.siapbali.debug
 
 # Matikan emulator
 exit   # pada terminal emulator, atau:
@@ -258,7 +258,7 @@ Catatan:
 - `seed --reset` mengganti id personel sehingga **sesi Android lama dapat gagal**; login ulang
   dengan akun demo (mis. `85000001` / `Polri#2026`).
 - Jika `adb install` menolak karena versi lama berbeda tanda tangan, jalankan
-  `adb uninstall id.polri.poldabali.kinerja.debug` lalu pasang ulang.
+  `adb uninstall id.jagradewata.siapbali.debug` lalu pasang ulang.
 - Emulator berjalan lebih cepat dengan `-gpu host -cores 4 -memory 4096`; bila emulator crash,
   ganti ke `-gpu swiftshader_indirect`.
 

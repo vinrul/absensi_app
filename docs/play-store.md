@@ -13,7 +13,7 @@ serta keputusan yang harus diambil sebelum unggahan pertama.
 | Item | Nilai |
 |---|---|
 | Nama tampilan | **SIAP Bali** |
-| Application ID | `id.polri.poldabali.kinerja` |
+| Application ID | `id.jagradewata.siapbali` |
 | Version code / name | `1` / `1.0.0` |
 | minSdk / targetSdk | 26 / 36 |
 | Kanal login | Android (`client=android`) |
@@ -36,29 +36,22 @@ dan ditandatangani dengan sertifikat upload.
 
 ## 2. Keputusan penting sebelum unggah
 
-### 2.1 Nama paket `id.polri.poldabali.kinerja`
+### 2.1 Nama paket
 
-Nama paket **permanen** setelah aplikasi pertama kali diunggah ke Play Console. Karena memakai
-domain `polri`, Google Play dapat meminta bukti kewenangan (kebijakan impersonation/aplikasi
-pemerintah). Pilih salah satu:
+`applicationId` final: **`id.jagradewata.siapbali`**, memakai domain pengembang. Nama paket
+bersifat permanen setelah unggahan pertama. Identitas Play tidak memakai nama instansi, sehingga
+listing tidak mengklaim afiliasi dengan Polda Bali/Polri. `namespace` internal Android masih
+`id.polri.poldabali.kinerja`, tetapi yang menentukan identitas Play adalah `applicationId`.
 
-- **A. Aplikasi resmi Polda Bali** — siapkan surat tugas/keterangan dari Polda Bali yang
-  menyatakan aplikasi dan logo digunakan untuk absensi personel. Gunakan akun developer
-  organisasi bila tersedia. Cantumkan dokumen saat Play Console meminta.
-- **B. Belum ada surat resmi** — ganti `applicationId` **sebelum unggahan pertama** ke domain
-  yang Anda kendalikan, misalnya `id.jagradewata.siapbali`. Ubah di
-  `android/app/build.gradle.kts` (`applicationId`), lalu build ulang AAB. `namespace` internal
-  boleh tetap. Setelah diunggah, nama paket tidak dapat diubah.
-
-Jangan mengunggah AAB sebelum keputusan ini final.
+Jika suatu saat ingin menerbitkan aplikasi resmi berlabel instansi, gunakan aplikasi dan akun
+developer terpisah dengan izin resmi.
 
 ### 2.2 Tipe akun developer
 
-- **Akun personal baru** — Google mewajibkan **closed testing** dengan minimal **12 tester
-  selama 14 hari** sebelum dapat mengajukan produksi (kebijakan dapat berubah; ikuti petunjuk
-  di Play Console → *Testing requirements*).
-- **Akun organisasi** — umumnya tidak terkena kewajiban tersebut, tetapi perlu verifikasi
-  organisasi.
+Akun yang dipakai adalah **akun personal yang sudah lama**. Kewajiban closed testing (minimal
+12 tester selama 14 hari) berlaku untuk akun personal **baru**; karena akun sudah lama,
+kemungkinan besar kewajiban tersebut tidak berlaku. Tetap cek **Play Console → Testing
+requirements** sebelum mengajukan produksi.
 
 ### 2.3 Akun peninjau (sudah dibuat di produksi)
 
@@ -131,13 +124,13 @@ SIAP Bali
 ### Deskripsi singkat (maks. 80 karakter)
 
 ```
-Absensi GPS, strong point, dan rekap kehadiran personel Polda Bali.
+Absensi GPS, strong point, dan rekap kehadiran personel.
 ```
 
 ### Deskripsi lengkap (maks. 4.000 karakter)
 
 ```
-SIAP Bali (Sistem Informasi Absensi Personel Bali) adalah aplikasi absensi dan strong point untuk personel Polda Bali dan Polres jajaran. Aplikasi membantu pencatatan kehadiran berbasis lokasi, pelaksanaan strong point, serta pemantauan rekap kehadiran secara tertib dan transparan.
+SIAP Bali (Sistem Informasi Absensi Personel Bali) adalah aplikasi absensi dan strong point untuk personel pada instansi yang menggunakan aplikasi. Aplikasi membantu pencatatan kehadiran berbasis lokasi, pelaksanaan strong point, serta pemantauan rekap kehadiran secara tertib dan transparan.
 
 Fitur utama:
 • Absensi berbasis GPS — check-in dan check-out dengan validasi lokasi dan radius titik dinas.
@@ -147,7 +140,7 @@ Fitur utama:
 • Bekerja offline — absensi tersimpan di perangkat lalu dikirim otomatis saat jaringan tersedia.
 • Keamanan — sesi login aman dan data hanya dapat diakses personel serta pengelola yang berwenang.
 
-Aplikasi ini diperuntukkan bagi personel Polda Bali yang telah memiliki akun dari admin satker. Akun tidak dapat didaftarkan sendiri melalui aplikasi.
+Aplikasi ini diperuntukkan bagi personel yang telah memiliki akun dari admin instansi. Akun tidak dapat didaftarkan sendiri melalui aplikasi.
 
 Catatan: beberapa fitur memerlukan izin lokasi, kamera, dan notifikasi. Izin lokasi hanya digunakan saat proses absensi/strong point, bukan untuk pelacakan terus-menerus.
 
@@ -194,7 +187,7 @@ Rilis perdana SIAP Bali: absensi GPS, strong point, riwayat kehadiran, mode offl
    - **Target audience**: pilih **18+**; aplikasi bukan untuk anak.
    - **News app**: No.
    - **Data safety**: isi sesuai §6.2.
-   - **Government apps**: jawab sesuai fakta; unggah surat kewenangan bila ada.
+   - **Government apps**: aplikasi tidak mengklaim afiliasi pemerintah; jawab sesuai fakta.
    - **Financial features / Health**: No.
    - **App category**: Business.
 
@@ -203,9 +196,9 @@ Rilis perdana SIAP Bali: absensi GPS, strong point, riwayat kehadiran, mode offl
    - Tambahkan email Anda sebagai tester.
    - Bagikan link opt-in, pasang dari Play Store, lalu uji login + absensi + riwayat.
 
-5. **Closed testing (bila akun personal baru)**
-   - Tambahkan minimal 12 tester, jalankan 14 hari, kumpulkan umpan balik.
-   - Jika akun organisasi/terverifikasi, tahap ini bisa dilewati sesuai petunjuk Play.
+5. **Closed testing (bila diminta Play Console)**
+   - Akun personal lama umumnya tidak terkena kewajiban 12 tester/14 hari. Jika Play Console
+     menampilkan persyaratan tersebut, tambahkan tester dan jalankan sesuai petunjuk.
 
 6. **Production**
    - Promote release dari testing, pilih negara **Indonesia**, isi catatan rilis.
@@ -275,8 +268,7 @@ terstruktur.
 
 ## 7. Checklist sebelum menekan Submit
 
-- [ ] Keputusan nama paket final (`id.polri...` atau ganti ke domain sendiri).
-- [ ] Surat kewenangan Polda Bali siap (bila memakai `id.polri`).
+- [ ] `applicationId` final `id.jagradewata.siapbali` dan AAB sudah di-build ulang.
 - [ ] Kebijakan privasi & halaman hapus data sudah ter-deploy dan **isinya benar** (bukan
       fallback SPA).
 - [ ] Akun peninjau `99999999` aktif dan bisa login di APK release (password di catatan internal).

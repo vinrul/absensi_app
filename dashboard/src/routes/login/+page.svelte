@@ -63,8 +63,10 @@
 			<div class="flex items-center gap-3">
 				<img src="/logo-polda-bali.png" alt="Logo SIAP Bali" class="h-20 w-auto" />
 				<div>
-					<p class="text-sm font-semibold tracking-widest text-gold-400 uppercase">Polda Bali</p>
-					<p class="text-xs text-navy-200">Kepolisian Daerah Bali</p>
+					<p class="text-sm font-semibold tracking-widest text-gold-400 uppercase">
+						Aplikasi Absensi Personel
+					</p>
+					<p class="text-xs text-navy-200">Berbasis lokasi &amp; strong point</p>
 				</div>
 			</div>
 
