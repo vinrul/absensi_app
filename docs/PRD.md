@@ -307,10 +307,11 @@ dashboard/Android/web personel. Jangan menambah fitur baru tanpa keputusan produ
 - **Rekap Harian Strong Point** memakai filter **satu tanggal** + satker, dengan sub-tab
   **Ringkasan** dan **Peta**. Ringkasan berisi kartu Personel, Sesi Jadwal, Strong Point, Sesi
   Hadir, Sesi Belum (TA), Sesi TC, total telat, dan total pulang cepat; klik kartu membuka
-  daftar personel. Di bawah kartu ditampilkan tabel **Strong Point Hari Ini** per sesi (sesi/jam,
-  titik/regu, jumlah personel, hadir, TC, TA, telat, pulang cepat); tombol **Lihat** membuka
-  daftar personel sesi tersebut. Peta menampilkan titik strong point + radius dan marker check-in
-  (hijau lengkap, kuning TC), dengan basemap Jalan/Satelit dan legenda.
+  daftar personel. Di bawah kartu ditampilkan daftar **Personel Strong Point Hari Ini** (satu
+  baris per personel per sesi) berisi sesi/jam, titik/regu, check-in/out, telat, pulang cepat,
+  dan badge status **Lengkap/TC/TA**; klik nama personel membuka detail rekap per personel.
+  Peta menampilkan titik strong point + radius dan marker check-in (hijau lengkap, kuning TC),
+  dengan basemap Jalan/Satelit dan legenda.
 - Jadwal dan rekap dapat diekspor **PDF** (A4 landscape); PDF jadwal berupa tabel
   Tanggal/Sesi/Jam/Titik/Regu/Anggota.
 - **Hari libur nasional tidak mengubah jadwal strong point**; jadwal mengikuti tanggal yang

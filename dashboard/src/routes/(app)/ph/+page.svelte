@@ -205,21 +205,6 @@
 		nilai: number | string;
 		baris: RekapPhHarian[];
 	};
-	type SesiHarianPh = {
-		jadwal_ph_id: string;
-		sesi: string | null;
-		jam_mulai: string;
-		jam_selesai: string;
-		strong_point_nama: string;
-		regu: string | null;
-		jumlah: number;
-		hadir: number;
-		tc: number;
-		ta: number;
-		telat: number;
-		pulangCepat: number;
-		baris: RekapPhHarian[];
-	};
 	const tanggalRekapPh = $derived.by(() => {
 		const hasil: string[] = [];
 		let cursor = dariRekap;
@@ -319,51 +304,14 @@
 			pulangCepat: baris.reduce((jumlah, row) => jumlah + row.menit_pulang_cepat, 0)
 		};
 	});
-	const sesiHarianPh = $derived.by(() => {
-		const peta = new Map<string, SesiHarianPh>();
-		for (const row of harianPh) {
-			let sesi = peta.get(row.jadwal_ph_id);
-			if (!sesi) {
-				sesi = {
-					jadwal_ph_id: row.jadwal_ph_id,
-					sesi: row.sesi,
-					jam_mulai: row.jam_mulai,
-					jam_selesai: row.jam_selesai,
-					strong_point_nama: row.strong_point_nama,
-					regu: null,
-					jumlah: 0,
-					hadir: 0,
-					tc: 0,
-					ta: 0,
-					telat: 0,
-					pulangCepat: 0,
-					baris: []
-				};
-				peta.set(row.jadwal_ph_id, sesi);
-			}
-			sesi.baris.push(row);
-			sesi.jumlah += 1;
-			if (row.masuk_jam === null) {
-				sesi.ta += 1;
-			} else {
-				sesi.hadir += 1;
-				if (row.pulang_jam === null) sesi.tc += 1;
-			}
-			sesi.telat += row.menit_telat;
-			sesi.pulangCepat += row.menit_pulang_cepat;
-		}
-		for (const sesi of peta.values()) {
-			sesi.baris.sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
-			sesi.regu =
-				[...new Set(sesi.baris.map((row) => row.regu).filter((nilai): nilai is string => Boolean(nilai)))]
-					.join(' · ') || null;
-		}
-		return [...peta.values()].sort(
+	const personelHarianPh = $derived.by(() =>
+		[...harianPh].sort(
 			(a, b) =>
 				a.jam_mulai.localeCompare(b.jam_mulai) ||
-				a.strong_point_nama.localeCompare(b.strong_point_nama, 'id')
-		);
-	});
+				a.strong_point_nama.localeCompare(b.strong_point_nama, 'id') ||
+				a.nama.localeCompare(b.nama, 'id')
+		)
+	);
 	const kartuHarianPh = $derived<KategoriHarianPh[]>([
 		{
 			id: 'personel',
@@ -1008,17 +956,6 @@
 		kategoriHarianPhAktif = kategori;
 	}
 
-	function bukaSesiHarianPh(sesi: SesiHarianPh) {
-		kategoriHarianPhAktif = {
-			id: `sesi-${sesi.jadwal_ph_id}`,
-			label: `${labelSesiPh(sesi.sesi)} · ${sesi.strong_point_nama}`,
-			keterangan: `${sesi.jam_mulai}–${sesi.jam_selesai}${sesi.regu ? ` · ${sesi.regu}` : ''}`,
-			warna: 'bg-sky-500',
-			nilai: sesi.jumlah,
-			baris: sesi.baris
-		};
-	}
-
 	function tutupKategoriHarianPh() {
 		kategoriHarianPhAktif = null;
 	}
@@ -1601,7 +1538,7 @@
 							? (satkerMap.get(satkerId) ?? '-')
 							: 'Semua Satker'} ·
 						{modeHarianPh === 'ringkasan'
-							? 'klik kartu atau Lihat pada tabel untuk daftar personel'
+							? 'klik kartu atau nama personel untuk rincian'
 							: 'marker strong point dan check-in'}
 					</p>
 				</div>
@@ -1659,89 +1596,95 @@
 						class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3"
 					>
 						<div>
-							<h3 class="text-sm font-semibold text-slate-700">Strong Point Hari Ini</h3>
+							<h3 class="text-sm font-semibold text-slate-700">
+								Personel Strong Point Hari Ini
+							</h3>
 							<p class="text-[11px] text-slate-500">
-								{sesiHarianPh.length} sesi · {ringkasanHarianPh.personel} personel · klik
-								<strong>Lihat</strong> untuk daftar personel
+								{ringkasanHarianPh.personel} personel · {ringkasanHarianPh.sesi} sesi ·
+								{ringkasanHarianPh.hadir} sesi check-in · {ringkasanHarianPh.belum} sesi belum
 							</p>
 						</div>
 						<span class="text-xs text-slate-500">{tanggalPendek(tanggalHarianPh)}</span>
 					</div>
-					{#if sesiHarianPh.length === 0}
+					{#if personelHarianPh.length === 0}
 						<p class="px-4 py-6 text-center text-sm text-slate-500">
-							Tidak ada jadwal strong point pada tanggal ini.
+							Tidak ada personel dengan jadwal strong point pada tanggal ini.
 						</p>
 					{:else}
 						<div class="max-h-96 overflow-auto">
-							<table class="w-full min-w-[760px]">
+							<table class="w-full min-w-[860px]">
 								<thead class="sticky top-0 bg-slate-50">
 									<tr>
+										<th class="th">Personel</th>
 										<th class="th">Sesi &amp; Jam</th>
 										<th class="th">Titik / Regu</th>
-										<th class="th text-center">Personel</th>
-										<th class="th text-center">Hadir</th>
-										<th class="th text-center">TC</th>
-										<th class="th text-center">TA</th>
+										<th class="th text-center">Check-in</th>
+										<th class="th text-center">Check-out</th>
 										<th class="th text-center">Telat</th>
 										<th class="th text-center">P. Cepat</th>
-										<th class="th"></th>
+										<th class="th text-center">Status</th>
 									</tr>
 								</thead>
 								<tbody class="divide-y divide-slate-100">
-									{#each sesiHarianPh as sesi (sesi.jadwal_ph_id)}
+									{#each personelHarianPh as row (row.jadwal_ph_id + row.personel_id)}
 										<tr class="hover:bg-slate-50/70">
+											<td class="td">
+												<button
+													type="button"
+													class="text-left font-medium text-slate-800 hover:text-navy-700 hover:underline"
+													onclick={() => bukaDetailPersonel(row.personel_id)}
+												>
+													{row.nama}
+												</button>
+												<p class="text-[11px] text-slate-500">
+													{row.pangkat} · {row.nrp}
+												</p>
+												<p class="text-[11px] text-slate-400">{row.unit ?? '-'}</p>
+											</td>
 											<td class="td whitespace-nowrap">
 												<p class="font-medium capitalize text-slate-800">
-													{labelSesiPh(sesi.sesi)}
+													{labelSesiPh(row.sesi)}
 												</p>
 												<p class="text-[11px] text-slate-500">
-													{sesi.jam_mulai}–{sesi.jam_selesai}
+													{row.jam_mulai}–{row.jam_selesai}
 												</p>
 											</td>
 											<td class="td">
-												<p class="font-medium text-slate-800">{sesi.strong_point_nama}</p>
-												{#if sesi.regu}
-													<p class="text-[11px] text-slate-500">{sesi.regu}</p>
+												<p class="text-slate-700">{row.strong_point_nama}</p>
+												{#if row.regu}
+													<p class="text-[11px] text-slate-500">{row.regu}</p>
 												{/if}
 											</td>
-											<td class="td text-center font-semibold text-slate-800">{sesi.jumlah}</td>
-											<td class="td text-center text-emerald-700">{sesi.hadir}</td>
+											<td class="td text-center font-mono text-slate-800">
+												{row.masuk_jam ?? '—'}
+											</td>
+											<td class="td text-center font-mono text-slate-800">
+												{row.pulang_jam ?? '—'}
+											</td>
 											<td
-												class="td text-center {sesi.tc > 0
+												class="td text-center {row.menit_telat > 0
 													? 'font-semibold text-amber-700'
 													: 'text-slate-400'}"
 											>
-												{sesi.tc > 0 ? sesi.tc : '-'}
+												{row.menit_telat > 0 ? `${row.menit_telat} mnt` : '-'}
 											</td>
 											<td
-												class="td text-center {sesi.ta > 0
+												class="td text-center {row.menit_pulang_cepat > 0
 													? 'font-semibold text-rose-700'
 													: 'text-slate-400'}"
 											>
-												{sesi.ta > 0 ? sesi.ta : '-'}
+												{row.menit_pulang_cepat > 0
+													? `${row.menit_pulang_cepat} mnt`
+													: '-'}
 											</td>
-											<td
-												class="td text-center {sesi.telat > 0
-													? 'font-semibold text-amber-700'
-													: 'text-slate-400'}"
-											>
-												{sesi.telat > 0 ? `${sesi.telat} mnt` : '-'}
-											</td>
-											<td
-												class="td text-center {sesi.pulangCepat > 0
-													? 'font-semibold text-rose-700'
-													: 'text-slate-400'}"
-											>
-												{sesi.pulangCepat > 0 ? `${sesi.pulangCepat} mnt` : '-'}
-											</td>
-											<td class="td text-right">
-												<button
-													type="button"
-													class="text-xs font-medium text-navy-700 underline"
-													onclick={() => bukaSesiHarianPh(sesi)}
-												>
-													Lihat
-												</button>
+											<td class="td text-center">
+												{#if !row.masuk_jam}
+													<Badge tone="red">TA</Badge>
+												{:else if !row.pulang_jam}
+													<Badge tone="amber">TC</Badge>
+												{:else}
+													<Badge tone="green">Lengkap</Badge>
+												{/if}
 											</td>
 										</tr>
 									{/each}
