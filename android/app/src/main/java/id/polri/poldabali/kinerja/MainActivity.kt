@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
 private data class Tab(val label: String, val judul: String, val ikon: ImageVector)
 
 private val DAFTAR_TAB = listOf(
-    Tab("Beranda", "Absensi & Strong Point", Icons.Filled.Home),
+    Tab("Beranda", "SIAP Bali", Icons.Filled.Home),
     Tab("Absensi", "Absensi", Icons.Filled.Place)
 )
 
