@@ -297,7 +297,8 @@
           "foto_masuk_url": { "type": "string", "nullable": true },
           "foto_pulang_url": { "type": "string", "nullable": true },
           "tidak_absen": { "type": "boolean" },
-          "tc": { "type": "boolean" }
+          "tc": { "type": "boolean" },
+          "lepas_dinas": { "type": "boolean" }
         }
       },
       "AbsensiMatriksSesiStrong": {

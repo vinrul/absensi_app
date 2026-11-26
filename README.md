@@ -328,8 +328,9 @@ Catatan penting:
 - **Alur absensi Android**: satu tab **Absensi** dengan wizard **pilih status → ambil GPS/radius →
   ambil foto → kirim**. Status tersedia: Dinas Kantor, Dinas Luar, PH/Strong Point, Piket/Shift,
   Operasi/Pam, Cuti, Izin, dan Sakit. Bila masih ada check-in terbuka, scan berikutnya otomatis
-  menjadi check-out tanpa memilih status. Tab **Strong** dihapus; jadwal strong point tampil di
-  Beranda dan diproses lewat tab Absensi.
+  menjadi check-out tanpa memilih status. **Dinas Luar wajib check-out**; piket/operasi yang
+  check-out pada hari berikutnya menandai hari itu sebagai **lepas dinas**. Tab **Strong** dihapus;
+  jadwal strong point tampil di Beranda dan diproses lewat tab Absensi.
 - **Wizard izin**: penjelasan lokasi, kamera, notifikasi, WorkManager, dan penyimpanan sebelum login. 
 - **Kebijakan fake GPS**: Android mendeteksi `Location.isMock`/`isFromMockProvider`, menampilkan
   peringatan bila Developer Options atau aplikasi mock dipilih, lalu mengirim `is_mock_suspect`.

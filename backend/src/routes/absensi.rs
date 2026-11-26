@@ -920,6 +920,8 @@ pub struct MatriksHariDto {
     pub tidak_absen: bool,
     /// Check-in tanpa check-out pada tanggal yang sudah lewat.
     pub tc: bool,
+    /// Hari setelah shift piket/operasi yang diakhiri check-out (lepas dinas).
+    pub lepas_dinas: bool,
 }
 
 impl MatriksHariDto {
@@ -948,6 +950,7 @@ impl MatriksHariDto {
             foto_pulang_url: None,
             tidak_absen: true,
             tc: false,
+            lepas_dinas: false,
         }
     }
 }
@@ -1036,6 +1039,8 @@ async fn muat_data_matriks(
     let satker_rows = satker::list_by_ids(&state.pool, &scope).await?;
     let libur_rows = libur::list(&state.pool, dari, sampai, &scope).await?;
     let jadwal_rows = ph::jadwal_matriks(&state.pool, &scope, dari, sampai, personel_id).await?;
+    let lepas_dinas_rows =
+        absensi::lepas_dinas_matriks(&state.pool, &scope, dari, sampai, personel_id).await?;
     let (absensi_rows, _) = absensi::list_harian(
         &state.pool,
         &ListHarianFilter {
@@ -1105,6 +1110,7 @@ async fn muat_data_matriks(
                 .map(|key| format!("/api/v1/files/{key}")),
             tidak_absen: false,
             tc: false,
+            lepas_dinas: false,
         };
         hari_per_personel
             .entry(row.personel_id)
@@ -1190,14 +1196,38 @@ async fn muat_data_matriks(
         }
     }
 
+    // Tandai hari setelah shift piket/operasi yang sudah check-out sebagai
+    // "lepas dinas". Hari tersebut dihitung hadir, bukan tidak absen.
+    if !lepas_dinas_rows.is_empty() {
+        let mut peta: HashMap<Uuid, Vec<NaiveDate>> = HashMap::new();
+        for row in lepas_dinas_rows {
+            peta.entry(row.personel_id).or_default().push(row.tanggal);
+        }
+        for orang in &mut data {
+            let Some(daftar) = peta.get(&orang.personel_id) else {
+                continue;
+            };
+            for tanggal in daftar {
+                let hari = orang
+                    .hari
+                    .entry(*tanggal)
+                    .or_insert_with(MatriksHariDto::tanpa_absensi);
+                hari.lepas_dinas = true;
+                hari.tidak_absen = false;
+            }
+        }
+    }
+
     // Tandai TC: check-in tanpa check-out yang sudah lewat hari. Hari ini belum
     // dianggap TC karena check-out masih dapat dilakukan sampai pukul 23.59.
     // Piket/Operasi memakai toleransi 25 jam karena shift dapat lintas hari.
     let sekarang = waktu::sekarang_wita().naive_local();
     for orang in &mut data {
         for (tanggal, hari) in &mut orang.hari {
-            let ada_absensi =
-                hari.status.is_some() || hari.masuk_jam.is_some() || hari.pulang_jam.is_some();
+            let ada_absensi = hari.lepas_dinas
+                || hari.status.is_some()
+                || hari.masuk_jam.is_some()
+                || hari.pulang_jam.is_some();
             if !ada_absensi {
                 // Sel yang hanya berisi jadwal strong point: TA hanya untuk tanggal
                 // yang sudah berjalan, bukan jadwal mendatang.
@@ -1208,6 +1238,7 @@ async fn muat_data_matriks(
                 status,
                 Some(
                     StatusKehadiran::DinasKantor
+                        | StatusKehadiran::DinasLuar
                         | StatusKehadiran::Ph
                         | StatusKehadiran::Piket
                         | StatusKehadiran::Operasi
@@ -1299,7 +1330,7 @@ fn jam_matriks_pdf(hari: &MatriksHariDto) -> String {
     }
 }
 
-const LEGENDA_MATRIKS_PDF: &str = r#"<div class="legenda"><b>DK</b> Dinas Kantor · <b>DL</b> Dinas Luar · <b>PH</b> Strong Point · <b>Piket</b> Piket/Shift · <b>Ops</b> Operasi/Pam · <b>Cuti</b> · <b>Izin</b> · <b>Sakit</b> · <b>TK</b> Tanpa Keterangan · <b>TA</b> tidak absen · <b>TC</b> check-in tanpa check-out · <b>TM</b> check-out tanpa check-in · <b>T</b> telat · <b>PC</b> pulang cepat</div>"#;
+const LEGENDA_MATRIKS_PDF: &str = r#"<div class="legenda"><b>DK</b> Dinas Kantor · <b>DL</b> Dinas Luar · <b>PH</b> Strong Point · <b>LD</b> Lepas dinas · <b>Piket</b> Piket/Shift · <b>Ops</b> Operasi/Pam · <b>Cuti</b> · <b>Izin</b> · <b>Sakit</b> · <b>TK</b> Tanpa Keterangan · <b>TA</b> tidak absen · <b>TC</b> check-in tanpa check-out · <b>TM</b> check-out tanpa check-in · <b>T</b> telat · <b>PC</b> pulang cepat</div>"#;
 
 const CSS_MATRIKS_PDF: &str = r#"
 @page { size: A4 landscape; margin: 8mm 8mm 10mm; }
@@ -1416,6 +1447,11 @@ fn html_matriks(
                         if hari.tc {
                             isi.push_str("<span class=\"status s-tc\">TC</span>");
                         }
+                        if hari.lepas_dinas {
+                            isi.push_str(
+                                "<span class=\"status s-hadir\">LD</span><span class=\"jam\">lepas dinas</span>",
+                            );
+                        }
                         if hari.masuk_jam.is_none() && hari.pulang_jam.is_some() {
                             isi.push_str("<span class=\"status s-tc\">TM</span>");
                         }
@@ -1425,7 +1461,7 @@ fn html_matriks(
                             );
                         }
                         if hari.sesi_strong.is_empty() {
-                            if !hari.tidak_absen {
+                            if !hari.tidak_absen && !hari.lepas_dinas {
                                 isi.push_str(&format!(
                                     "<span class=\"jam\">{}</span>",
                                     laporan::esc(&jam_matriks_pdf(hari))
@@ -1634,12 +1670,38 @@ pub async fn rekap_absensi(
     )
     .await?;
 
-    let rows = absensi::rekap(&state.pool, &scope, dari, sampai).await?;
+    let mut rows = absensi::rekap(&state.pool, &scope, dari, sampai).await?;
+    tambahkan_lepas_dinas(&state, &scope, dari, sampai, &mut rows).await?;
 
     Ok(Json(serde_json::json!({
         "rentang": { "dari": dari, "sampai": sampai },
         "data": rows,
     })))
+}
+
+/// Hari "lepas dinas" tidak memiliki baris absensi tersendiri, tetapi tetap
+/// dihitung sebagai hari hadir pada rekap.
+async fn tambahkan_lepas_dinas(
+    state: &AppState,
+    scope: &[Uuid],
+    dari: NaiveDate,
+    sampai: NaiveDate,
+    rows: &mut [absensi::RekapRow],
+) -> AppResult<()> {
+    let lepas = absensi::lepas_dinas_matriks(&state.pool, scope, dari, sampai, None).await?;
+    if lepas.is_empty() {
+        return Ok(());
+    }
+    let mut hitung: HashMap<Uuid, i64> = HashMap::new();
+    for row in lepas {
+        *hitung.entry(row.personel_id).or_default() += 1;
+    }
+    for row in rows.iter_mut() {
+        if let Some(jumlah) = hitung.get(&row.personel_id) {
+            row.hadir += jumlah;
+        }
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------- ekspor PDF
@@ -1856,7 +1918,8 @@ pub async fn ekspor_rekap_pdf(
     )
     .await?;
 
-    let rows = absensi::rekap(&state.pool, &scope, dari, sampai).await?;
+    let mut rows = absensi::rekap(&state.pool, &scope, dari, sampai).await?;
+    tambahkan_lepas_dinas(&state, &scope, dari, sampai, &mut rows).await?;
 
     let nama_satker = nama_satker_terpilih(&state, query.satker_id).await?;
     let dicetak_oleh = nama_pencetak(&state, &user).await?;

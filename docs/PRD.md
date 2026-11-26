@@ -138,6 +138,11 @@ miliknya pada daftar absensi/penilaian dan tidak dapat mengakses dashboard pimpi
   dengan `perlu_verifikasi=true`, `reject` menolak dengan HTTP 422. Default development `flag`,
   produksi disarankan `reject`.
 - `client_uuid` menjamin idempotensi pengiriman ulang antrean offline.
+- **Dinas Luar wajib check-in dan check-out.** Scan kedua pada hari yang sama menjadi
+  check-out; setelah check-out, status hari tersebut selesai.
+- **Piket/Operasi lintas hari:** check-out pada hari berikutnya (mis. shift 25 Nov 20:00 s.d.
+  26 Nov 08:00) menandai tanggal check-out sebagai **lepas dinas**. Hari itu dihitung hadir;
+  bila check-out tidak dilakukan, hari berikutnya dihitung tidak absen (TA).
 - Satu absen masuk dan satu absen pulang per personel per hari.
 - Foto bukti absensi yang diunggah dari Android dapat dilihat di dashboard: galeri pada rekap
   absensi dan tombol Masuk/Pulang pada detail per orang. Berkas hanya dapat diakses pemilik atau

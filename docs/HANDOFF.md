@@ -213,9 +213,13 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     - **Absensi harian memakai state machine check-in/check-out.** `POST /absensi` menentukan
       `checkin`/`checkout` dari catatan terbuka, bukan dari field `jenis` klien. Dinas Kantor
       dibuka `jam_masuk − 30 menit` s.d. `jam_pulang`; Piket/Shift dan Operasi/Pam dicatat per
-      siklus tanpa jadwal (check-out otomatis bila selisih ≤ 24 jam + 1 jam); Dinas Luar/Cuti/Izin/
-      Sakit hanya check-in sekali per hari. `GET /absensi/konteks` memberi tahu aksi dan sesi strong
-      point yang aktif.
+      siklus tanpa jadwal (check-out otomatis bila selisih ≤ 24 jam + 1 jam); **Dinas Luar wajib
+      check-in dan check-out**; Cuti/Izin/Sakit hanya check-in sekali per hari. `GET /absensi/konteks`
+      memberi tahu aksi dan sesi strong point yang aktif.
+    - **Lepas dinas piket/operasi lintas hari.** Check-out pada hari berikutnya (mis. shift
+      25 Nov 20:00–26 Nov 08:00) menandai tanggal check-out dengan `lepas_dinas=true`; hari itu
+      dihitung hadir (bukan TA) dan tampil **LD/Lepas dinas** di matriks, Rekap Harian, dan PDF.
+      Tanpa check-out, hari berikutnya tetap TA.
     - **Hari strong point menggantikan Dinas Kantor.** Bila ada jadwal strong point, Dinas Kantor
       ditolak; check-in/check-out strong point dicerminkan ke `absensi` berstatus `ph` sehingga
       hadir, telat, dan pulang cepat ikut rekap kehadiran. Jika sesi baru sudah dibuka sedangkan
@@ -319,16 +323,18 @@ mengirim `client=personel_web` dan menyegarkan sesi lewat cookie httpOnly.
     tidak ditandai. Badge status dan penanda ditampilkan terpisah (mis. **DK TC**), sehingga
     status DK/PH tetap terbaca meski check-out belum ada. TC hanya aktif setelah tanggal
     berganti (toleransi check-out sampai 23.59; Piket/Operasi 25 jam), jadi pada hari
-    berjalan check-in tanpa check-out hanya menampilkan status + jam masuk.
+    berjalan check-in tanpa check-out hanya menampilkan status + jam masuk. Hari setelah
+    shift piket/operasi yang diakhiri check-out ditandai `lepas_dinas` (LD) dan tidak dihitung
+    TA; tanpa check-out hari tersebut tetap TA.
     Jadwal strong point dimuat per sesi (`sesi_strong`): pagi/sore, jam jadwal, realisasi
     check-in/check-out, telat/pulang cepat, serta flag TC/TA per sesi. Jika ada jadwal tetapi
     tidak ada absensi, sel menampilkan PH + TA; jika statusnya Izin/Sakit/Dinas Luar/Cuti,
     status tersebut tetap tampil bersama penanda Jadwal PH.
 33. **Rekap Harian memakai ulang matriks satu hari.** Tab **Rekap Harian** memanggil
     `GET /absensi/matriks?dari=<tanggal>&sampai=<tanggal>` (bukan endpoint baru), lalu
-    menghitung kartu di klien: Tidak Absen (`tidak_absen`), Jadwal PH (`jadwal_strong` dengan
-    rincian Sudah PH dari `ph_absen` dan Belum PH), serta status DK/DL/Piket/Operasi/Cuti/Izin/
-    Sakit dari `statusEfektif`. Sub-tab **Peta** memakai data matriks yang sama (koordinat
+    menghitung kartu di klien: Tidak Absen (`tidak_absen`), **Lepas Dinas** (`lepas_dinas`),
+    Jadwal PH (`jadwal_strong` dengan rincian Sudah PH dari `ph_absen` dan Belum PH), serta status
+    DK/DL/Piket/Operasi/Cuti/Izin/Sakit dari `statusEfektif`. Sub-tab **Peta** memakai data matriks yang sama (koordinat
     check-in), ditambah `GET /titik-dinas` dan `GET /ph/strong-point` dengan filter `satker_id`;
     hanya titik aktif yang digambar, radius memakai `radius_m`, marker personel diwarnai per
     status, dan basemap dapat diganti Jalan/Satelit. Kartu dapat diklik untuk modal daftar

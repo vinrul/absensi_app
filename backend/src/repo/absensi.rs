@@ -204,7 +204,7 @@ pub async fn catatan_terbuka(
          WHERE m.personel_id = $1
            AND m.tanggal >= $2
            AND m.jenis = 'masuk'
-           AND m.status_kehadiran IN ('dinas_kantor', 'piket', 'operasi')
+           AND m.status_kehadiran IN ('dinas_kantor', 'dinas_luar', 'piket', 'operasi')
            AND NOT EXISTS (
                SELECT 1 FROM absensi p
                 WHERE p.personel_id = m.personel_id
@@ -388,6 +388,14 @@ pub struct AbsensiHarianRow {
     pub foto_pulang_path: Option<String>,
 }
 
+/// Satu hari yang dihitung "lepas dinas" karena piket/operasi check-out
+/// pada hari berikutnya setelah shift malam.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct LepasDinasRow {
+    pub personel_id: Uuid,
+    pub tanggal: NaiveDate,
+}
+
 pub struct ListHarianFilter {
     pub satker_ids: Vec<Uuid>,
     pub personel_id: Option<Uuid>,
@@ -555,6 +563,39 @@ pub async fn list_harian(
         .await?;
 
     Ok((rows, total))
+}
+
+/// Tanggal-tanggal yang dihitung "lepas dinas": check-out piket/operasi yang
+/// terjadi pada hari setelah check-in (shift lintas hari).
+pub async fn lepas_dinas_matriks(
+    pool: &PgPool,
+    satker_ids: &[Uuid],
+    dari: NaiveDate,
+    sampai: NaiveDate,
+    personel_id: Option<Uuid>,
+) -> AppResult<Vec<LepasDinasRow>> {
+    const SQL: &str = r#"
+        SELECT p.personel_id,
+               (p.captured_at AT TIME ZONE 'Asia/Makassar')::date AS tanggal
+          FROM absensi p
+          JOIN absensi m ON m.id = p.grup_id AND m.jenis = 'masuk'
+         WHERE p.jenis = 'pulang'
+           AND m.status_kehadiran IN ('piket', 'operasi')
+           AND p.status_kehadiran IN ('piket', 'operasi')
+           AND p.satker_id = ANY($1::uuid[])
+           AND ($2::uuid IS NULL OR p.personel_id = $2)
+           AND (p.captured_at AT TIME ZONE 'Asia/Makassar')::date
+               BETWEEN greatest($3::date, m.tanggal + 1) AND $4
+         GROUP BY 1, 2
+         ORDER BY 2, 1
+    "#;
+    Ok(sqlx::query_as::<_, LepasDinasRow>(SQL)
+        .bind(satker_ids)
+        .bind(personel_id)
+        .bind(dari)
+        .bind(sampai)
+        .fetch_all(pool)
+        .await?)
 }
 
 // --------------------------------------------------------------- rekap & verif

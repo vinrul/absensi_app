@@ -121,6 +121,8 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 3.67 | Tab Rekap Harian ringkas | ✅ | Menu sidebar **Rekap Harian**; filter tanggal (default hari ini) + satker; sub-tab **Ringkasan** berisi kartu Tidak Absen, Jadwal PH (rincian Sudah/Belum PH), DK, DL, Piket, Operasi, Cuti, Izin, Sakit; sub-tab **Peta** menampilkan marker check-in berwarna status, titik dinas + radius, strong point + radius, basemap Jalan/Satelit, legenda, dan popup; klik kartu membuka modal daftar personel + tombol Detail |
 | 3.68 | Combobox ber-pencarian pada filter & anggota Strong Point | ✅ | Rekap Kehadiran/Harian/Verifikasi/Detail: combobox satker + personel; Jadwal/Rekap Strong Point: combobox satker; modal Jadwal & Penempatan: combobox satker + pencarian nama/NRP; Titik Strong Point: combobox pemilik titik |
 | 3.69 | Kartu ringkasan Rekap Kehadiran | ✅ | Sepuluh kartu total periode (hadir, telat + menit, dinas luar, piket, cuti, izin, sakit, libur nasional, tanpa keterangan, menunggu verifikasi) tampil di atas mode **Matriks** dan **Ringkasan**; angka mengikuti filter satker/personel; klik kartu membuka modal rincian per personel |
+| 3.70 | Dinas Luar wajib check-out | ✅ | `butuh_checkout` mencakup Dinas Luar; `catatan_terbuka` mencari catatan `dinas_luar`; scan kedua menjadi **check-out**, scan ketiga 409 |
+| 3.71 | Lepas dinas piket/operasi lintas hari | ✅ | Check-out piket/operasi pada hari berikutnya menandai tanggal check-out `lepas_dinas=true`; matriks menampilkan **LD**, Rekap Harian memiliki kartu **Lepas Dinas**, dan total hadir bertambah; tanpa check-out hari berikutnya TA |
 
 ## 4. Modul Strong Point v2 (terpisah dari absensi harian)
 
@@ -152,8 +154,8 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 4.24 | Fallback & pengingat jadwal bulanan | ✅ | Bulan berjalan tanpa jadwal otomatis memakai bulan terakhir yang tersedia (`disalin_dari_bulan`); `GET /ph/jadwal/status` memberi peringatan susun bulan depan |
 | 4.25 | Daftar penempatan & ubah titik | ✅ | Tabel anggota + satker + titik; tombol **Ubah/Tempatkan** membuka modal satker/titik/anggota tanpa pilihan level |
 | 4.26 | Absensi harian check-in/out otomatis | ✅ | `POST /absensi` menentukan `checkin`/`checkout` dari catatan terbuka; `GET /absensi/konteks` menyediakan aksi, status terkunci, jendela kantor, dan sesi strong point |
-| 4.27 | Jendela waktu & radius | ✅ | Dinas Kantor dibuka `jam_masuk − 30 menit` s.d. `jam_pulang`; Piket/Operasi tanpa jadwal; Dinas Luar/Cuti/Izin/Sakit sekali/hari tanpa check-out |
-| 4.28 | Piket/Operasi lintas hari | ✅ | Check-out otomatis bila selisih ≤ 24 jam + 1 jam; lewat itu siklus lama ditutup dan scan baru menjadi check-in; telat tidak dihitung |
+| 4.27 | Jendela waktu & radius | ✅ | Dinas Kantor dibuka `jam_masuk − 30 menit` s.d. `jam_pulang`; Piket/Operasi tanpa jadwal; **Dinas Luar wajib check-in dan check-out**; Cuti/Izin/Sakit sekali/hari tanpa check-out |
+| 4.28 | Piket/Operasi lintas hari | ✅ | Check-out otomatis bila selisih ≤ 24 jam + 1 jam; lewat itu siklus lama ditutup dan scan baru menjadi check-in; telat tidak dihitung; check-out pada hari berikutnya menandai hari itu **lepas dinas** |
 | 4.29 | Strong point menggantikan absensi kantor | ✅ | Dinas Kantor ditolak bila ada jadwal; absensi PH dicerminkan ke `absensi` status `ph` sehingga hadir/telat/pulang cepat masuk rekap kehadiran |
 | 4.30 | Android satu tab Absensi | ✅ | Tab Strong dihapus; wizard status → GPS → foto → kirim; check-out berikutnya tidak memilih status |
 | 4.31 | Riwayat absensi Android per tanggal | ✅ | `riwayatHarian()` menggabungkan absensi + jadwal/absensi PH: satu baris per tanggal, status berpasangan dengan check-in/check-out, sesi strong point pagi/sore beserta realisasi; rentang mengikuti tanggal server (mendukung fake time) |
@@ -285,6 +287,8 @@ nilai di [`penilaian.md`](penilaian.md), dan skenario uji di [`UAT.md`](UAT.md).
 | 9.41 | Emulator Pixel Fold API 36 | ✅ | Boot ~40 detik dengan `-gpu host -cores 4 -memory 4096`; APK debug terpasang, wizard izin menampilkan "Selamat datang di SIAP Bali", login tampil; launch tanpa dialog izin 1,8 detik |
 | 9.42 | Daftar Personel Strong Point Hari Ini | ✅ | Chrome headless 25 Nov: 3 personel × 2 sesi = 6 baris (Pagi 07:00–09:00, Sore 16:00–18:00); kolom personel, sesi/jam, titik/regu, check-in/out, telat, pulang cepat, badge TA; klik nama I Ketut Wijaya membuka `?tab=rekap&personel_id=...` |
 | 9.43 | Format telat jam:menit | ✅ | Uji lokal dengan `menit_telat=90`: daftar menampilkan **1:30**, kartu total telat menampilkan **6:45**; nilai ≤60 menit tetap `45 mnt`; data uji dikembalikan setelah verifikasi |
+| 9.44 | Dinas Luar check-in & check-out | ✅ | API produksi lokal: check-in `dinas_luar` → 200 `checkin`, scan kedua → 200 `checkout`, scan ketiga → 409; deskripsi Android menjadi "Wajib check-in dan check-out" |
+| 9.45 | Lepas dinas piket lintas hari | ✅ | Simulasi 25 Nov 20:00 check-in piket, 26 Nov 08:00 check-out: matriks 26 Nov `lepas_dinas=true`, `tidak_absen=false`, `tc=false`; Rekap Harian menampilkan kartu **Lepas Dinas = 1** dan nama I Gede Wijaya; rekap hadir 2 hari (25 piket + 26 lepas dinas) |
 
 ## 10. Publikasi Google Play
 

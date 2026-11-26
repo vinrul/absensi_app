@@ -290,6 +290,7 @@
 	        const status = statusEfektif(hari);
 	        const bagian = [orang.nama, tanggalSingkat(tanggal)];
 	        if (hari.tidak_absen) bagian.push('Tidak absen');
+	        if (hari.lepas_dinas) bagian.push('lepas dinas');
 	        if (status) bagian.push(LABEL_STATUS_KEHADIRAN[status]);
 	        if (hari.jadwal_strong && status !== 'ph') bagian.push('ada jadwal strong point');
 	        if (hari.tc) bagian.push('check-in tanpa check-out');
@@ -304,7 +305,7 @@
 	                if (sesi.tidak_absen) teks += ' TA';
 	                bagian.push(teks);
 	            }
-	        } else if (!hari.tidak_absen) {
+	        } else if (!hari.tidak_absen && !hari.lepas_dinas) {
 	            bagian.push(waktuMatriks(hari));
 	        }
 	        if (hari.menit_telat > 0) bagian.push(`telat ${hari.menit_telat} menit`);
@@ -351,6 +352,7 @@
 	        const data = matriksHarian?.data ?? [];
 	        const tanggal = filter.harian.tanggal;
 	        const tidakAbsen: AbsensiMatriksPersonel[] = [];
+	        const lepasDinas: AbsensiMatriksPersonel[] = [];
 	        const jadwalPh: AbsensiMatriksPersonel[] = [];
 	        const sudahPh: AbsensiMatriksPersonel[] = [];
 	        const perStatus = new Map<StatusKehadiran, AbsensiMatriksPersonel[]>();
@@ -359,6 +361,7 @@
 	            const hari = orang.hari[tanggal];
 	            if (!hari) continue;
 	            if (hari.tidak_absen) tidakAbsen.push(orang);
+	            if (hari.lepas_dinas) lepasDinas.push(orang);
 	            if (hari.jadwal_strong) jadwalPh.push(orang);
 	            if (hari.ph_absen) sudahPh.push(orang);
 	            const status = statusEfektif(hari);
@@ -382,6 +385,13 @@
 	                keterangan: 'Hari kerja tanpa catatan absensi',
 	                tone: 'red',
 	                orang: urut(tidakAbsen)
+	            },
+	            {
+	                id: 'lepas_dinas',
+	                label: 'Lepas Dinas',
+	                keterangan: 'Selesai piket lintas hari',
+	                tone: 'green',
+	                orang: urut(lepasDinas)
 	            },
 	            {
 	                id: 'jadwal_ph',
@@ -1471,6 +1481,14 @@
 															TC
 														</span>
 													{/if}
+													{#if hari.lepas_dinas}
+														<span
+															class="inline-flex rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200"
+															title="Lepas dinas setelah piket lintas hari"
+														>
+															LD
+														</span>
+													{/if}
 													{#if hari.masuk_jam === null && hari.pulang_jam}
 														<span
 															class="inline-flex rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200"
@@ -1516,7 +1534,7 @@
 																>{/if}
 														</span>
 													{/each}
-												{:else if !hari.tidak_absen}
+												{:else if !hari.tidak_absen && !hari.lepas_dinas}
 													<span
 														class="mt-0.5 block font-mono text-[10px] leading-tight text-slate-700"
 														>{waktuMatriks(hari)}</span
@@ -1526,6 +1544,12 @@
 													<span
 														class="block text-[9px] font-medium leading-tight text-rose-600"
 														>tanpa check-out</span
+													>
+												{/if}
+												{#if hari.lepas_dinas}
+													<span
+														class="block text-[9px] font-medium leading-tight text-emerald-700"
+														>Lepas dinas</span
 													>
 												{/if}
 												{#if hari.sesi_strong.length === 0 && menitMatriks(hari)}
@@ -2085,6 +2109,7 @@
 						<Badge tone={nadaStatus(status)}>{LABEL_STATUS_KEHADIRAN[status]}</Badge>
 					{/if}
 					{#if hari.tidak_absen}<Badge tone="slate">Tidak absen</Badge>{/if}
+					{#if hari.lepas_dinas}<Badge tone="green">Lepas dinas</Badge>{/if}
 					{#if hari.tc}<Badge tone="red">TC · tanpa check-out</Badge>{/if}
 					{#if hari.masuk_jam === null && hari.pulang_jam}
 						<Badge tone="red">TM · tanpa check-in</Badge>
@@ -2271,6 +2296,7 @@
 										<Badge tone={nadaStatus(status)}>{LABEL_STATUS_KEHADIRAN[status]}</Badge>
 									{/if}
 									{#if hari?.tidak_absen}<Badge tone="slate">TA</Badge>{/if}
+									{#if hari?.lepas_dinas}<Badge tone="green">Lepas Dinas</Badge>{/if}
 									{#if hari?.tc}<Badge tone="red">TC</Badge>{/if}
 									{#if hari?.jadwal_strong && status !== 'ph'}
 										<Badge tone="blue">Jadwal PH</Badge>
@@ -2291,7 +2317,7 @@
 												{/if}
 											</p>
 										{/each}
-									{:else if !hari.tidak_absen}
+									{:else if !hari.tidak_absen && !hari.lepas_dinas}
 										<p class="font-mono">{waktuMatriks(hari)}</p>
 									{/if}
 									{#if hari.tidak_absen}

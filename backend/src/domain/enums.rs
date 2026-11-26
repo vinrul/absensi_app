@@ -179,11 +179,12 @@ impl StatusKehadiran {
     pub fn butuh_checkout(&self) -> bool {
         matches!(
             self,
-            Self::DinasKantor | Self::Piket | Self::Operasi | Self::Ph
+            Self::DinasKantor | Self::DinasLuar | Self::Piket | Self::Operasi | Self::Ph
         )
     }
 
-    /// Status yang hanya dicatat sekali per hari (tanpa check-out).
+    /// Status yang tidak boleh dicatat dua kali pada hari yang sama. Dinas luar
+    /// tetap satu status per hari meskipun sekarang wajib check-out.
     pub fn sekali_sehari(&self) -> bool {
         matches!(
             self,
@@ -343,6 +344,12 @@ pg_enum!(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dinas_luar_wajib_checkout_dan_tetap_sekali_sehari() {
+        assert!(StatusKehadiran::DinasLuar.butuh_checkout());
+        assert!(StatusKehadiran::DinasLuar.sekali_sehari());
+    }
 
     #[test]
     fn audit_hanya_untuk_admin_sistem_dan_admin_polda() {

@@ -206,6 +206,8 @@ export interface AbsensiMatriksHari {
 	tidak_absen: boolean;
 	/** Check-in tanpa check-out pada tanggal yang sudah lewat. */
 	tc: boolean;
+	/** Hari setelah shift piket/operasi yang diakhiri check-out (lepas dinas). */
+	lepas_dinas: boolean;
 }
 
 export interface AbsensiMatriksPersonel {

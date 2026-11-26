@@ -89,7 +89,7 @@ private data class OpsiStatus(
 
 private val STATUS_KEHADIRAN = listOf(
     OpsiStatus("dinas_kantor", "Dinas Kantor", Icons.Filled.Home, "Wajib di dalam radius kantor"),
-    OpsiStatus("dinas_luar", "Dinas Luar", Icons.Filled.Place, "Catat lokasi, cukup check-in"),
+    OpsiStatus("dinas_luar", "Dinas Luar", Icons.Filled.Place, "Wajib check-in dan check-out"),
     OpsiStatus("ph", "PH / Strong Point", Icons.Filled.Person, "Sesuai jadwal strong point"),
     OpsiStatus("piket", "Piket / Shift", Icons.Filled.Lock, "Wajib check-in dan check-out"),
     OpsiStatus("operasi", "Operasi / Pam", Icons.Filled.Warning, "Boleh di luar radius kantor"),
